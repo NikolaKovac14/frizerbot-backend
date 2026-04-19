@@ -167,6 +167,12 @@ app.put('/salons/:id', async (req, res) => {
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function buildSystemPrompt(salon, busySlots) {
+  // Današnji datum v Ljubljana časovnem pasu
+  const today = new Date().toLocaleDateString('sl-SI', {
+    timeZone: 'Europe/Ljubljana',
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
+
   // Izračunaj proste termine (vsi HOURS minus zasedeni)
   const busyByDate = {};
   busySlots.forEach(s => {
@@ -175,10 +181,10 @@ function buildSystemPrompt(salon, busySlots) {
     busyByDate[d].add(s.time);
   });
 
-  // Naslednji 7 dni
+  // Naslednji 7 dni (v Ljubljana časovnem pasu)
   const days = [];
   for (let i = 0; i < 7; i++) {
-    const d = new Date();
+    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
     d.setDate(d.getDate() + i);
     const dateStr = d.toISOString().split('T')[0];
     const dayName = d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'numeric' });
@@ -194,6 +200,7 @@ function buildSystemPrompt(salon, busySlots) {
     : 'Vsi termini naslednji teden so prosti (08:00-19:00).';
 
   return 'Si AI asistent za frizerski salon ' + salon.name + '. Odgovarjas VEDNO in SAMO v slovenscini.\n' +
+    'Danasnji datum je: ' + today + ' (Ljubljana, Slovenija)\n' +
     'NIKOLI ne uporabi markdown formatiranja (**bold**, *italic*) - pisi navadno besedilo.\n' +
     'Si prijazen, profesionalen in jedrnat (max 2-3 stavki razen pri rezervacijah).\n\n' +
     'INFORMACIJE O SALONU:\n' +
