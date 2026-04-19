@@ -157,16 +157,17 @@ app.put('/salons/:id', async (req, res) => {
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function buildSystemPrompt(salon, freeSlots) {
-  let slotsText = 'Trenutno ni vpisanih prostih terminov.';
-  if (freeSlots && freeSlots.length > 0) {
+  let slotsText = 'Vsi termini so prosti (08:00-19:00), razen če je označeno drugače.';
+    if (freeSlots && freeSlots.length > 0) {
     const grouped = {};
     freeSlots.forEach(s => {
-      const d = new Date(s.date).toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'numeric' });
-      if (!grouped[d]) grouped[d] = [];
-      grouped[d].push(s.time);
+        const d = new Date(s.date).toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'numeric' });
+        if (!grouped[d]) grouped[d] = [];
+        grouped[d].push(s.time);
     });
-    slotsText = Object.entries(grouped).map(([d, times]) => d + ': ' + times.join(', ')).join('\n');
-  }
+    slotsText = 'Prosti termini:\n' + Object.entries(grouped).map(([d, times]) => d + ': ' + times.join(', ')).join('\n');
+    slotsText += '\nDrugi termini so po dogovoru - pokliči salon.';
+    }
 
   return 'Si AI asistent za frizerski salon ' + salon.name + '. Odgovarjas VEDNO in SAMO v slovenscini.\n' +
     'NIKOLI ne uporabi cirilice ali kateregakoli drugega pisma.\n' +
