@@ -406,23 +406,7 @@ function buildChatPage(salon) {
         const data = await res.json();
         removeTyping();
         addBotMsg(data.reply, data.bookingDetected);
-        if (data.bookingDetected) {
-        messages.push({ 
-            role: 'assistant', 
-            content: data.reply 
-        });
-        // Dodaj sistemsko opombo da je ta termin rezerviran za to stranko
-        messages.push({ 
-            role: 'user', 
-            content: '[SISTEM: Termin ' + data.bookingDetected.date + ' ob ' + data.bookingDetected.time + ' je uspešno rezerviran za ' + data.bookingDetected.customerName + '. To je njena/njegova rezervacija.]' 
-        });
-        messages.push({
-            role: 'assistant',
-            content: 'Razumem, termin je potrjen in vpisan.'
-        });
-        } else {
         messages.push({ role: 'assistant', content: data.reply });
-        }
       } catch(e) {
         removeTyping();
         addBotMsg('Oprostite, prislo je do napake. Poklisite nas: ${salon.phone}');
