@@ -19,6 +19,8 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+const HOURS = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00'];
+
 async function initDB() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS salons (
@@ -41,7 +43,7 @@ async function initDB() {
       salon_id TEXT REFERENCES salons(id),
       date DATE NOT NULL,
       time TEXT NOT NULL,
-      status TEXT DEFAULT 'free',
+      status TEXT DEFAULT 'busy',
       customer_name TEXT,
       service TEXT,
       created_at TIMESTAMP DEFAULT NOW(),
@@ -91,12 +93,20 @@ app.get('/admin/:id/timeslots', async (req, res) => {
 
 app.post('/admin/:id/timeslots', async (req, res) => {
   const { date, time, status, customerName, service } = req.body;
-  await pool.query(`
-    INSERT INTO timeslots (salon_id, date, time, status, customer_name, service)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    ON CONFLICT (salon_id, date, time) DO UPDATE
-    SET status = $4, customer_name = $5, service = $6
-  `, [req.params.id, date, time, status, customerName, service]);
+  if (status === 'busy') {
+    await pool.query(`
+      INSERT INTO timeslots (salon_id, date, time, status, customer_name, service)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (salon_id, date, time) DO UPDATE
+      SET status = $4, customer_name = $5, service = $6
+    `, [req.params.id, date, time, status, customerName, service]);
+  } else {
+    // Če postavimo nazaj na prost - izbrišemo iz DB
+    await pool.query(
+      'DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3',
+      [req.params.id, date, time]
+    );
+  }
   res.json({ success: true });
 });
 
@@ -107,11 +117,11 @@ app.post('/chat', async (req, res) => {
   const salon = rows[0];
   if (!salon) return res.status(404).json({ error: 'Salon not found' });
 
-  // Pridobi proste termine za naslednje 7 dni
+  // Pridobi ZASEDENE termine za naslednje 7 dni
   const today = new Date();
   const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const { rows: slots } = await pool.query(
-    "SELECT date, time FROM timeslots WHERE salon_id = $1 AND date >= $2 AND date <= $3 AND status = 'free' ORDER BY date, time",
+  const { rows: busySlots } = await pool.query(
+    "SELECT date, time FROM timeslots WHERE salon_id = $1 AND date >= $2 AND date <= $3 AND status = 'busy' ORDER BY date, time",
     [salonId, today.toISOString().split('T')[0], nextWeek.toISOString().split('T')[0]]
   );
 
@@ -119,7 +129,7 @@ app.post('/chat', async (req, res) => {
     const data = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
-      system: buildSystemPrompt(salon, slots),
+      system: buildSystemPrompt(salon, busySlots),
       messages: messages
     });
     const reply = data.content[0].text;
@@ -156,21 +166,34 @@ app.put('/salons/:id', async (req, res) => {
 });
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-function buildSystemPrompt(salon, freeSlots) {
-  let slotsText = 'Vsi termini so prosti (08:00-19:00), razen če je označeno drugače.';
-    if (freeSlots && freeSlots.length > 0) {
-    const grouped = {};
-    freeSlots.forEach(s => {
-        const d = new Date(s.date).toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'numeric' });
-        if (!grouped[d]) grouped[d] = [];
-        grouped[d].push(s.time);
-    });
-    slotsText = 'Prosti termini:\n' + Object.entries(grouped).map(([d, times]) => d + ': ' + times.join(', ')).join('\n');
-    slotsText += '\nDrugi termini so po dogovoru - pokliči salon.';
+function buildSystemPrompt(salon, busySlots) {
+  // Izračunaj proste termine (vsi HOURS minus zasedeni)
+  const busyByDate = {};
+  busySlots.forEach(s => {
+    const d = new Date(s.date).toISOString().split('T')[0];
+    if (!busyByDate[d]) busyByDate[d] = new Set();
+    busyByDate[d].add(s.time);
+  });
+
+  // Naslednji 7 dni
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const dateStr = d.toISOString().split('T')[0];
+    const dayName = d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'numeric' });
+    const busy = busyByDate[dateStr] || new Set();
+    const free = HOURS.filter(h => !busy.has(h));
+    if (free.length > 0) {
+      days.push(dayName + ': ' + free.join(', '));
     }
+  }
+
+  const slotsText = days.length > 0
+    ? days.join('\n')
+    : 'Vsi termini naslednji teden so prosti (08:00-19:00).';
 
   return 'Si AI asistent za frizerski salon ' + salon.name + '. Odgovarjas VEDNO in SAMO v slovenscini.\n' +
-    'NIKOLI ne uporabi cirilice ali kateregakoli drugega pisma.\n' +
     'NIKOLI ne uporabi markdown formatiranja (**bold**, *italic*) - pisi navadno besedilo.\n' +
     'Si prijazen, profesionalen in jedrnat (max 2-3 stavki razen pri rezervacijah).\n\n' +
     'INFORMACIJE O SALONU:\n' +
@@ -337,12 +360,10 @@ function buildAdminPage(salon) {
     .date-nav button { background: #1a1410; color: #c9a84c; border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer; font-size: 16px; }
     .date-nav h2 { flex: 1; text-align: center; font-size: 16px; color: #2d2520; }
     .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
-    .slot { background: #fff; border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-    .slot.free { border-color: #4ade80; }
+    .slot { background: #fff; border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; border: 2px solid #4ade80; transition: all 0.15s; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
     .slot.busy { border-color: #f87171; background: #fff5f5; }
     .slot .time { font-size: 18px; font-weight: 600; color: #1a1410; }
-    .slot .status { font-size: 11px; margin-top: 4px; }
-    .slot.free .status { color: #16a34a; }
+    .slot .status { font-size: 11px; margin-top: 4px; color: #16a34a; }
     .slot.busy .status { color: #dc2626; }
     .slot .customer { font-size: 11px; color: #6b5f52; margin-top: 2px; }
     .legend { display: flex; gap: 16px; margin-bottom: 16px; font-size: 12px; color: #6b5f52; }
@@ -350,17 +371,16 @@ function buildAdminPage(salon) {
     .dot { width: 10px; height: 10px; border-radius: 50%; }
     .dot.free { background: #4ade80; }
     .dot.busy { background: #f87171; }
-    .dot.empty { background: #ddd; }
     .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
     .modal.open { display: flex; }
     .modal-box { background: #fff; border-radius: 16px; padding: 24px; width: 300px; }
     .modal-box h3 { margin-bottom: 16px; color: #1a1410; }
     .modal-box label { display: block; font-size: 12px; color: #6b5f52; margin-bottom: 4px; margin-top: 12px; }
-    .modal-box input, .modal-box select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    .modal-box input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
     .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
     .btn { flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; }
-    .btn-free { background: #dcfce7; color: #16a34a; }
     .btn-busy { background: #fee2e2; color: #dc2626; }
+    .btn-free { background: #dcfce7; color: #16a34a; }
     .btn-cancel { background: #f3f4f6; color: #6b7280; }
   </style>
 </head>
@@ -368,7 +388,7 @@ function buildAdminPage(salon) {
   <div class="header">
     <div>
       <h1>Admin: ${salon.name}</h1>
-      <p>Upravljanje terminov</p>
+      <p>Klikni na termin da ga oznacis kot zaseden</p>
     </div>
     <a href="/salon/${salon.id}" style="color:#c9a84c;font-size:12px;text-decoration:none;">Oglej chat stran</a>
   </div>
@@ -379,9 +399,8 @@ function buildAdminPage(salon) {
       <button id="next">&#8250;</button>
     </div>
     <div class="legend">
-      <span><div class="dot free"></div> Prost</span>
+      <span><div class="dot free"></div> Prost (default)</span>
       <span><div class="dot busy"></div> Zaseden</span>
-      <span><div class="dot empty"></div> Ni vpisan</span>
     </div>
     <div class="slots" id="slots"></div>
   </div>
@@ -389,18 +408,14 @@ function buildAdminPage(salon) {
   <div class="modal" id="modal">
     <div class="modal-box">
       <h3 id="modal-title">Termin</h3>
-      <label>Status</label>
-      <select id="modal-status">
-        <option value="free">Prost</option>
-        <option value="busy">Zaseden</option>
-      </select>
       <label>Ime stranke (opcijsko)</label>
       <input type="text" id="modal-customer" placeholder="Ime Priimek" />
       <label>Storitev (opcijsko)</label>
       <input type="text" id="modal-service" placeholder="Zenski haircut..." />
       <div class="modal-btns">
         <button class="btn btn-cancel" id="modal-cancel">Preklic</button>
-        <button class="btn btn-free" id="modal-save">Shrani</button>
+        <button class="btn btn-free" id="modal-set-free">Prost</button>
+        <button class="btn btn-busy" id="modal-set-busy">Zaseden</button>
       </div>
     </div>
   </div>
@@ -413,13 +428,8 @@ function buildAdminPage(salon) {
     let currentSlot = null;
     let slotsData = {};
 
-    function formatDate(d) {
-      return d.toISOString().split('T')[0];
-    }
-
-    function formatDateSl(d) {
-      return d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    }
+    function formatDate(d) { return d.toISOString().split('T')[0]; }
+    function formatDateSl(d) { return d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
 
     async function loadSlots() {
       const dateStr = formatDate(currentDate);
@@ -436,10 +446,11 @@ function buildAdminPage(salon) {
       container.innerHTML = '';
       HOURS.forEach(hour => {
         const slot = slotsData[hour];
+        const isBusy = slot && slot.status === 'busy';
         const div = document.createElement('div');
-        div.className = 'slot ' + (slot ? slot.status : 'empty');
+        div.className = 'slot' + (isBusy ? ' busy' : '');
         div.innerHTML = '<div class="time">' + hour + '</div>' +
-          '<div class="status">' + (slot ? (slot.status === 'free' ? 'Prost' : 'Zaseden') : 'Ni vpisan') + '</div>' +
+          '<div class="status">' + (isBusy ? 'Zaseden' : 'Prost') + '</div>' +
           (slot && slot.customer_name ? '<div class="customer">' + slot.customer_name + '</div>' : '');
         div.addEventListener('click', () => openModal(hour, slot));
         container.appendChild(div);
@@ -449,18 +460,12 @@ function buildAdminPage(salon) {
     function openModal(time, slot) {
       currentSlot = time;
       document.getElementById('modal-title').textContent = 'Termin ob ' + time;
-      document.getElementById('modal-status').value = slot ? slot.status : 'free';
       document.getElementById('modal-customer').value = slot ? (slot.customer_name || '') : '';
       document.getElementById('modal-service').value = slot ? (slot.service || '') : '';
       document.getElementById('modal').classList.add('open');
     }
 
-    document.getElementById('modal-cancel').addEventListener('click', () => {
-      document.getElementById('modal').classList.remove('open');
-    });
-
-    document.getElementById('modal-save').addEventListener('click', async () => {
-      const status = document.getElementById('modal-status').value;
+    async function saveSlot(status) {
       const customerName = document.getElementById('modal-customer').value;
       const service = document.getElementById('modal-service').value;
       await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots', {
@@ -470,17 +475,16 @@ function buildAdminPage(salon) {
       });
       document.getElementById('modal').classList.remove('open');
       loadSlots();
-    });
+    }
 
-    document.getElementById('prev').addEventListener('click', () => {
-      currentDate.setDate(currentDate.getDate() - 1);
-      loadSlots();
+    document.getElementById('modal-cancel').addEventListener('click', () => {
+      document.getElementById('modal').classList.remove('open');
     });
+    document.getElementById('modal-set-busy').addEventListener('click', () => saveSlot('busy'));
+    document.getElementById('modal-set-free').addEventListener('click', () => saveSlot('free'));
 
-    document.getElementById('next').addEventListener('click', () => {
-      currentDate.setDate(currentDate.getDate() + 1);
-      loadSlots();
-    });
+    document.getElementById('prev').addEventListener('click', () => { currentDate.setDate(currentDate.getDate() - 1); loadSlots(); });
+    document.getElementById('next').addEventListener('click', () => { currentDate.setDate(currentDate.getDate() + 1); loadSlots(); });
 
     loadSlots();
   </script>
