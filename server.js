@@ -36,7 +36,6 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
-
   await pool.query(`
     CREATE TABLE IF NOT EXISTS timeslots (
       id SERIAL PRIMARY KEY,
@@ -50,7 +49,6 @@ async function initDB() {
       UNIQUE(salon_id, date, time)
     )
   `);
-
   const { rows } = await pool.query('SELECT id FROM salons WHERE id = $1', ['salon_1']);
   if (rows.length === 0) {
     await pool.query(`
@@ -101,12 +99,34 @@ app.post('/admin/:id/timeslots', async (req, res) => {
       SET status = $4, customer_name = $5, service = $6
     `, [req.params.id, date, time, status, customerName, service]);
   } else {
-    // Če postavimo nazaj na prost - izbrišemo iz DB
-    await pool.query(
-      'DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3',
-      [req.params.id, date, time]
-    );
+    await pool.query('DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3', [req.params.id, date, time]);
   }
+  res.json({ success: true });
+});
+
+// ─── BOOKING ENDPOINT (kliče frontend po potrditvi bota) ─────────────────────
+app.post('/booking', async (req, res) => {
+  const { salonId, date, time, customerName, service } = req.body;
+  if (!salonId || !date || !time || !customerName || !service) {
+    return res.status(400).json({ error: 'Manjkajo podatki' });
+  }
+  // Preveri ali je termin še prost
+  const { rows: existing } = await pool.query(
+    "SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3 AND status = 'busy'",
+    [salonId, date, time]
+  );
+  if (existing.length > 0) {
+    return res.status(409).json({ error: 'Ta termin je žal že zaseden. Izberite drug termin.' });
+  }
+  // Vpiši rezervacijo
+  await pool.query(`
+    INSERT INTO timeslots (salon_id, date, time, status, customer_name, service)
+    VALUES ($1, $2, $3, 'busy', $4, $5)
+    ON CONFLICT (salon_id, date, time) DO UPDATE
+    SET status = 'busy', customer_name = $4, service = $5
+  `, [salonId, date, time, customerName, service]);
+
+  console.log('Nova rezervacija:', { salonId, date, time, customerName, service });
   res.json({ success: true });
 });
 
@@ -117,23 +137,54 @@ app.post('/chat', async (req, res) => {
   const salon = rows[0];
   if (!salon) return res.status(404).json({ error: 'Salon not found' });
 
-  // Pridobi ZASEDENE termine za naslednje 7 dni
-  const today = new Date();
-  const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const todayLj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
+  const nextWeek = new Date(todayLj.getTime() + 7 * 24 * 60 * 60 * 1000);
   const { rows: busySlots } = await pool.query(
     "SELECT date, time FROM timeslots WHERE salon_id = $1 AND date >= $2 AND date <= $3 AND status = 'busy' ORDER BY date, time",
-    [salonId, today.toISOString().split('T')[0], nextWeek.toISOString().split('T')[0]]
+    [salonId, todayLj.toISOString().split('T')[0], nextWeek.toISOString().split('T')[0]]
   );
 
   try {
     const data = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
+      max_tokens: 600,
       system: buildSystemPrompt(salon, busySlots),
       messages: messages
     });
-    const reply = data.content[0].text;
-    res.json({ reply, bookingDetected: detectBooking(reply) });
+
+    const raw = data.content[0].text;
+
+    // Zaznaj če bot vrne JSON rezervacijo
+    const bookingMatch = raw.match(/\[\[BOOKING:(.*?)\]\]/s);
+    if (bookingMatch) {
+      try {
+        const booking = JSON.parse(bookingMatch[1]);
+        // Preveri ali je termin prost
+        const { rows: existing } = await pool.query(
+          "SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3 AND status = 'busy'",
+          [salonId, booking.date, booking.time]
+        );
+        if (existing.length > 0) {
+          const reply = 'Oprostite, ta termin je bil ravnokar zaseden. Izberite drug termin.';
+          return res.json({ reply, bookingDetected: null });
+        }
+        // Vpiši v bazo
+        await pool.query(`
+          INSERT INTO timeslots (salon_id, date, time, status, customer_name, service)
+          VALUES ($1, $2, $3, 'busy', $4, $5)
+          ON CONFLICT (salon_id, date, time) DO UPDATE
+          SET status = 'busy', customer_name = $4, service = $5
+        `, [salonId, booking.date, booking.time, booking.customerName, booking.service]);
+
+        console.log('Bot rezerviral:', booking);
+        const reply = raw.replace(/\[\[BOOKING:.*?\]\]/s, '').trim();
+        return res.json({ reply, bookingDetected: booking });
+      } catch (e) {
+        console.error('Booking parse error:', e);
+      }
+    }
+
+    res.json({ reply: raw, bookingDetected: null });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'API error' });
@@ -167,13 +218,11 @@ app.put('/salons/:id', async (req, res) => {
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function buildSystemPrompt(salon, busySlots) {
-  // Današnji datum v Ljubljana časovnem pasu
-  const today = new Date().toLocaleDateString('sl-SI', {
-    timeZone: 'Europe/Ljubljana',
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  const todayLj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
+  const todayStr = todayLj.toLocaleDateString('sl-SI', {
+    timeZone: 'Europe/Ljubljana', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   });
 
-  // Izračunaj proste termine (vsi HOURS minus zasedeni)
   const busyByDate = {};
   busySlots.forEach(s => {
     const d = new Date(s.date).toISOString().split('T')[0];
@@ -181,7 +230,6 @@ function buildSystemPrompt(salon, busySlots) {
     busyByDate[d].add(s.time);
   });
 
-  // Naslednji 7 dni (v Ljubljana časovnem pasu)
   const days = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
@@ -191,38 +239,50 @@ function buildSystemPrompt(salon, busySlots) {
     const busy = busyByDate[dateStr] || new Set();
     const free = HOURS.filter(h => !busy.has(h));
     if (free.length > 0) {
-      days.push(dayName + ': ' + free.join(', '));
+      days.push(dateStr + ' (' + dayName + '): ' + free.join(', '));
     }
   }
 
-  const slotsText = days.length > 0
-    ? days.join('\n')
-    : 'Vsi termini naslednji teden so prosti (08:00-19:00).';
+  const slotsText = days.length > 0 ? days.join('\n') : 'Vsi termini so prosti.';
 
-  return 'Si AI asistent za frizerski salon ' + salon.name + '. Odgovarjas VEDNO in SAMO v slovenscini.\n' +
-    'Danasnji datum je: ' + today + ' (Ljubljana, Slovenija)\n' +
-    'NIKOLI ne uporabi markdown formatiranja (**bold**, *italic*) - pisi navadno besedilo.\n' +
-    'Si prijazen, profesionalen in jedrnat (max 2-3 stavki razen pri rezervacijah).\n\n' +
-    'INFORMACIJE O SALONU:\n' +
-    '- Ime: ' + salon.name + '\n' +
-    '- Naslov: ' + salon.address + '\n' +
-    '- Telefon: ' + salon.phone + '\n' +
-    '- Delovni cas: ' + salon.hours + '\n\n' +
-    'STORITVE IN CENIK:\n' + salon.services + '\n\n' +
-    'PROSTI TERMINI (naslednji teden):\n' + slotsText + '\n\n' +
-    'NAVODILA ZA REZERVACIJE:\n' +
-    '- Ko stranka zeli rezervacijo, jo prijazno vprasaj za: ime, storitev, dan in cas\n' +
-    '- Predlagaj proste termine iz zgornjega seznama\n' +
-    '- Ko imas vse podatke, reci da bo termin potrjen\n\n' +
-    'PRAVILA:\n' +
-    '- Nikoli si ne izmisljuj informacij\n' +
-    '- Ce ne ves, preusmeri na telefon: ' + salon.phone + '\n' +
-    '- Bodi topel in prijazen kot pravi recepcionist';
-}
+  return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjas VEDNO in SAMO v slovenscini.
+NIKOLI ne uporabi markdown formatiranja - pisi navadno besedilo.
+Si prijazen, profesionalen in jedrnat.
 
-function detectBooking(text) {
-  const patterns = [/termin.*potrjen/i, /rezerviral/i, /booking confirmed/i];
-  return patterns.some(p => p.test(text)) ? { detected: true } : null;
+Danasnji datum: ${todayStr}
+
+INFORMACIJE O SALONU:
+- Ime: ${salon.name}
+- Naslov: ${salon.address}
+- Telefon: ${salon.phone}
+- Delovni cas: ${salon.hours}
+
+STORITVE IN CENIK:
+${salon.services}
+
+PROSTI TERMINI (oblika YYYY-MM-DD):
+${slotsText}
+
+REZERVACIJE - POMEMBNO:
+Ko stranka potrdi rezervacijo (imas ime, storitev, datum in cas), OBVEZNO:
+1. Napisi normalen odgovor stranki da je termin potrjen
+2. Na KONEC odgovora dodaj TOCNO to (brez presledkov):
+[[BOOKING:{"date":"YYYY-MM-DD","time":"HH:MM","customerName":"ime stranke","service":"storitev"}]]
+
+Primer pravilnega odgovora:
+"Odlicno Ana! Vas termin za zenski haircut je potrjen za ponedeljek 21.4. ob 10:00. Se vidimo!
+[[BOOKING:{"date":"2026-04-21","time":"10:00","customerName":"Ana","service":"Zenski haircut"}]]"
+
+POTEK REZERVACIJE:
+1. Stranka pove kaj hoce
+2. Predlagaj proste termine
+3. Ko stranka izbere termin, vprasaj za ime
+4. Ko imas ime, potrdi in dodaj [[BOOKING:...]]
+
+PRAVILA:
+- Nikoli si ne izmisljuj prostih terminov - uporabi samo termine iz seznama zgoraj
+- Ce termin ni na seznamu, reci da je zaseden
+- Ce ne ves odgovora, preusmeri na telefon: ${salon.phone}`;
 }
 
 function buildChatPage(salon) {
@@ -250,6 +310,7 @@ function buildChatPage(salon) {
     .msg.user .bubble { background: #1a1410; color: #f0ebe0; border-bottom-right-radius: 4px; }
     .msg.bot .bubble { background: #fff; color: #2d2520; border-bottom-left-radius: 4px; border: 0.5px solid rgba(0,0,0,0.08); box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
     .msg-time { font-size: 10px; color: #aaa; margin-top: 4px; padding: 0 4px; }
+    .booking-confirm { background: #dcfce7; border: 1px solid #4ade80; border-radius: 12px; padding: 10px 14px; font-size: 13px; color: #16a34a; margin-top: 4px; }
     .typing { display: flex; gap: 4px; padding: 12px 14px; background: #fff; border-radius: 18px; border-bottom-left-radius: 4px; width: fit-content; border: 0.5px solid rgba(0,0,0,0.08); }
     .typing span { width: 6px; height: 6px; border-radius: 50%; background: #bbb; animation: bounce 1.2s infinite; }
     .typing span:nth-child(2) { animation-delay: 0.2s; }
@@ -269,7 +330,7 @@ function buildChatPage(salon) {
     <div class="header-avatar">${salon.name.charAt(0)}</div>
     <div class="header-info">
       <h1>${salon.name}</h1>
-      <p>AI Asistent - Odgovori v manj kot 10 sekund</p>
+      <p>AI Asistent - Rezervacije 24/7</p>
     </div>
     <div class="header-dot"></div>
   </div>
@@ -293,21 +354,31 @@ function buildChatPage(salon) {
     const SALON_ID = '${salon.id}';
     let messages = [];
     let isTyping = false;
+
     function getTime() { return new Date().toLocaleTimeString('sl-SI', { hour: '2-digit', minute: '2-digit' }); }
-    function addBotMsg(text) {
+
+    function addBotMsg(text, booking) {
       const msgs = document.getElementById('messages');
       const div = document.createElement('div');
       div.className = 'msg bot';
-      div.innerHTML = '<div class="bubble">' + text + '</div><div class="msg-time">' + getTime() + '</div>';
-      msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+      let extra = '';
+      if (booking) {
+        extra = '<div class="booking-confirm">✅ Rezervacija vpisana: ' + booking.service + ', ' + booking.date + ' ob ' + booking.time + '</div>';
+      }
+      div.innerHTML = '<div class="bubble">' + text + '</div>' + extra + '<div class="msg-time">' + getTime() + '</div>';
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
     }
+
     function addUserMsg(text) {
       const msgs = document.getElementById('messages');
       const div = document.createElement('div');
       div.className = 'msg user';
       div.innerHTML = '<div class="bubble">' + text + '</div><div class="msg-time">' + getTime() + '</div>';
-      msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
     }
+
     function showTyping() {
       const msgs = document.getElementById('messages');
       const div = document.createElement('div');
@@ -316,6 +387,7 @@ function buildChatPage(salon) {
       msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
     }
     function removeTyping() { document.getElementById('typing')?.remove(); }
+
     async function sendMsg() {
       if (isTyping) return;
       const input = document.getElementById('input');
@@ -332,7 +404,8 @@ function buildChatPage(salon) {
           body: JSON.stringify({ salonId: SALON_ID, messages })
         });
         const data = await res.json();
-        removeTyping(); addBotMsg(data.reply);
+        removeTyping();
+        addBotMsg(data.reply, data.bookingDetected);
         messages.push({ role: 'assistant', content: data.reply });
       } catch(e) {
         removeTyping();
@@ -340,9 +413,10 @@ function buildChatPage(salon) {
       }
       isTyping = false;
     }
+
     document.getElementById('input').addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
     document.getElementById('send').addEventListener('click', sendMsg);
-    setTimeout(() => { addBotMsg('Pozdravljeni! Sem AI asistent salona ${salon.name}. Pomagam z informacijami o storitvah, cenah in rezervacijah. Kako vam lahko pomagam?'); }, 300);
+    setTimeout(() => { addBotMsg('Pozdravljeni! Sem AI asistent salona ${salon.name}. Pomagam z rezervacijami, cenami in informacijami. Kako vam lahko pomagam?'); }, 300);
   </script>
 </body>
 </html>`;
@@ -369,15 +443,18 @@ function buildAdminPage(salon) {
     .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
     .slot { background: #fff; border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; border: 2px solid #4ade80; transition: all 0.15s; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
     .slot.busy { border-color: #f87171; background: #fff5f5; }
+    .slot.bot-booking { border-color: #60a5fa; background: #eff6ff; }
     .slot .time { font-size: 18px; font-weight: 600; color: #1a1410; }
     .slot .status { font-size: 11px; margin-top: 4px; color: #16a34a; }
     .slot.busy .status { color: #dc2626; }
+    .slot.bot-booking .status { color: #2563eb; }
     .slot .customer { font-size: 11px; color: #6b5f52; margin-top: 2px; }
-    .legend { display: flex; gap: 16px; margin-bottom: 16px; font-size: 12px; color: #6b5f52; }
+    .legend { display: flex; gap: 16px; margin-bottom: 16px; font-size: 12px; color: #6b5f52; flex-wrap: wrap; }
     .legend span { display: flex; align-items: center; gap: 6px; }
     .dot { width: 10px; height: 10px; border-radius: 50%; }
     .dot.free { background: #4ade80; }
     .dot.busy { background: #f87171; }
+    .dot.bot { background: #60a5fa; }
     .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
     .modal.open { display: flex; }
     .modal-box { background: #fff; border-radius: 16px; padding: 24px; width: 300px; }
@@ -395,7 +472,7 @@ function buildAdminPage(salon) {
   <div class="header">
     <div>
       <h1>Admin: ${salon.name}</h1>
-      <p>Klikni na termin da ga oznacis kot zaseden</p>
+      <p>Klikni na termin za urejanje · Modri = rezerviral bot</p>
     </div>
     <a href="/salon/${salon.id}" style="color:#c9a84c;font-size:12px;text-decoration:none;">Oglej chat stran</a>
   </div>
@@ -406,18 +483,18 @@ function buildAdminPage(salon) {
       <button id="next">&#8250;</button>
     </div>
     <div class="legend">
-      <span><div class="dot free"></div> Prost (default)</span>
-      <span><div class="dot busy"></div> Zaseden</span>
+      <span><div class="dot free"></div> Prost</span>
+      <span><div class="dot busy"></div> Zaseden (ti)</span>
+      <span><div class="dot bot"></div> Zaseden (bot)</span>
     </div>
     <div class="slots" id="slots"></div>
   </div>
-
   <div class="modal" id="modal">
     <div class="modal-box">
       <h3 id="modal-title">Termin</h3>
-      <label>Ime stranke (opcijsko)</label>
+      <label>Ime stranke</label>
       <input type="text" id="modal-customer" placeholder="Ime Priimek" />
-      <label>Storitev (opcijsko)</label>
+      <label>Storitev</label>
       <input type="text" id="modal-service" placeholder="Zenski haircut..." />
       <div class="modal-btns">
         <button class="btn btn-cancel" id="modal-cancel">Preklic</button>
@@ -426,7 +503,6 @@ function buildAdminPage(salon) {
       </div>
     </div>
   </div>
-
   <script>
     const API_URL = '${apiUrl}';
     const SALON_ID = '${salon.id}';
@@ -454,11 +530,13 @@ function buildAdminPage(salon) {
       HOURS.forEach(hour => {
         const slot = slotsData[hour];
         const isBusy = slot && slot.status === 'busy';
+        const isBot = isBusy && slot.customer_name;
         const div = document.createElement('div');
-        div.className = 'slot' + (isBusy ? ' busy' : '');
+        div.className = 'slot' + (isBusy ? (isBot ? ' bot-booking' : ' busy') : '');
         div.innerHTML = '<div class="time">' + hour + '</div>' +
-          '<div class="status">' + (isBusy ? 'Zaseden' : 'Prost') + '</div>' +
-          (slot && slot.customer_name ? '<div class="customer">' + slot.customer_name + '</div>' : '');
+          '<div class="status">' + (isBusy ? (isBot ? 'Bot rezervacija' : 'Zaseden') : 'Prost') + '</div>' +
+          (slot && slot.customer_name ? '<div class="customer">' + slot.customer_name + '</div>' : '') +
+          (slot && slot.service ? '<div class="customer">' + slot.service + '</div>' : '');
         div.addEventListener('click', () => openModal(hour, slot));
         container.appendChild(div);
       });
@@ -484,16 +562,14 @@ function buildAdminPage(salon) {
       loadSlots();
     }
 
-    document.getElementById('modal-cancel').addEventListener('click', () => {
-      document.getElementById('modal').classList.remove('open');
-    });
+    document.getElementById('modal-cancel').addEventListener('click', () => document.getElementById('modal').classList.remove('open'));
     document.getElementById('modal-set-busy').addEventListener('click', () => saveSlot('busy'));
     document.getElementById('modal-set-free').addEventListener('click', () => saveSlot('free'));
-
     document.getElementById('prev').addEventListener('click', () => { currentDate.setDate(currentDate.getDate() - 1); loadSlots(); });
     document.getElementById('next').addEventListener('click', () => { currentDate.setDate(currentDate.getDate() + 1); loadSlots(); });
 
     loadSlots();
+    setInterval(loadSlots, 30000);
   </script>
 </body>
 </html>`;
@@ -514,15 +590,6 @@ async function addToCalendar(salon, booking) {
     }
   });
   return event.data.id;
-}
-
-async function sendConfirmation(salon, booking) {
-  await resend.emails.send({
-    from: 'noreply@frizerbot.si',
-    to: booking.customerEmail,
-    subject: 'Potrjen termin - ' + salon.name,
-    html: '<p>Pozdravljeni ' + booking.customerName + ', vas termin je potrjen: ' + booking.service + ' dne ' + booking.date + ' ob ' + booking.time + '.</p>'
-  });
 }
 
 const PORT = process.env.PORT || 3000;
