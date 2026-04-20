@@ -155,6 +155,22 @@ app.post('/chat', async (req, res) => {
     const raw = data.content[0].text;
     console.log('✅ Bot raw response:', raw);
 
+    // ── FIX 1: NAJPREJ obdelajmo DELETE ──
+    const deleteMatch = raw.match(/\[\[DELETE:\s*(\{[\s\S]*?\})\s*\]\]/);
+    if (deleteMatch) {
+      try {
+        const deleteData = JSON.parse(deleteMatch[1]);
+        console.log('✅ Parsed DELETE:', deleteData);
+        
+        await pool.query(
+          'DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3',
+          [salonId, deleteData.date, deleteData.time]
+        );
+        console.log('✅ Termin obrisan:', deleteData.date, deleteData.time);
+      } catch (e) {
+        console.error('❌ DELETE error:', e);
+      }
+    }
     // ── FIX 1: Bolj robustni regex – ujame tudi če je presledek ali newline v JSON-u ──
     const bookingMatch = raw.match(/\[\[BOOKING:\s*(\{[\s\S]*?\})\s*\]\]/);
     if (bookingMatch) {
@@ -164,7 +180,7 @@ app.post('/chat', async (req, res) => {
         console.log('✅ Parsed booking:', booking);
       } catch (e) {
         console.error('❌ Booking JSON parse error:', e, '\nRaw match:', bookingMatch[1]);
-        const reply = raw.replace(/\[\[BOOKING:[\s\S]*?\]\]/, '').trim();
+        const reply = raw.replace(/\[\[DELETE:[\s\S]*?\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
         return res.json({
           reply: reply + '\n\nOprostite, prišlo je do tehnične napake pri rezervaciji. Pokličite nas na ' + salon.phone,
           bookingDetected: null
@@ -195,7 +211,7 @@ app.post('/chat', async (req, res) => {
 
       console.log('✅ Bot rezervirao:', { date: booking.date, time: booking.time, name: finalName, email: finalEmail, phone: finalPhone, service: finalService });
 
-      const reply = raw.replace(/\[\[BOOKING:[\s\S]*?\]\]/, '').trim();
+      const reply = raw.replace(/\[\[DELETE:[\s\S]*?\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
       return res.json({
         reply,
         bookingDetected: {
