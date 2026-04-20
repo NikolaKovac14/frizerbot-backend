@@ -156,22 +156,27 @@ app.post('/chat', async (req, res) => {
     console.log('✅ Bot raw response:', raw);
 
     // ── FIX 1: NAJPREJ obdelajmo DELETE ──
-    const deleteMatch = raw.match(/\[\[DELETE:\s*(\{[\s\S]*?\})\s*\]\]/);
+    const deleteMatch = raw.match(/\[\[DELETE:([^\]]+)\]\]/);
     if (deleteMatch) {
       try {
-        const deleteData = JSON.parse(deleteMatch[1]);
-        console.log('✅ Parsed DELETE:', deleteData);
+        const dateTimeStr = deleteMatch[1].trim();
+        // Format je: 2026-04-20T15:00
+        const [date, time] = dateTimeStr.split('T');
         
-        await pool.query(
-          'DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3',
-          [salonId, deleteData.date, deleteData.time]
-        );
-        console.log('✅ Termin obrisan:', deleteData.date, deleteData.time);
+        if (date && time) {
+          console.log('✅ Brišem termin:', date, time);
+          
+          await pool.query(
+            'DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3',
+            [salonId, date, time]
+          );
+          console.log('✅ Termin obrisan:', date, time);
+        }
       } catch (e) {
         console.error('❌ DELETE error:', e);
       }
     }
-    // ── FIX 1: Bolj robustni regex – ujame tudi če je presledek ali newline v JSON-u ──
+    // ── FIX 2: Bolj robustni regex – ujame tudi če je presledek ali newline v JSON-u ──
     const bookingMatch = raw.match(/\[\[BOOKING:\s*(\{[\s\S]*?\})\s*\]\]/);
     if (bookingMatch) {
       let booking;
@@ -180,7 +185,7 @@ app.post('/chat', async (req, res) => {
         console.log('✅ Parsed booking:', booking);
       } catch (e) {
         console.error('❌ Booking JSON parse error:', e, '\nRaw match:', bookingMatch[1]);
-        const reply = raw.replace(/\[\[DELETE:[\s\S]*?\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
+        const reply = raw.replace(/\[\[DELETE:[^\]]*\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
         return res.json({
           reply: reply + '\n\nOprostite, prišlo je do tehnične napake pri rezervaciji. Pokličite nas na ' + salon.phone,
           bookingDetected: null
@@ -211,7 +216,7 @@ app.post('/chat', async (req, res) => {
 
       console.log('✅ Bot rezervirao:', { date: booking.date, time: booking.time, name: finalName, email: finalEmail, phone: finalPhone, service: finalService });
 
-      const reply = raw.replace(/\[\[DELETE:[\s\S]*?\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
+      const reply = raw.replace(/\[\[DELETE:[^\]]*\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
       return res.json({
         reply,
         bookingDetected: {
@@ -325,9 +330,9 @@ REZERVACIJE - PRAVILA:
 - Stranka JE ze vpisala podatke
 - Ko stranka izbere termin in storitev, TAKOJ potrdi rezervacijo brez dodatnih vprašanj
 - BRISANJE: Ako stranka želi izbrisati STARI termin in rezervirati NOVI:
-  1. Na KONEC odgovora dodaj [[DELETE:...]] tag
+  1. Na KONEC odgovora dodaj [[DELETE:YYYY-MM-DDTHH:MM]] tag
   2. Zatim dodaj [[BOOKING:...]] tag s NOVIM terminom
-  3. Primer: "Izbrisem ti termin ob 16:00.[[DELETE]]Rezerviram te na 17:00.[[BOOKING:...]]"
+  3. Primer: "Izbrisem ti termin ob 16:00.[[DELETE:2026-04-20T16:00]] Rezerviram te na 17:00.[[BOOKING:{...}]]"
 
 - Na KONEC odgovora dodaj tagove:
 [[BOOKING:{"date":"YYYY-MM-DD","time":"HH:MM","customerName":"${safeName}","service":"ime storitve"}]]
@@ -338,7 +343,7 @@ REZERVACIJE - PRAVILA:
 POTEK:
 1. Stranka pove kaj hoce → predlagaj proste termine
 2. Stranka potrdi termin → takoj dodaj [[BOOKING:...]] tag
-3. AKO ZA BRISANJEM: dodaj [[DELETE]] tag, zatim [[BOOKING:...]] tag
+3. AKO ZA BRISANJEM: dodaj [[DELETE:YYYY-MM-DDTHH:MM]] tag, zatim [[BOOKING:...]] tag
 4. V sporocilu potrdi rezervacijo
 
 PRAVILA:
