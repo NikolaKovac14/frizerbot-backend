@@ -143,6 +143,8 @@ app.post('/chat', async (req, res) => {
   );
 
   try {
+    console.log('📤 Slanje Anthropic API - customerInfo:', customerInfo);
+    
     const data = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 600,
@@ -151,7 +153,7 @@ app.post('/chat', async (req, res) => {
     });
 
     const raw = data.content[0].text;
-    console.log('Bot raw response:', raw); // ← DEBUG: vedno logi odgovor
+    console.log('✅ Bot raw response:', raw);
 
     // ── FIX 1: Bolj robustni regex – ujame tudi če je presledek ali newline v JSON-u ──
     const bookingMatch = raw.match(/\[\[BOOKING:\s*(\{[\s\S]*?\})\s*\]\]/);
@@ -159,10 +161,9 @@ app.post('/chat', async (req, res) => {
       let booking;
       try {
         booking = JSON.parse(bookingMatch[1]);
-        console.log('Parsed booking:', booking);
+        console.log('✅ Parsed booking:', booking);
       } catch (e) {
-        // ── FIX 2: Če JSON parse spodleti, vrni napako stranki namesto tihe napake ──
-        console.error('Booking JSON parse error:', e, '\nRaw match:', bookingMatch[1]);
+        console.error('❌ Booking JSON parse error:', e, '\nRaw match:', bookingMatch[1]);
         const reply = raw.replace(/\[\[BOOKING:[\s\S]*?\]\]/, '').trim();
         return res.json({
           reply: reply + '\n\nOprostite, prišlo je do tehnične napake pri rezervaciji. Pokličite nas na ' + salon.phone,
@@ -179,7 +180,6 @@ app.post('/chat', async (req, res) => {
         return res.json({ reply: 'Oprostite, ta termin je bil ravnokar zaseden. Izberite drug termin.', bookingDetected: null });
       }
 
-      // ── FIX 3: customerInfo je VEDNO poslan s frontenda, uporabi ga ──
       const cInfo = customerInfo || {};
       const finalName = booking.customerName || cInfo.name || 'Neznano';
       const finalEmail = cInfo.email || booking.customerEmail || '';
@@ -193,7 +193,7 @@ app.post('/chat', async (req, res) => {
         SET status = 'busy', customer_name = $4, customer_email = $5, customer_phone = $6, service = $7
       `, [salonId, booking.date, booking.time, finalName, finalEmail, finalPhone, finalService]);
 
-      console.log('✅ Bot rezerviral:', { date: booking.date, time: booking.time, name: finalName, email: finalEmail, phone: finalPhone, service: finalService });
+      console.log('✅ Bot rezervirao:', { date: booking.date, time: booking.time, name: finalName, email: finalEmail, phone: finalPhone, service: finalService });
 
       const reply = raw.replace(/\[\[BOOKING:[\s\S]*?\]\]/, '').trim();
       return res.json({
@@ -215,11 +215,15 @@ app.post('/chat', async (req, res) => {
     res.json({ reply: cleanReply, needInfo, bookingDetected: null });
 
   } catch (err) {
-    console.error('Chat API error:', err);
-    res.status(500).json({ error: 'API error' });
+    console.error('❌ Chat API error:');
+    console.error('   Status:', err.status);
+    console.error('   Message:', err.message);
+    console.error('   Error:', JSON.stringify(err, null, 2));
+    
+    let errorMsg = err.message || 'Unknown error';
+    res.status(500).json({ error: 'API error: ' + errorMsg });
   }
 });
-
 // ─── SALON MANAGEMENT ─────────────────────────────────────────────────────────
 app.get('/salons', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM salons WHERE active = true ORDER BY created_at');
