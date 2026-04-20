@@ -250,6 +250,7 @@ app.put('/salons/:id', async (req, res) => {
 });
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
+// Zamijeni cijelu buildSystemPrompt funkciju s ovom verzijom
 function buildSystemPrompt(salon, busySlots, customerInfo) {
   const todayLj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
   const todayStr = todayLj.toLocaleDateString('sl-SI', {
@@ -278,9 +279,7 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
 
   const slotsText = days.length > 0 ? days.join('\n') : 'Vsi termini so prosti.';
 
-  // ── FIX 4: Jasnejši sistem prompt za booking tag format ──
   if (customerInfo) {
-    // Ime brez narekovajev in posebnih znakov za varni JSON
     const safeName = (customerInfo.name || '').replace(/"/g, '').replace(/\\/g, '');
 
     return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjas VEDNO in SAMO v slovenscini.
@@ -309,16 +308,22 @@ PODATKI STRANKE (ze vpisani - NE sprašuj znova):
 REZERVACIJE - PRAVILA:
 - Stranka JE ze vpisala podatke
 - Ko stranka izbere termin in storitev, TAKOJ potrdi rezervacijo brez dodatnih vprašanj
-- Na KONEC odgovora dodaj tag v TOCNO tej obliki (brez presledkov, brez newlineov znotraj):
+- BRISANJE: Ako stranka želi izbrisati STARI termin in rezervirati NOVI:
+  1. Na KONEC odgovora dodaj [[DELETE:...]] tag
+  2. Zatim dodaj [[BOOKING:...]] tag s NOVIM terminom
+  3. Primer: "Izbrisem ti termin ob 16:00.[[DELETE]]Rezerviram te na 17:00.[[BOOKING:...]]"
+
+- Na KONEC odgovora dodaj tagove:
 [[BOOKING:{"date":"YYYY-MM-DD","time":"HH:MM","customerName":"${safeName}","service":"ime storitve"}]]
 - Zamenjaj YYYY-MM-DD z dejanskim datumom, HH:MM s terminom, ime storitve z izbrano storitvijo
 - Primer: [[BOOKING:{"date":"2025-06-15","time":"10:00","customerName":"${safeName}","service":"Zenski haircut"}]]
-- Tag mora biti na koncu sporocila, brez nicesar za njim
+- Tagovi morajo biti na koncu sporocila, brez nicesar za njim
 
 POTEK:
 1. Stranka pove kaj hoce → predlagaj proste termine
 2. Stranka potrdi termin → takoj dodaj [[BOOKING:...]] tag
-3. V sporocilu potrdi rezervacijo (brez taga na koncu ze napises potrditev)
+3. AKO ZA BRISANJEM: dodaj [[DELETE]] tag, zatim [[BOOKING:...]] tag
+4. V sporocilu potrdi rezervacijo
 
 PRAVILA:
 - Nikoli si ne izmisljuj prostih terminov - uporabi samo termine iz seznama
@@ -349,7 +354,6 @@ REZERVACIJE - PRAVILA:
 - Ko stranka hoce rezervirati termin, dodaj [[NEED_INFO]] na KONEC odgovora
 - Primer: "Odlicno! Pred rezervacijo potrebujem se vase podatke.[[NEED_INFO]]"
 - [[NEED_INFO]] mora biti ZADNJA stvar v odgovoru, brez nicesar za njim
-- Ko bo stranka vpisala podatke, bo sistem to javil in potem nadaljuj z rezervacijo
 
 POTEK:
 1. Stranka pove kaj hoce → predlagaj proste termine
