@@ -4,7 +4,6 @@ if (process.env.NODE_ENV !== 'production') {
 const express = require('express');
 const cors = require('cors');
 const Anthropic = require('@anthropic-ai/sdk');
-const { google } = require('googleapis');
 const { Pool } = require('pg');
 
 const app = express();
@@ -12,7 +11,6 @@ app.use(cors());
 app.use(express.json());
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const resend = { emails: { send: async () => console.log('Email skipped - no Resend key') } };
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -153,46 +151,71 @@ app.post('/chat', async (req, res) => {
     });
 
     const raw = data.content[0].text;
+    console.log('Bot raw response:', raw); // ← DEBUG: vedno logi odgovor
 
-    // Zaznaj BOOKING tag
-    const bookingMatch = raw.match(/\[\[BOOKING:(.*?)\]\]/s);
+    // ── FIX 1: Bolj robustni regex – ujame tudi če je presledek ali newline v JSON-u ──
+    const bookingMatch = raw.match(/\[\[BOOKING:\s*(\{[\s\S]*?\})\s*\]\]/);
     if (bookingMatch) {
+      let booking;
       try {
-        const booking = JSON.parse(bookingMatch[1]);
-
-        // Preveri termin
-        const { rows: existing } = await pool.query(
-          "SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3 AND status = 'busy'",
-          [salonId, booking.date, booking.time]
-        );
-        if (existing.length > 0) {
-          return res.json({ reply: 'Oprostite, ta termin je bil ravnokar zaseden. Izberite drug termin.', bookingDetected: null });
-        }
-
-        // Vpiši v bazo z vsemi podatki stranke
-        const cInfo = customerInfo || {};
-        await pool.query(`
-          INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, customer_phone, service)
-          VALUES ($1, $2, $3, 'busy', $4, $5, $6, $7)
-          ON CONFLICT (salon_id, date, time) DO UPDATE
-          SET status = 'busy', customer_name = $4, customer_email = $5, customer_phone = $6, service = $7
-        `, [salonId, booking.date, booking.time, booking.customerName || cInfo.name, cInfo.email || '', cInfo.phone || '', booking.service]);
-
-        console.log('Bot rezerviral:', booking, cInfo);
-        const reply = raw.replace(/\[\[BOOKING:.*?\]\]/s, '').trim();
-        return res.json({ reply, bookingDetected: { ...booking, ...cInfo } });
+        booking = JSON.parse(bookingMatch[1]);
+        console.log('Parsed booking:', booking);
       } catch (e) {
-        console.error('Booking parse error:', e);
+        // ── FIX 2: Če JSON parse spodleti, vrni napako stranki namesto tihe napake ──
+        console.error('Booking JSON parse error:', e, '\nRaw match:', bookingMatch[1]);
+        const reply = raw.replace(/\[\[BOOKING:[\s\S]*?\]\]/, '').trim();
+        return res.json({
+          reply: reply + '\n\nOprostite, prišlo je do tehnične napake pri rezervaciji. Pokličite nas na ' + salon.phone,
+          bookingDetected: null
+        });
       }
+
+      // Preveri termin
+      const { rows: existing } = await pool.query(
+        "SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3 AND status = 'busy'",
+        [salonId, booking.date, booking.time]
+      );
+      if (existing.length > 0) {
+        return res.json({ reply: 'Oprostite, ta termin je bil ravnokar zaseden. Izberite drug termin.', bookingDetected: null });
+      }
+
+      // ── FIX 3: customerInfo je VEDNO poslan s frontenda, uporabi ga ──
+      const cInfo = customerInfo || {};
+      const finalName = booking.customerName || cInfo.name || 'Neznano';
+      const finalEmail = cInfo.email || booking.customerEmail || '';
+      const finalPhone = cInfo.phone || booking.customerPhone || '';
+      const finalService = booking.service || 'Storitev';
+
+      await pool.query(`
+        INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, customer_phone, service)
+        VALUES ($1, $2, $3, 'busy', $4, $5, $6, $7)
+        ON CONFLICT (salon_id, date, time) DO UPDATE
+        SET status = 'busy', customer_name = $4, customer_email = $5, customer_phone = $6, service = $7
+      `, [salonId, booking.date, booking.time, finalName, finalEmail, finalPhone, finalService]);
+
+      console.log('✅ Bot rezerviral:', { date: booking.date, time: booking.time, name: finalName, email: finalEmail, phone: finalPhone, service: finalService });
+
+      const reply = raw.replace(/\[\[BOOKING:[\s\S]*?\]\]/, '').trim();
+      return res.json({
+        reply,
+        bookingDetected: {
+          date: booking.date,
+          time: booking.time,
+          customerName: finalName,
+          service: finalService,
+          email: finalEmail,
+          phone: finalPhone
+        }
+      });
     }
 
-    // Zaznaj NEED_INFO tag - bot prosi za kontaktne podatke
+    // Zaznaj NEED_INFO tag
     const needInfo = raw.includes('[[NEED_INFO]]');
     const cleanReply = raw.replace('[[NEED_INFO]]', '').trim();
     res.json({ reply: cleanReply, needInfo, bookingDetected: null });
 
   } catch (err) {
-    console.error(err);
+    console.error('Chat API error:', err);
     res.status(500).json({ error: 'API error' });
   }
 });
@@ -251,15 +274,12 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
 
   const slotsText = days.length > 0 ? days.join('\n') : 'Vsi termini so prosti.';
 
-  // Podatki o stranki če so že vpisani
-  const customerSection = customerInfo
-    ? `\nPODATKI STRANKE (že vpisani - NE sprašuj znova):
-- Ime: ${customerInfo.name}
-- Email: ${customerInfo.email}
-- Telefon: ${customerInfo.phone}\n`
-    : '\nSTRANKA NI VPISALA PODATKOV - pred rezervacijo moraš prikazati [[NEED_INFO]]\n';
+  // ── FIX 4: Jasnejši sistem prompt za booking tag format ──
+  if (customerInfo) {
+    // Ime brez narekovajev in posebnih znakov za varni JSON
+    const safeName = (customerInfo.name || '').replace(/"/g, '').replace(/\\/g, '');
 
-  return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjas VEDNO in SAMO v slovenscini.
+    return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjas VEDNO in SAMO v slovenscini.
 NIKOLI ne uporabi markdown formatiranja - pisi navadno besedilo.
 Si prijazen, profesionalen in jedrnat.
 
@@ -276,27 +296,66 @@ ${salon.services}
 
 PROSTI TERMINI (oblika YYYY-MM-DD):
 ${slotsText}
-${customerSection}
-REZERVACIJE - PRAVILA:
-${customerInfo ? `
-- Stranka je že vpisala podatke (ime: ${customerInfo.name})
-- Ko stranka izbere storitev in termin, TAKOJ potrdi rezervacijo
-- Dodaj [[BOOKING:{"date":"YYYY-MM-DD","time":"HH:MM","customerName":"${customerInfo.name}","service":"storitev"}]]
-` : `
-- Stranka ŠE NI vpisala kontaktnih podatkov
-- Ko stranka hoče rezervirati, dodaj [[NEED_INFO]] na konec odgovora
-- Primer: "Odlično! Pred rezervacijo potrebujem še vaše podatke.[[NEED_INFO]]"
-- Ko bo stranka vpisala podatke, bo sistem to javil in potem nadaljuj z rezervacijo
-`}
 
-POTEK REZERVACIJE:
-1. Stranka pove kaj hoče → predlagaj proste termine
-2. Stranka izbere termin → če ni podatkov: [[NEED_INFO]], če ima podatke: [[BOOKING:...]]
-3. Potrdi rezervacijo stranki
+PODATKI STRANKE (ze vpisani - NE sprašuj znova):
+- Ime: ${safeName}
+- Email: ${customerInfo.email}
+- Telefon: ${customerInfo.phone}
+
+REZERVACIJE - PRAVILA:
+- Stranka JE ze vpisala podatke
+- Ko stranka izbere termin in storitev, TAKOJ potrdi rezervacijo brez dodatnih vprašanj
+- Na KONEC odgovora dodaj tag v TOCNO tej obliki (brez presledkov, brez newlineov znotraj):
+[[BOOKING:{"date":"YYYY-MM-DD","time":"HH:MM","customerName":"${safeName}","service":"ime storitve"}]]
+- Zamenjaj YYYY-MM-DD z dejanskim datumom, HH:MM s terminom, ime storitve z izbrano storitvijo
+- Primer: [[BOOKING:{"date":"2025-06-15","time":"10:00","customerName":"${safeName}","service":"Zenski haircut"}]]
+- Tag mora biti na koncu sporocila, brez nicesar za njim
+
+POTEK:
+1. Stranka pove kaj hoce → predlagaj proste termine
+2. Stranka potrdi termin → takoj dodaj [[BOOKING:...]] tag
+3. V sporocilu potrdi rezervacijo (brez taga na koncu ze napises potrditev)
 
 PRAVILA:
-- Nikoli si ne izmišljuj prostih terminov
+- Nikoli si ne izmisljuj prostih terminov - uporabi samo termine iz seznama
 - Ce ne ves, preusmeri na telefon: ${salon.phone}`;
+
+  } else {
+    return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjas VEDNO in SAMO v slovenscini.
+NIKOLI ne uporabi markdown formatiranja - pisi navadno besedilo.
+Si prijazen, profesionalen in jedrnat.
+
+Danasnji datum: ${todayStr}
+
+INFORMACIJE O SALONU:
+- Ime: ${salon.name}
+- Naslov: ${salon.address}
+- Telefon: ${salon.phone}
+- Delovni cas: ${salon.hours}
+
+STORITVE IN CENIK:
+${salon.services}
+
+PROSTI TERMINI (oblika YYYY-MM-DD):
+${slotsText}
+
+STRANKA NI VPISALA PODATKOV.
+
+REZERVACIJE - PRAVILA:
+- Ko stranka hoce rezervirati termin, dodaj [[NEED_INFO]] na KONEC odgovora
+- Primer: "Odlicno! Pred rezervacijo potrebujem se vase podatke.[[NEED_INFO]]"
+- [[NEED_INFO]] mora biti ZADNJA stvar v odgovoru, brez nicesar za njim
+- Ko bo stranka vpisala podatke, bo sistem to javil in potem nadaljuj z rezervacijo
+
+POTEK:
+1. Stranka pove kaj hoce → predlagaj proste termine
+2. Stranka izbere termin → dodaj [[NEED_INFO]]
+3. Ko dobiš podatke stranke → potrdi rezervacijo z [[BOOKING:...]] tagom
+
+PRAVILA:
+- Nikoli si ne izmisljuj prostih terminov
+- Ce ne ves, preusmeri na telefon: ${salon.phone}`;
+  }
 }
 
 function buildChatPage(salon) {
@@ -337,8 +396,6 @@ function buildChatPage(salon) {
     .send-btn svg { width: 16px; height: 16px; fill: #c9a84c; }
     .info-bar { background: #faf7f2; padding: 10px 16px; display: flex; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid rgba(0,0,0,0.06); font-size: 12px; color: #6b5f52; }
     .powered { text-align: center; font-size: 11px; color: #bbb; padding: 6px; background: #fff; }
-
-    /* KONTAKTNI OBRAZEC */
     .contact-form { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 16px; margin-top: 6px; display: flex; flex-direction: column; gap: 10px; max-width: 280px; }
     .contact-form .form-title { font-size: 13px; font-weight: 600; color: #1a1410; }
     .contact-form .form-sub { font-size: 11px; color: #6b5f52; margin-top: -6px; }
@@ -346,7 +403,6 @@ function buildChatPage(salon) {
     .contact-form input:focus { border-color: #c9a84c; }
     .contact-form .submit-btn { background: #1a1410; color: #e8c97a; border: none; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity 0.15s; }
     .contact-form .submit-btn:hover { opacity: 0.85; }
-    .customer-badge { display: flex; align-items: center; gap: 6px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 100px; padding: 4px 12px; font-size: 11px; color: #16a34a; width: fit-content; margin-bottom: 4px; }
   </style>
 </head>
 <body>
@@ -369,7 +425,7 @@ function buildChatPage(salon) {
       <span id="customer-bar-text" style="font-size:11px; color:#16a34a;"></span>
     </div>
     <div class="input-area">
-      <input type="text" id="input" placeholder="Vpisite sporocilo..." />
+      <input type="text" id="input" placeholder="Vpišite sporočilo..." />
       <button class="send-btn" id="send">
         <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
       </button>
@@ -381,7 +437,7 @@ function buildChatPage(salon) {
     const SALON_ID = '${salon.id}';
     let messages = [];
     let isTyping = false;
-    let customerInfo = null; // Podatki stranke ko jih vpiše
+    let customerInfo = null;
 
     function getTime() { return new Date().toLocaleTimeString('sl-SI', { hour: '2-digit', minute: '2-digit' }); }
 
@@ -418,9 +474,7 @@ function buildChatPage(salon) {
 
     function showContactForm() {
       const msgs = document.getElementById('messages');
-      // Odstrani morebitni obstoječ obrazec
       document.getElementById('contact-form-msg')?.remove();
-
       const div = document.createElement('div');
       div.className = 'msg bot';
       div.id = 'contact-form-msg';
@@ -444,30 +498,22 @@ function buildChatPage(salon) {
       const name = document.getElementById('cf-name')?.value.trim();
       const email = document.getElementById('cf-email')?.value.trim();
       const phone = document.getElementById('cf-phone')?.value.trim();
-
       if (!name || !email || !phone) {
         alert('Prosimo izpolnite vsa polja.');
         return;
       }
-
-      // Shrani podatke
       customerInfo = { name, email, phone };
-
-      // Odstrani obrazec
       document.getElementById('contact-form-msg')?.remove();
-
-      // Pokaži badge na vrhu
       document.getElementById('customer-bar').style.display = 'block';
       document.getElementById('customer-bar-text').textContent = '👤 ' + name + ' · ' + phone;
 
-      // Dodaj sistemsko sporočilo in nadaljuj
-      addUserMsg(name + ' (' + email + ', ' + phone + ')');
+      // ── FIX 5: Prikaži potrditev obrazca, BREZ dodajanja v messages history ──
+      // Namesto tega dodamo sistem sporočilo ki botu pove da nadaljuje z rezervacijo
+      addUserMsg('✓ ' + name + ' | ' + email + ' | ' + phone);
       messages.push({
         role: 'user',
-        content: '[STRANKA JE VPISALA PODATKE] Ime: ' + name + ', Email: ' + email + ', Telefon: ' + phone + '. Nadaljuj z rezervacijo.'
+        content: 'Moji podatki so: Ime: ' + name + ', Email: ' + email + ', Telefon: ' + phone + '. Prosim nadaljuj z rezervacijo termina ki sva se ga dogovorila.'
       });
-
-      // Pošlji botu da nadaljuje
       sendToBot();
     }
 
@@ -498,19 +544,19 @@ function buildChatPage(salon) {
           addBotMsg(data.reply);
           messages.push({ role: 'assistant', content: data.reply });
           showContactForm();
-        } else {
+        } else if (data.bookingDetected) {
           addBotMsg(data.reply, data.bookingDetected);
-          if (data.bookingDetected) {
-            messages.push({ role: 'assistant', content: data.reply });
-            messages.push({ role: 'user', content: '[SISTEM: Rezervacija je bila uspešno vpisana za ' + customerInfo?.name + ' ob ' + data.bookingDetected.time + '. Termin je zaseden.]' });
-            messages.push({ role: 'assistant', content: 'Razumem, rezervacija je potrjena.' });
-          } else {
-            messages.push({ role: 'assistant', content: data.reply });
-          }
+          messages.push({ role: 'assistant', content: data.reply });
+          // Obvesti bota da je rezervacija potrjena
+          messages.push({ role: 'user', content: '[SISTEM: Rezervacija uspešno shranjena.]' });
+          messages.push({ role: 'assistant', content: 'Rezervacija je potrjena.' });
+        } else {
+          addBotMsg(data.reply);
+          messages.push({ role: 'assistant', content: data.reply });
         }
       } catch(e) {
         removeTyping();
-        addBotMsg('Oprostite, prislo je do napake. Poklisite nas: ${salon.phone}');
+        addBotMsg('Oprostite, prišlo je do napake. Pokličite nas: ${salon.phone}');
       }
       isTyping = false;
     }
@@ -650,8 +696,6 @@ function buildAdminPage(salon) {
       document.getElementById('modal-title').textContent = 'Termin ob ' + time;
       document.getElementById('modal-customer').value = slot ? (slot.customer_name || '') : '';
       document.getElementById('modal-service').value = slot ? (slot.service || '') : '';
-
-      // Pokaži kontaktne podatke stranke če so
       const infoSection = document.getElementById('modal-info-section');
       if (slot && slot.customer_email) {
         infoSection.innerHTML = '<div class="modal-info">' +
@@ -661,7 +705,6 @@ function buildAdminPage(salon) {
       } else {
         infoSection.innerHTML = '';
       }
-
       document.getElementById('modal').classList.add('open');
     }
 
