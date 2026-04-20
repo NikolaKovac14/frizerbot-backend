@@ -288,7 +288,9 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
 
   const busyByDate = {};
   busySlots.forEach(s => {
-    const d = new Date(s.date).toISOString().split('T')[0];
+    const d = typeof s.date === 'string' 
+  ? s.date.split('T')[0] 
+  : s.date.toISOString().split('T')[0];
     if (!busyByDate[d]) busyByDate[d] = new Set();
     busyByDate[d].add(s.time);
   });
@@ -311,11 +313,12 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
   if (customerInfo) {
     const safeName = (customerInfo.name || '').replace(/"/g, '').replace(/\\/g, '');
 
-    return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjas VEDNO in SAMO v slovenscini.
+return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjas VEDNO in SAMO v slovenscini.
 NIKOLI ne uporabi markdown formatiranja - pisi navadno besedilo.
 Si prijazen, profesionalen in jedrnat.
 
 Danasnji datum: ${todayStr}
+DATUM ZA TAGE: ${todayLj.toISOString().split('T')[0]}
 
 INFORMACIJE O SALONU:
 - Ime: ${salon.name}
@@ -338,12 +341,14 @@ REZERVACIJE - PRAVILA:
 - Stranka JE ze vpisala podatke
 - Ko stranka izbere termin in storitev, TAKOJ potrdi rezervacijo brez dodatnih vprašanj
 
-BRISANJE IN PRESELITEV:
-- Ako stranka želi izbrisati STARI termin in rezervirati NOVI:
-  1. TAKOJ sprocesiraj DELETE in BOOKING skupaj
-  2. Na KONEC odgovora dodaj [[DELETE:YYYY-MM-DDTHH:MM]]
-  3. Zatim TAKOJ dodaj [[BOOKING:{...}]] tag s NOVIM terminom
-  4. Primer: "Izbrisem ti termin ob 16:00 in rezerviram te ob 17:00.[[DELETE:2026-04-20T16:00]][[BOOKING:{...}]]"
+BRISANJE TERMINA:
+- Ako stranka želi IZBRISATI termin, VEDNO dodaj [[DELETE:YYYY-MM-DDTHH:MM]] tag na KONEC odgovora
+- Primer samo brisanje: "Termin ob 18:00 sem ti izbrisal.[[DELETE:2026-04-20T18:00]]"
+- KRITIČNO: Brez tega taga se brisanje NE zgodi - vedno ga dodaj!
+
+BRISANJE IN PRESELITEV (DELETE + nova rezervacija):
+- Dodaj NAJPREJ [[DELETE:...]] nato [[BOOKING:{...}]]
+- Primer: "Prestavil sem tvoj termin.[[DELETE:2026-04-20T16:00]][[BOOKING:{...}]]"
 
 NOVA REZERVACIJA:
 - Na KONEC odgovora dodaj:
@@ -365,11 +370,12 @@ KRITIČNO:
 - Ce ne ves, preusmeri na telefon: ${salon.phone}`;
 
   } else {
-    return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjas VEDNO in SAMO v slovenscini.
+return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjas VEDNO in SAMO v slovenscini.
 NIKOLI ne uporabi markdown formatiranja - pisi navadno besedilo.
 Si prijazen, profesionalen in jedrnat.
 
 Danasnji datum: ${todayStr}
+DATUM ZA TAGE: ${todayLj.toISOString().split('T')[0]}
 
 INFORMACIJE O SALONU:
 - Ime: ${salon.name}
