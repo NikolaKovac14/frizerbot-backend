@@ -156,25 +156,33 @@ app.post('/chat', async (req, res) => {
     console.log('✅ Bot raw response:', raw);
 
     // ── FIX 1: NAJPREJ obdelajmo DELETE ──
+    console.log('🔍 DELETE regex test:', raw.match(/\[\[DELETE:([^\]]+)\]\]/));
     const deleteMatch = raw.match(/\[\[DELETE:([^\]]+)\]\]/);
     if (deleteMatch) {
       try {
         const dateTimeStr = deleteMatch[1].trim();
-        // Format je: 2026-04-20T15:00
+        console.log('📝 Parsed DELETE dateTime:', dateTimeStr);
+        // Format je: 2026-04-20T15:00 ali 2026-04-20T08:00
         const [date, time] = dateTimeStr.split('T');
+        
+        console.log('📅 Parsed date:', date, '⏰ time:', time);
         
         if (date && time) {
           console.log('✅ Brišem termin:', date, time);
           
-          await pool.query(
+          const result = await pool.query(
             'DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3',
             [salonId, date, time]
           );
-          console.log('✅ Termin obrisan:', date, time);
+          console.log('✅ Termin obrisan - deleted rows:', result.rowCount);
+        } else {
+          console.error('❌ Date ali time missing - date:', date, 'time:', time);
         }
       } catch (e) {
-        console.error('❌ DELETE error:', e);
+        console.error('❌ DELETE error:', e.message);
       }
+    } else {
+      console.log('ℹ️ Ni DELETE taga u odgovoru');
     }
     // ── FIX 2: Bolj robustni regex – ujame tudi če je presledek ali newline v JSON-u ──
     const bookingMatch = raw.match(/\[\[BOOKING:\s*(\{[\s\S]*?\})\s*\]\]/);
@@ -232,7 +240,7 @@ app.post('/chat', async (req, res) => {
 
     // Zaznaj NEED_INFO tag
     const needInfo = raw.includes('[[NEED_INFO]]');
-    const cleanReply = raw.replace('[[NEED_INFO]]', '').trim();
+    const cleanReply = raw.replace('[[NEED_INFO]]', '').replace(/\[\[DELETE:[^\]]*\]\]/g, '').trim();
     res.json({ reply: cleanReply, needInfo, bookingDetected: null });
 
   } catch (err) {
@@ -329,12 +337,16 @@ PODATKI STRANKE (ze vpisani - NE sprašuj znova):
 REZERVACIJE - PRAVILA:
 - Stranka JE ze vpisala podatke
 - Ko stranka izbere termin in storitev, TAKOJ potrdi rezervacijo brez dodatnih vprašanj
-- BRISANJE: Ako stranka želi izbrisati STARI termin in rezervirati NOVI:
-  1. Na KONEC odgovora dodaj [[DELETE:YYYY-MM-DDTHH:MM]] tag
-  2. Zatim dodaj [[BOOKING:...]] tag s NOVIM terminom
-  3. Primer: "Izbrisem ti termin ob 16:00.[[DELETE:2026-04-20T16:00]] Rezerviram te na 17:00.[[BOOKING:{...}]]"
 
-- Na KONEC odgovora dodaj tagove:
+BRISANJE IN PRESELITEV:
+- Ako stranka želi izbrisati STARI termin in rezervirati NOVI:
+  1. TAKOJ sprocesiraj DELETE in BOOKING skupaj
+  2. Na KONEC odgovora dodaj [[DELETE:YYYY-MM-DDTHH:MM]]
+  3. Zatim TAKOJ dodaj [[BOOKING:{...}]] tag s NOVIM terminom
+  4. Primer: "Izbrisem ti termin ob 16:00 in rezerviram te ob 17:00.[[DELETE:2026-04-20T16:00]][[BOOKING:{...}]]"
+
+NOVA REZERVACIJA:
+- Na KONEC odgovora dodaj:
 [[BOOKING:{"date":"YYYY-MM-DD","time":"HH:MM","customerName":"${safeName}","service":"ime storitve"}]]
 - Zamenjaj YYYY-MM-DD z dejanskim datumom, HH:MM s terminom, ime storitve z izbrano storitvijo
 - Primer: [[BOOKING:{"date":"2025-06-15","time":"10:00","customerName":"${safeName}","service":"Zenski haircut"}]]
@@ -342,12 +354,14 @@ REZERVACIJE - PRAVILA:
 
 POTEK:
 1. Stranka pove kaj hoce → predlagaj proste termine
-2. Stranka potrdi termin → takoj dodaj [[BOOKING:...]] tag
-3. AKO ZA BRISANJEM: dodaj [[DELETE:YYYY-MM-DDTHH:MM]] tag, zatim [[BOOKING:...]] tag
+2. Stranka izbere termin → takoj dodaj [[BOOKING:...]] tag
+3. AKO ZAHTEVA BRISANJE: dodaj [[DELETE:...]] tag PRED [[BOOKING:...]] tagom
 4. V sporocilu potrdi rezervacijo
 
-PRAVILA:
+KRITIČNO:
 - Nikoli si ne izmisljuj prostih terminov - uporabi samo termine iz seznama
+- NE POSTAVLJAJ VPRASANJ po brisanju - TAKOJ naredi novo rezervacijo ce je stranka ca prej sporocila kateri termin ji ugaja
+- Ako stranka samo zeli izbrisati brez nove rezervacije, naredi SAMO DELETE
 - Ce ne ves, preusmeri na telefon: ${salon.phone}`;
 
   } else {
