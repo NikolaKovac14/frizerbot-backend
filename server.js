@@ -5,16 +5,18 @@ const express = require('express');
 const cors = require('cors');
 const Anthropic = require('@anthropic-ai/sdk');
 const { Pool } = require('pg');
+const sgMail = require('@sendgrid/mail');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
 const HOURS = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00'];
@@ -62,6 +64,139 @@ async function initDB() {
     ]);
   }
   console.log('DB inicializiran');
+}
+
+// ─── EMAIL FUNKCIJE ──────────────────────────────────────────────────────────
+async function sendConfirmationEmail(customerEmail, customerName, salon, date, time, service) {
+  try {
+    const dateLj = new Date(date + 'T00:00:00');
+    const dateFormatted = dateLj.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    
+    const msg = {
+      to: customerEmail,
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@frizerbot.si',
+      subject: `✅ Rezervacija potrjena - ${salon.name}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #2d2520;">
+          <div style="background: #1a1410; padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: #c9a84c; margin: 0; font-size: 24px;">✅ Rezervacija Potrjena</h1>
+          </div>
+          
+          <div style="background: #fff; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <p style="margin: 0 0 20px 0; font-size: 16px;">Pozdravljeni <strong>${customerName}</strong>,</p>
+            
+            <p style="margin: 0 0 25px 0; font-size: 14px; color: #6b5f52;">Vaša rezervacija je uspješno potvrjena. Pogledajte detalje ispod:</p>
+            
+            <div style="background: #f5f0eb; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
+                <span style="color: #6b5f52;">📅 Datum:</span>
+                <strong style="color: #1a1410;">${dateFormatted}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
+                <span style="color: #6b5f52;">🕐 Vrijeme:</span>
+                <strong style="color: #1a1410;">${time}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
+                <span style="color: #6b5f52;">💇 Usluga:</span>
+                <strong style="color: #1a1410;">${service}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 14px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 12px;">
+                <span style="color: #6b5f52;">📍 Lokacija:</span>
+                <strong style="color: #1a1410;">${salon.address}</strong>
+              </div>
+            </div>
+            
+            <div style="background: #dcfce7; border-left: 4px solid #4ade80; padding: 15px; border-radius: 4px; margin-bottom: 25px; font-size: 13px; color: #16a34a;">
+              <strong>💡 Savjet:</strong> Pojavite se 5 minuta ranije. Ako trebate otkazati, slobodno nas pozovite na ${salon.phone}.
+            </div>
+            
+            <div style="border-top: 1px solid #e5e7eb; padding-top: 20px;">
+              <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                Ako trebate pomoć ili trebate otkazati, slobodno nas kontaktirajte:<br>
+                📞 <strong>${salon.phone}</strong><br>
+                📧 <strong>${salon.notification_email}</strong>
+              </p>
+            </div>
+          </div>
+          
+          <div style="text-align: center; padding: 15px; font-size: 11px; color: #aaa;">
+            <p style="margin: 0;">Powered by FrizerBot.si</p>
+          </div>
+        </div>
+      `
+    };
+
+    await sgMail.send(msg);
+    console.log('✅ Potvrda email poslana klijentu:', customerEmail);
+  } catch (err) {
+    console.error('❌ Error sending confirmation email:', err);
+  }
+}
+
+async function sendNotificationToSalon(salon, customerName, customerEmail, customerPhone, date, service, time) {
+  try {
+    const dateLj = new Date(date + 'T00:00:00');
+    const dateFormatted = dateLj.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    
+    const msg = {
+      to: salon.notification_email,
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@frizerbot.si',
+      subject: `🔔 Nova Rezervacija - ${salon.name} (${dateFormatted} ${time})`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #2d2520;">
+          <div style="background: #1a1410; padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: #c9a84c; margin: 0; font-size: 24px;">🔔 Nova Rezervacija</h1>
+          </div>
+          
+          <div style="background: #fff; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <p style="margin: 0 0 20px 0; font-size: 16px;">Imate novu rezervaciju u <strong>${salon.name}</strong>!</p>
+            
+            <div style="background: #f5f0eb; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
+                <span style="color: #6b5f52;">👤 Ime:</span>
+                <strong style="color: #1a1410;">${customerName}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
+                <span style="color: #6b5f52;">📞 Telefon:</span>
+                <strong style="color: #1a1410;"><a href="tel:${customerPhone}" style="color: #1a1410; text-decoration: none;">${customerPhone}</a></strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
+                <span style="color: #6b5f52;">📧 Email:</span>
+                <strong style="color: #1a1410;"><a href="mailto:${customerEmail}" style="color: #1a1410; text-decoration: none;">${customerEmail}</a></strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
+                <span style="color: #6b5f52;">📅 Datum:</span>
+                <strong style="color: #1a1410;">${dateFormatted}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
+                <span style="color: #6b5f52;">🕐 Vrijeme:</span>
+                <strong style="color: #1a1410;">${time}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 14px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 12px;">
+                <span style="color: #6b5f52;">💇 Usluga:</span>
+                <strong style="color: #1a1410;">${service}</strong>
+              </div>
+            </div>
+            
+            <div style="text-align: center;">
+              <a href="${process.env.API_URL || 'https://frizerbot-backend-production.up.railway.app'}/admin/${salon.id}" style="background: #1a1410; color: #c9a84c; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: 600; font-size: 14px;">
+                Otvori Admin Panel
+              </a>
+            </div>
+          </div>
+          
+          <div style="text-align: center; padding: 15px; font-size: 11px; color: #aaa;">
+            <p style="margin: 0;">Powered by FrizerBot.si</p>
+          </div>
+        </div>
+      `
+    };
+
+    await sgMail.send(msg);
+    console.log('✅ Notifikacija email poslana salonu:', salon.notification_email);
+  } catch (err) {
+    console.error('❌ Error sending notification email to salon:', err);
+  }
 }
 
 // ─── HOSTED CHAT STRAN ────────────────────────────────────────────────────────
@@ -117,12 +252,24 @@ app.post('/booking', async (req, res) => {
   if (existing.length > 0) {
     return res.status(409).json({ error: 'Ta termin je že zaseden.' });
   }
+
+  const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE id = $1', [salonId]);
+  const salon = salonRows[0];
+
   await pool.query(`
     INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, customer_phone, service)
     VALUES ($1, $2, $3, 'busy', $4, $5, $6, $7)
     ON CONFLICT (salon_id, date, time) DO UPDATE
     SET status = 'busy', customer_name = $4, customer_email = $5, customer_phone = $6, service = $7
   `, [salonId, date, time, customerName, customerEmail || '', customerPhone || '', service]);
+
+  // Pošalji email-e
+  if (customerEmail) {
+    await sendConfirmationEmail(customerEmail, customerName, salon, date, time, service);
+  }
+  if (salon.notification_email) {
+    await sendNotificationToSalon(salon, customerName, customerEmail || '', customerPhone || '', date, service, time);
+  }
 
   console.log('Nova rezervacija:', { salonId, date, time, customerName, customerEmail, customerPhone, service });
   res.json({ success: true });
@@ -222,6 +369,14 @@ app.post('/chat', async (req, res) => {
         SET status = 'busy', customer_name = $4, customer_email = $5, customer_phone = $6, service = $7
       `, [salonId, booking.date, booking.time, finalName, finalEmail, finalPhone, finalService]);
 
+      // Pošalji email-e
+      if (finalEmail) {
+        await sendConfirmationEmail(finalEmail, finalName, salon, booking.date, booking.time, finalService);
+      }
+      if (salon.notification_email) {
+        await sendNotificationToSalon(salon, finalName, finalEmail, finalPhone, booking.date, finalService, booking.time);
+      }
+
       console.log('✅ Bot rezervirao:', { date: booking.date, time: booking.time, name: finalName, email: finalEmail, phone: finalPhone, service: finalService });
 
       const reply = raw.replace(/\[\[DELETE:[^\]]*\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
@@ -253,6 +408,7 @@ app.post('/chat', async (req, res) => {
     res.status(500).json({ error: 'API error: ' + errorMsg });
   }
 });
+
 // ─── SALON MANAGEMENT ─────────────────────────────────────────────────────────
 app.get('/salons', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM salons WHERE active = true ORDER BY created_at');
@@ -279,7 +435,6 @@ app.put('/salons/:id', async (req, res) => {
 });
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-// Zamijeni cijelu buildSystemPrompt funkciju s ovom verzijom
 function buildSystemPrompt(salon, busySlots, customerInfo) {
   const todayLj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
   const todayStr = todayLj.toLocaleDateString('sl-SI', {
