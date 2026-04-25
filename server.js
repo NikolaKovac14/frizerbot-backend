@@ -366,6 +366,13 @@ app.post('/chat', async (req, res) => {
         [salonId, booking.date, booking.time]
       );
       if (existing.length > 0) {
+        // Če je ista stranka - posodobi storitev
+        if (existing[0].customer_email === finalEmail) {
+          await pool.query(`UPDATE timeslots SET service=$1 WHERE salon_id=$2 AND date=$3 AND time=$4`,
+            [finalService, salonId, booking.date, booking.time]);
+          const reply = raw.replace(/\[\[DELETE:[^\]]*\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
+          return res.json({ reply, bookingDetected: { date: booking.date, time: booking.time, customerName: finalName, service: finalService, email: finalEmail, phone: finalPhone }});
+        }
         return res.json({ reply: 'Oprostite, ta termin je bil ravnokar zaseden. Izberite drug termin.', bookingDetected: null });
       }
 
@@ -503,6 +510,9 @@ REZERVACIJE - PRAVILA:
 - Stranka JE že vpisala podatke
 - Ko stranka izbere termin in storitev, TAKOJ potrdi rezervacijo brez dodatnih vprašanj
 - Rezerviraj SAMO termine iz zgornjega seznama prostih terminov - nobenih drugih
+- KRITIČNO: [[BOOKING:...]] tag dodaj SAMO ko imaš VSE: datum + čas + IME + STORITEV
+- ČE STRANKA NI POVEDALA STORITVE: vprašaj za storitev, NE dodajaj [[BOOKING:...]] taga
+- NE rezerviraj z "Storitev" ali prazno storitvijo kot placeholder
 
 BRISANJE TERMINA:
 - Če stranka želi IZBRISATI termin, VEDNO dodaj [[DELETE:YYYY-MM-DDTHH:MM]] na KONEC odgovora
