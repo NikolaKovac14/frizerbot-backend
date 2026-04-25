@@ -85,7 +85,7 @@ async function sendConfirmationEmail(customerEmail, customerName, salon, date, t
           <div style="background: #fff; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
             <p style="margin: 0 0 20px 0; font-size: 16px;">Pozdravljeni <strong>${customerName}</strong>,</p>
             
-            <p style="margin: 0 0 25px 0; font-size: 14px; color: #6b5f52;">Vaša rezervacija je uspješno potvrjena. Pogledajte detalje ispod:</p>
+            <p style="margin: 0 0 25px 0; font-size: 14px; color: #6b5f52;">Vaša rezervacija je bila uspešno potrjena. Podrobnosti so spodaj:</p>
             
             <div style="background: #f5f0eb; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
               <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
@@ -93,26 +93,26 @@ async function sendConfirmationEmail(customerEmail, customerName, salon, date, t
                 <strong style="color: #1a1410;">${dateFormatted}</strong>
               </div>
               <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
-                <span style="color: #6b5f52;">🕐 Vrijeme:</span>
+                <span style="color: #6b5f52;">🕐 Ura:</span>
                 <strong style="color: #1a1410;">${time}</strong>
               </div>
               <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
-                <span style="color: #6b5f52;">💇 Usluga:</span>
+                <span style="color: #6b5f52;">💇 Storitev:</span>
                 <strong style="color: #1a1410;">${service}</strong>
               </div>
               <div style="display: flex; justify-content: space-between; font-size: 14px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 12px;">
-                <span style="color: #6b5f52;">📍 Lokacija:</span>
+                <span style="color: #6b5f52;">📍 Naslov:</span>
                 <strong style="color: #1a1410;">${salon.address}</strong>
               </div>
             </div>
             
             <div style="background: #dcfce7; border-left: 4px solid #4ade80; padding: 15px; border-radius: 4px; margin-bottom: 25px; font-size: 13px; color: #16a34a;">
-              <strong>💡 Savjet:</strong> Pojavite se 5 minuta ranije. Ako trebate otkazati, slobodno nas pozovite na ${salon.phone}.
+              <strong>💡 Nasvet:</strong> Prosimo, pridite 5 minut prej. Če morate odpovedati termin, nas pokličite na ${salon.phone}.
             </div>
             
             <div style="border-top: 1px solid #e5e7eb; padding-top: 20px;">
               <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                Ako trebate pomoć ili trebate otkazati, slobodno nas kontaktirajte:<br>
+                Če potrebujete pomoč ali želite odpovedati termin, nas kontaktirajte:<br>
                 📞 <strong>${salon.phone}</strong><br>
                 📧 <strong>${salon.notification_email}</strong>
               </p>
@@ -120,16 +120,16 @@ async function sendConfirmationEmail(customerEmail, customerName, salon, date, t
           </div>
           
           <div style="text-align: center; padding: 15px; font-size: 11px; color: #aaa;">
-            <p style="margin: 0;">Powered by FrizerBot.si</p>
+            <p style="margin: 0;">Poganja FrizerBot.si</p>
           </div>
         </div>
       `
     };
 
     await sgMail.send(msg);
-    console.log('✅ Potvrda email poslana klijentu:', customerEmail);
+    console.log('✅ Potrditveni e-mail poslan stranki:', customerEmail);
   } catch (err) {
-    console.error('❌ Error sending confirmation email:', err);
+    console.error('❌ Napaka pri pošiljanju e-maila stranki:', err);
   }
 }
 
@@ -149,7 +149,7 @@ async function sendNotificationToSalon(salon, customerName, customerEmail, custo
           </div>
           
           <div style="background: #fff; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <p style="margin: 0 0 20px 0; font-size: 16px;">Imate novu rezervaciju u <strong>${salon.name}</strong>!</p>
+            <p style="margin: 0 0 20px 0; font-size: 16px;">Nova rezervacija v salonu <strong>${salon.name}</strong>!</p>
             
             <div style="background: #f5f0eb; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
               <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
@@ -161,7 +161,7 @@ async function sendNotificationToSalon(salon, customerName, customerEmail, custo
                 <strong style="color: #1a1410;"><a href="tel:${customerPhone}" style="color: #1a1410; text-decoration: none;">${customerPhone}</a></strong>
               </div>
               <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
-                <span style="color: #6b5f52;">📧 Email:</span>
+                <span style="color: #6b5f52;">📧 E-pošta:</span>
                 <strong style="color: #1a1410;"><a href="mailto:${customerEmail}" style="color: #1a1410; text-decoration: none;">${customerEmail}</a></strong>
               </div>
               <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
@@ -169,33 +169,33 @@ async function sendNotificationToSalon(salon, customerName, customerEmail, custo
                 <strong style="color: #1a1410;">${dateFormatted}</strong>
               </div>
               <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
-                <span style="color: #6b5f52;">🕐 Vrijeme:</span>
+                <span style="color: #6b5f52;">🕐 Ura:</span>
                 <strong style="color: #1a1410;">${time}</strong>
               </div>
               <div style="display: flex; justify-content: space-between; font-size: 14px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 12px;">
-                <span style="color: #6b5f52;">💇 Usluga:</span>
+                <span style="color: #6b5f52;">💇 Storitev:</span>
                 <strong style="color: #1a1410;">${service}</strong>
               </div>
             </div>
             
             <div style="text-align: center;">
               <a href="${process.env.API_URL || 'https://frizerbot-backend-production.up.railway.app'}/admin/${salon.id}" style="background: #1a1410; color: #c9a84c; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: 600; font-size: 14px;">
-                Otvori Admin Panel
+                Odpri Admin Panel
               </a>
             </div>
           </div>
           
           <div style="text-align: center; padding: 15px; font-size: 11px; color: #aaa;">
-            <p style="margin: 0;">Powered by FrizerBot.si</p>
+            <p style="margin: 0;">Poganja FrizerBot.si</p>
           </div>
         </div>
       `
     };
 
     await sgMail.send(msg);
-    console.log('✅ Notifikacija email poslana salonu:', salon.notification_email);
+    console.log('✅ Obvestilo e-mail poslano salonu:', salon.notification_email);
   } catch (err) {
-    console.error('❌ Error sending notification email to salon:', err);
+    console.error('❌ Napaka pri pošiljanju obvestila salonu:', err);
   }
 }
 
@@ -263,7 +263,6 @@ app.post('/booking', async (req, res) => {
     SET status = 'busy', customer_name = $4, customer_email = $5, customer_phone = $6, service = $7
   `, [salonId, date, time, customerName, customerEmail || '', customerPhone || '', service]);
 
-  // Pošalji email-e
   if (customerEmail) {
     await sendConfirmationEmail(customerEmail, customerName, salon, date, time, service);
   }
@@ -302,36 +301,32 @@ app.post('/chat', async (req, res) => {
     const raw = data.content[0].text;
     console.log('✅ Bot raw response:', raw);
 
-    // ── FIX 1: NAJPREJ obdelajmo DELETE ──
-    console.log('🔍 DELETE regex test:', raw.match(/\[\[DELETE:([^\]]+)\]\]/));
     const deleteMatch = raw.match(/\[\[DELETE:([^\]]+)\]\]/);
     if (deleteMatch) {
       try {
         const dateTimeStr = deleteMatch[1].trim();
         console.log('📝 Parsed DELETE dateTime:', dateTimeStr);
-        // Format je: 2026-04-20T15:00 ali 2026-04-20T08:00
         const [date, time] = dateTimeStr.split('T');
         
         console.log('📅 Parsed date:', date, '⏰ time:', time);
         
         if (date && time) {
           console.log('✅ Brišem termin:', date, time);
-          
           const result = await pool.query(
             'DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3',
             [salonId, date, time]
           );
-          console.log('✅ Termin obrisan - deleted rows:', result.rowCount);
+          console.log('✅ Termin izbrisan - deleted rows:', result.rowCount);
         } else {
-          console.error('❌ Date ali time missing - date:', date, 'time:', time);
+          console.error('❌ Date ali time manjkata - date:', date, 'time:', time);
         }
       } catch (e) {
-        console.error('❌ DELETE error:', e.message);
+        console.error('❌ DELETE napaka:', e.message);
       }
     } else {
-      console.log('ℹ️ Ni DELETE taga u odgovoru');
+      console.log('ℹ️ Ni DELETE taga v odgovoru');
     }
-    // ── FIX 2: Bolj robustni regex – ujame tudi če je presledek ali newline v JSON-u ──
+
     const bookingMatch = raw.match(/\[\[BOOKING:\s*(\{[\s\S]*?\})\s*\]\]/);
     if (bookingMatch) {
       let booking;
@@ -339,7 +334,7 @@ app.post('/chat', async (req, res) => {
         booking = JSON.parse(bookingMatch[1]);
         console.log('✅ Parsed booking:', booking);
       } catch (e) {
-        console.error('❌ Booking JSON parse error:', e, '\nRaw match:', bookingMatch[1]);
+        console.error('❌ Booking JSON parse napaka:', e, '\nRaw match:', bookingMatch[1]);
         const reply = raw.replace(/\[\[DELETE:[^\]]*\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
         return res.json({
           reply: reply + '\n\nOprostite, prišlo je do tehnične napake pri rezervaciji. Pokličite nas na ' + salon.phone,
@@ -347,7 +342,6 @@ app.post('/chat', async (req, res) => {
         });
       }
 
-      // Preveri termin
       const { rows: existing } = await pool.query(
         "SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3 AND status = 'busy'",
         [salonId, booking.date, booking.time]
@@ -369,7 +363,6 @@ app.post('/chat', async (req, res) => {
         SET status = 'busy', customer_name = $4, customer_email = $5, customer_phone = $6, service = $7
       `, [salonId, booking.date, booking.time, finalName, finalEmail, finalPhone, finalService]);
 
-      // Pošalji email-e
       if (finalEmail) {
         await sendConfirmationEmail(finalEmail, finalName, salon, booking.date, booking.time, finalService);
       }
@@ -377,7 +370,7 @@ app.post('/chat', async (req, res) => {
         await sendNotificationToSalon(salon, finalName, finalEmail, finalPhone, booking.date, finalService, booking.time);
       }
 
-      console.log('✅ Bot rezervirao:', { date: booking.date, time: booking.time, name: finalName, email: finalEmail, phone: finalPhone, service: finalService });
+      console.log('✅ Bot rezerviral:', { date: booking.date, time: booking.time, name: finalName, email: finalEmail, phone: finalPhone, service: finalService });
 
       const reply = raw.replace(/\[\[DELETE:[^\]]*\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
       return res.json({
@@ -393,19 +386,18 @@ app.post('/chat', async (req, res) => {
       });
     }
 
-    // Zaznaj NEED_INFO tag
     const needInfo = raw.includes('[[NEED_INFO]]');
     const cleanReply = raw.replace('[[NEED_INFO]]', '').replace(/\[\[DELETE:[^\]]*\]\]/g, '').trim();
     res.json({ reply: cleanReply, needInfo, bookingDetected: null });
 
   } catch (err) {
-    console.error('❌ Chat API error:');
+    console.error('❌ Chat API napaka:');
     console.error('   Status:', err.status);
     console.error('   Message:', err.message);
     console.error('   Error:', JSON.stringify(err, null, 2));
     
     let errorMsg = err.message || 'Unknown error';
-    res.status(500).json({ error: 'API error: ' + errorMsg });
+    res.status(500).json({ error: 'API napaka: ' + errorMsg });
   }
 });
 
@@ -440,12 +432,16 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
   const todayStr = todayLj.toLocaleDateString('sl-SI', {
     timeZone: 'Europe/Ljubljana', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   });
+  const todayDateStr = todayLj.toISOString().split('T')[0];
+  // Trenutna ura v Ljubljana (npr. 17 za 17:xx)
+  const currentHour = todayLj.getHours();
+  const currentMinute = todayLj.getMinutes();
 
   const busyByDate = {};
   busySlots.forEach(s => {
     const d = typeof s.date === 'string' 
-  ? s.date.split('T')[0] 
-  : s.date.toISOString().split('T')[0];
+      ? s.date.split('T')[0] 
+      : s.date.toISOString().split('T')[0];
     if (!busyByDate[d]) busyByDate[d] = new Set();
     busyByDate[d].add(s.time);
   });
@@ -457,47 +453,62 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
     const dateStr = d.toISOString().split('T')[0];
     const dayName = d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'numeric' });
     const busy = busyByDate[dateStr] || new Set();
-    const free = HOURS.filter(h => !busy.has(h));
+    let free = HOURS.filter(h => !busy.has(h));
+    
+    // Za današnji dan: prikaži samo termine, ki so STROGO v prihodnosti
+    // (ura termina mora biti > trenutna ura, ali enaka ampak z minutami = 0 in trenutnih minut = 0)
+    if (dateStr === todayDateStr) {
+      free = free.filter(h => {
+        const [hh] = h.split(':').map(Number);
+        // Termin je veljaven le če je ura termina > trenutna ura
+        // (ker so termini vedno na polno uro, zadostuje primerjava ure)
+        if (hh > currentHour) return true;
+        // Če je ura enaka, termin je zaseden (npr. 17:00 ob točno 17:00 ni več razumen)
+        return false;
+      });
+    }
+    
     if (free.length > 0) {
       days.push(dateStr + ' (' + dayName + '): ' + free.join(', '));
     }
   }
 
-  const slotsText = days.length > 0 ? days.join('\n') : 'Vsi termini so prosti.';
+  const slotsText = days.length > 0 ? days.join('\n') : 'Trenutno ni prostih terminov v naslednjih 7 dneh.';
 
   if (customerInfo) {
     const safeName = (customerInfo.name || '').replace(/"/g, '').replace(/\\/g, '');
 
-return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjas VEDNO in SAMO v slovenscini.
-NIKOLI ne uporabi markdown formatiranja - pisi navadno besedilo.
+return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjaš VEDNO in SAMO v slovenščini.
+NIKOLI ne uporabi markdown formatiranja - piši navadno besedilo.
 Si prijazen, profesionalen in jedrnat.
 
-Danasnji datum: ${todayStr}
-DATUM ZA TAGE: ${todayLj.toISOString().split('T')[0]}
+Današnji datum: ${todayStr}
+DATUM ZA TAGE: ${todayDateStr}
 
 INFORMACIJE O SALONU:
 - Ime: ${salon.name}
 - Naslov: ${salon.address}
 - Telefon: ${salon.phone}
-- Delovni cas: ${salon.hours}
+- Delovni čas: ${salon.hours}
 
 STORITVE IN CENIK:
 ${salon.services}
 
-PROSTI TERMINI (oblika YYYY-MM-DD):
+PROSTI TERMINI (oblika YYYY-MM-DD) - samo termini od zdaj naprej:
 ${slotsText}
 
-PODATKI STRANKE (ze vpisani - NE sprašuj znova):
+PODATKI STRANKE (že vpisani - NE sprašuj znova):
 - Ime: ${safeName}
-- Email: ${customerInfo.email}
+- E-pošta: ${customerInfo.email}
 - Telefon: ${customerInfo.phone}
 
 REZERVACIJE - PRAVILA:
-- Stranka JE ze vpisala podatke
+- Stranka JE že vpisala podatke
 - Ko stranka izbere termin in storitev, TAKOJ potrdi rezervacijo brez dodatnih vprašanj
+- Rezerviraj SAMO termine iz zgornjega seznama prostih terminov - nobenih drugih
 
 BRISANJE TERMINA:
-- Ako stranka želi IZBRISATI termin, VEDNO dodaj [[DELETE:YYYY-MM-DDTHH:MM]] tag na KONEC odgovora
+- Če stranka želi IZBRISATI termin, VEDNO dodaj [[DELETE:YYYY-MM-DDTHH:MM]] tag na KONEC odgovora
 - Primer samo brisanje: "Termin ob 18:00 sem ti izbrisal.[[DELETE:2026-04-20T18:00]]"
 - KRITIČNO: Brez tega taga se brisanje NE zgodi - vedno ga dodaj!
 
@@ -509,56 +520,57 @@ NOVA REZERVACIJA:
 - Na KONEC odgovora dodaj:
 [[BOOKING:{"date":"YYYY-MM-DD","time":"HH:MM","customerName":"${safeName}","service":"ime storitve"}]]
 - Zamenjaj YYYY-MM-DD z dejanskim datumom, HH:MM s terminom, ime storitve z izbrano storitvijo
-- Primer: [[BOOKING:{"date":"2025-06-15","time":"10:00","customerName":"${safeName}","service":"Zenski haircut"}]]
-- Tagovi morajo biti na koncu sporocila, brez nicesar za njim
+- Primer: [[BOOKING:{"date":"2025-06-15","time":"10:00","customerName":"${safeName}","service":"Ženski haircut"}]]
+- Tagi morajo biti na koncu sporočila, brez ničesar za njim
 
 POTEK:
-1. Stranka pove kaj hoce → predlagaj proste termine
+1. Stranka pove kaj hoče → predlagaj proste termine
 2. Stranka izbere termin → takoj dodaj [[BOOKING:...]] tag
-3. AKO ZAHTEVA BRISANJE: dodaj [[DELETE:...]] tag PRED [[BOOKING:...]] tagom
-4. V sporocilu potrdi rezervacijo
+3. ČE ZAHTEVA BRISANJE: dodaj [[DELETE:...]] tag PRED [[BOOKING:...]] tagom
+4. V sporočilu potrdi rezervacijo
 
 KRITIČNO:
-- Nikoli si ne izmisljuj prostih terminov - uporabi samo termine iz seznama
-- NE POSTAVLJAJ VPRASANJ po brisanju - TAKOJ naredi novo rezervacijo ce je stranka ca prej sporocila kateri termin ji ugaja
-- Ako stranka samo zeli izbrisati brez nove rezervacije, naredi SAMO DELETE
-- Ce ne ves, preusmeri na telefon: ${salon.phone}`;
+- Nikoli si ne izmišljuj prostih terminov - uporabi samo termine iz zgornjega seznama
+- NE POSTAVLJAJ VPRAŠANJ po brisanju - TAKOJ naredi novo rezervacijo če je stranka prej sporočila kateri termin ji ustreza
+- Če stranka samo želi izbrisati brez nove rezervacije, naredi SAMO DELETE
+- Če ne veš, preusmeri na telefon: ${salon.phone}`;
 
   } else {
-return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjas VEDNO in SAMO v slovenscini.
-NIKOLI ne uporabi markdown formatiranja - pisi navadno besedilo.
+return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjaš VEDNO in SAMO v slovenščini.
+NIKOLI ne uporabi markdown formatiranja - piši navadno besedilo.
 Si prijazen, profesionalen in jedrnat.
 
-Danasnji datum: ${todayStr}
-DATUM ZA TAGE: ${todayLj.toISOString().split('T')[0]}
+Današnji datum: ${todayStr}
+DATUM ZA TAGE: ${todayDateStr}
 
 INFORMACIJE O SALONU:
 - Ime: ${salon.name}
 - Naslov: ${salon.address}
 - Telefon: ${salon.phone}
-- Delovni cas: ${salon.hours}
+- Delovni čas: ${salon.hours}
 
 STORITVE IN CENIK:
 ${salon.services}
 
-PROSTI TERMINI (oblika YYYY-MM-DD):
+PROSTI TERMINI (oblika YYYY-MM-DD) - samo termini od zdaj naprej:
 ${slotsText}
 
 STRANKA NI VPISALA PODATKOV.
 
 REZERVACIJE - PRAVILA:
-- Ko stranka hoce rezervirati termin, dodaj [[NEED_INFO]] na KONEC odgovora
-- Primer: "Odlicno! Pred rezervacijo potrebujem se vase podatke.[[NEED_INFO]]"
-- [[NEED_INFO]] mora biti ZADNJA stvar v odgovoru, brez nicesar za njim
+- Ko stranka hoče rezervirati termin, dodaj [[NEED_INFO]] na KONEC odgovora
+- Primer: "Odlično! Pred rezervacijo potrebujem še vaše podatke.[[NEED_INFO]]"
+- [[NEED_INFO]] mora biti ZADNJA stvar v odgovoru, brez ničesar za njim
+- Rezerviraj SAMO termine iz zgornjega seznama prostih terminov - nobenih drugih
 
 POTEK:
-1. Stranka pove kaj hoce → predlagaj proste termine
+1. Stranka pove kaj hoče → predlagaj proste termine
 2. Stranka izbere termin → dodaj [[NEED_INFO]]
 3. Ko dobiš podatke stranke → potrdi rezervacijo z [[BOOKING:...]] tagom
 
 PRAVILA:
-- Nikoli si ne izmisljuj prostih terminov
-- Ce ne ves, preusmeri na telefon: ${salon.phone}`;
+- Nikoli si ne izmišljuj prostih terminov
+- Če ne veš, preusmeri na telefon: ${salon.phone}`;
   }
 }
 
@@ -687,7 +699,7 @@ function buildChatPage(salon) {
           <div class="form-title">Vaši kontaktni podatki</div>
           <div class="form-sub">Potrebujemo za potrditev rezervacije</div>
           <input type="text" id="cf-name" placeholder="Ime in priimek" />
-          <input type="email" id="cf-email" placeholder="Email naslov" />
+          <input type="email" id="cf-email" placeholder="E-poštni naslov" />
           <input type="tel" id="cf-phone" placeholder="Telefonska številka" />
           <button class="submit-btn" onclick="submitContactForm()">Potrdi in nadaljuj →</button>
         </div>
@@ -711,12 +723,10 @@ function buildChatPage(salon) {
       document.getElementById('customer-bar').style.display = 'block';
       document.getElementById('customer-bar-text').textContent = '👤 ' + name + ' · ' + phone;
 
-      // ── FIX 5: Prikaži potrditev obrazca, BREZ dodajanja v messages history ──
-      // Namesto tega dodamo sistem sporočilo ki botu pove da nadaljuje z rezervacijo
       addUserMsg('✓ ' + name + ' | ' + email + ' | ' + phone);
       messages.push({
         role: 'user',
-        content: 'Moji podatki so: Ime: ' + name + ', Email: ' + email + ', Telefon: ' + phone + '. Prosim nadaljuj z rezervacijo termina ki sva se ga dogovorila.'
+        content: 'Moji podatki so: Ime: ' + name + ', E-pošta: ' + email + ', Telefon: ' + phone + '. Prosim nadaljuj z rezervacijo termina, ki sva se ga dogovorila.'
       });
       sendToBot();
     }
@@ -751,7 +761,6 @@ function buildChatPage(salon) {
         } else if (data.bookingDetected) {
           addBotMsg(data.reply, data.bookingDetected);
           messages.push({ role: 'assistant', content: data.reply });
-          // Obvesti bota da je rezervacija potrjena
           messages.push({ role: 'user', content: '[SISTEM: Rezervacija uspešno shranjena.]' });
           messages.push({ role: 'assistant', content: 'Rezervacija je potrjena.' });
         } else {
@@ -848,7 +857,7 @@ function buildAdminPage(salon) {
       <label>Ime stranke</label>
       <input type="text" id="modal-customer" placeholder="Ime Priimek" />
       <label>Storitev</label>
-      <input type="text" id="modal-service" placeholder="Zenski haircut..." />
+      <input type="text" id="modal-service" placeholder="Ženski haircut..." />
       <div class="modal-btns">
         <button class="btn btn-cancel" id="modal-cancel">Preklic</button>
         <button class="btn btn-free" id="modal-set-free">Prost</button>
