@@ -521,7 +521,11 @@ POTEK:
 3. ČE ZAHTEVA BRISANJE: dodaj [[DELETE:...]] PRED [[BOOKING:...]]
 
 KRITIČNO:
-- Nikoli si ne izmišljuj prostih terminov - samo iz zgornjega seznama
+- Trenutna ura je ${String(currentHour).padStart(2,'0')}:${String(currentMinute).padStart(2,'0')}
+- Nikoli si ne izmišljuj prostih terminov - uporabi samo termine iz zgornjega seznama
+- ČE STRANKA ZAHTEVA TERMIN KI NI V SEZNAMU PROSTIH TERMINOV: zavrni in predlagaj bližnji prosti termin
+- ČE STRANKA ZAHTEVA PRETEKLI TERMIN (pred ${String(currentHour).padStart(2,'0')}:${String(currentMinute).padStart(2,'0')}): jasno povej "Ta termin je že minil" in predlagaj naslednji prosti termin
+- NE POTRJUJ terminov ki niso v seznamu prostih terminov
 - NE POSTAVLJAJ VPRAŠANJ po brisanju
 - Če ne veš, preusmeri na telefon: ${salon.phone}`;
 
@@ -556,10 +560,15 @@ REZERVACIJE - PRAVILA:
 
 PRAVILA:
 - Nikoli si ne izmišljuj prostih terminov
-- Če ne veš, preusmeri na telefon: ${salon.phone}`;
+- Če ne veš, preusmeri na telefon: ${salon.phone}
+
+KRITIČNO:
+- Trenutna ura je ${String(currentHour).padStart(2,'0')}:${String(currentMinute).padStart(2,'0')}
+- ČE STRANKA ZAHTEVA TERMIN KI NI V SEZNAMU PROSTIH TERMINOV: zavrni in predlagaj bližnji prosti termin
+- ČE STRANKA ZAHTEVA PRETEKLI TERMIN: jasno povej "Ta termin je že minil" in predlagaj naslednjega
+- NE POTRJUJ terminov ki niso v seznamu prostih terminov`;
   }
 }
-
 function buildChatPage(salon) {
   const apiUrl = process.env.API_URL || 'https://frizerbot-backend-production.up.railway.app';
   return `<!DOCTYPE html>
