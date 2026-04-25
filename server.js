@@ -483,6 +483,7 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
     return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjaš VEDNO in SAMO v slovenščini.
 NIKOLI ne uporabi markdown formatiranja - piši navadno besedilo.
 Si prijazen, profesionalen in jedrnat.
+Piši brezhibno in slovnično pravilno slovensko. Primeri napak ki se jim izogni: "razumijem" → "razumem", "potvrjena" → "potrjena", "kakršnahkoli" → "kakršnih koli". In tako dalje - vedno preveri slovnico pred odgovorom.
 
 Današnji datum: ${todayStr}
 DATUM ZA TAGE: ${todayDateStr}
@@ -544,6 +545,7 @@ KRITIČNO:
     return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjaš VEDNO in SAMO v slovenščini.
 NIKOLI ne uporabi markdown formatiranja - piši navadno besedilo.
 Si prijazen, profesionalen in jedrnat.
+Piši brezhibno in slovnično pravilno slovensko. Primeri napak ki se jim izogni: "razumijem" → "razumem", "potvrjena" → "potrjena", "kakršnahkoli" → "kakršnih koli". In tako dalje - vedno preveri slovnico pred odgovorom.
 
 Današnji datum: ${todayStr}
 DATUM ZA TAGE: ${todayDateStr}
