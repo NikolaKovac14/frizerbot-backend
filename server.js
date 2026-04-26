@@ -120,7 +120,7 @@ async function sendConfirmationEmail(customerEmail, customerName, salon, date, t
     const dateFormatted = dateLj.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const msg = {
       to: customerEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@frizerbot.si',
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
       subject: `✅ Rezervacija potrjena - ${salon.name}`,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #2d2520;">
@@ -160,7 +160,7 @@ async function sendConfirmationEmail(customerEmail, customerName, salon, date, t
             </div>
           </div>
           <div style="text-align: center; padding: 15px; font-size: 11px; color: #aaa;">
-            <p style="margin: 0;">Poganja FrizerBot.si</p>
+            <p style="margin: 0;">Poganja BookWell.si</p>
           </div>
         </div>
       `
@@ -178,7 +178,7 @@ async function sendNotificationToSalon(salon, customerName, customerEmail, custo
     const dateFormatted = dateLj.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const msg = {
       to: salon.notification_email,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@frizerbot.si',
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
       subject: `🔔 Nova Rezervacija - ${salon.name} (${dateFormatted} ${time})`,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #2d2520;">
@@ -214,13 +214,13 @@ async function sendNotificationToSalon(salon, customerName, customerEmail, custo
               </div>
             </div>
             <div style="text-align: center;">
-              <a href="${process.env.API_URL || 'https://frizerbot-backend-production.up.railway.app'}/admin/${salon.id}" style="background: #1a1410; color: #c9a84c; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: 600; font-size: 14px;">
+              <a href="${process.env.API_URL || 'https://bookwell.si'}/admin/${salon.id}" style="background: #1a1410; color: #c9a84c; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: 600; font-size: 14px;">
                 Odpri Admin Panel
               </a>
             </div>
           </div>
           <div style="text-align: center; padding: 15px; font-size: 11px; color: #aaa;">
-            <p style="margin: 0;">Poganja FrizerBot.si</p>
+            <p style="margin: 0;">Poganja BookWell.si</p>
           </div>
         </div>
       `
@@ -584,7 +584,7 @@ KRITIČNO:
   }
 }
 function buildChatPage(salon) {
-  const apiUrl = process.env.API_URL || 'https://frizerbot-backend-production.up.railway.app';
+  const apiUrl = process.env.API_URL || 'https://bookwell.si';
   return `<!DOCTYPE html>
 <html lang="sl">
 <head>
@@ -654,7 +654,7 @@ function buildChatPage(salon) {
         <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
       </button>
     </div>
-    <div class="powered">Poganja FrizerBot.si</div>
+    <div class="powered">Poganja BookWell.si</div>
   </div>
   <script>
     const API_URL = '${apiUrl}';
@@ -781,7 +781,7 @@ function buildChatPage(salon) {
 }
 
 function buildAdminPage(salon) {
-  const apiUrl = process.env.API_URL || 'https://frizerbot-backend-production.up.railway.app';
+  const apiUrl = process.env.API_URL || 'https://bookwell.si';
   const scheduleJson = JSON.stringify(salon.schedule || DEFAULT_SCHEDULE);
 
   return `<!DOCTYPE html>
@@ -1070,9 +1070,11 @@ function buildAdminPage(salon) {
 </body>
 </html>`;
 }
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/landing.html');
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
   await initDB();
-  console.log('FrizerBot backend running on port ' + PORT);
 });
