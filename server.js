@@ -97,6 +97,7 @@ async function initDB() {
       UNIQUE(salon_id, date, time)
     )
   `);
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE`);
   const { rows } = await pool.query('SELECT id FROM salons WHERE id = $1', ['salon_1']);
   if (rows.length === 0) {
     await pool.query(`
@@ -234,7 +235,7 @@ async function sendNotificationToSalon(salon, customerName, customerEmail, custo
 
 // ─── HOSTED CHAT STRAN ────────────────────────────────────────────────────────
 app.get('/salon/:id', async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM salons WHERE id = $1 AND active = true', [req.params.id]);
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [req.params.id]);
   const salon = rows[0];
   if (!salon) return res.status(404).send('<h1>Salon not found</h1>');
   res.send(buildChatPage(salon));
@@ -242,7 +243,7 @@ app.get('/salon/:id', async (req, res) => {
 
 // ─── ADMIN PANEL ──────────────────────────────────────────────────────────────
 app.get('/admin/:id', async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM salons WHERE id = $1', [req.params.id]);
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
   const salon = rows[0];
   if (!salon) return res.status(404).send('<h1>Salon not found</h1>');
   res.send(buildAdminPage(salon));
@@ -250,36 +251,44 @@ app.get('/admin/:id', async (req, res) => {
 
 app.get('/admin/:id/timeslots', async (req, res) => {
   const { date } = req.query;
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salonId = salonRows[0]?.id || req.params.id;
   const { rows } = await pool.query(
     'SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 ORDER BY time',
-    [req.params.id, date]
+    [salonId, date]
   );
   res.json(rows);
 });
 
 app.post('/admin/:id/timeslots', async (req, res) => {
   const { date, time, status, customerName, service } = req.body;
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salonId = salonRows[0]?.id || req.params.id;
   if (status === 'busy') {
     await pool.query(`
       INSERT INTO timeslots (salon_id, date, time, status, customer_name, service)
       VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (salon_id, date, time) DO UPDATE
       SET status = $4, customer_name = $5, service = $6
-    `, [req.params.id, date, time, status, customerName, service]);
+    `, [salonId, date, time, status, customerName, service]);
   } else {
-    await pool.query('DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3', [req.params.id, date, time]);
+    await pool.query('DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3', [salonId, date, time]);
   }
   res.json({ success: true });
 });
 
 // ─── SCHEDULE ENDPOINT ────────────────────────────────────────────────────────
 app.get('/admin/:id/schedule', async (req, res) => {
-  const { rows } = await pool.query('SELECT schedule FROM salons WHERE id = $1', [req.params.id]);
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salonId = salonRows[0]?.id || req.params.id;
+  const { rows } = await pool.query('SELECT schedule FROM salons WHERE id = $1', [salonId]);
   res.json(rows[0]?.schedule || DEFAULT_SCHEDULE);
 });
 
 app.post('/admin/:id/schedule', async (req, res) => {
-  await pool.query('UPDATE salons SET schedule = $1 WHERE id = $2', [JSON.stringify(req.body), req.params.id]);
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salonId = salonRows[0]?.id || req.params.id;
+  await pool.query('UPDATE salons SET schedule = $1 WHERE id = $2', [JSON.stringify(req.body), salonId]);
   res.json({ success: true });
 });
 
@@ -289,21 +298,23 @@ app.post('/booking', async (req, res) => {
   if (!salonId || !date || !time || !customerName || !service) {
     return res.status(400).json({ error: 'Manjkajo podatki' });
   }
+
+  const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [salonId]);
+  const salon = salonRows[0];
+  if (!salon) return res.status(404).json({ error: 'Salon not found' });
+
   const { rows: existing } = await pool.query(
     "SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3 AND status = 'busy'",
-    [salonId, date, time]
+    [salon.id, date, time]
   );
   if (existing.length > 0) return res.status(409).json({ error: 'Ta termin je že zaseden.' });
-
-  const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE id = $1', [salonId]);
-  const salon = salonRows[0];
 
   await pool.query(`
     INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, customer_phone, service)
     VALUES ($1, $2, $3, 'busy', $4, $5, $6, $7)
     ON CONFLICT (salon_id, date, time) DO UPDATE
     SET status = 'busy', customer_name = $4, customer_email = $5, customer_phone = $6, service = $7
-  `, [salonId, date, time, customerName, customerEmail || '', customerPhone || '', service]);
+  `, [salon.id, date, time, customerName, customerEmail || '', customerPhone || '', service]);
 
   if (customerEmail) await sendConfirmationEmail(customerEmail, customerName, salon, date, time, service);
   if (salon.notification_email) await sendNotificationToSalon(salon, customerName, customerEmail || '', customerPhone || '', date, service, time);
@@ -313,15 +324,16 @@ app.post('/booking', async (req, res) => {
 // ─── CHAT ─────────────────────────────────────────────────────────────────────
 app.post('/chat', async (req, res) => {
   const { salonId, messages, customerInfo } = req.body;
-  const { rows } = await pool.query('SELECT * FROM salons WHERE id = $1 AND active = true', [salonId]);
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [salonId]);
   const salon = rows[0];
   if (!salon) return res.status(404).json({ error: 'Salon not found' });
 
+  const actualSalonId = salon.id;
   const todayLj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
   const nextWeek = new Date(todayLj.getTime() + 7 * 24 * 60 * 60 * 1000);
   const { rows: busySlots } = await pool.query(
     "SELECT date, time FROM timeslots WHERE salon_id = $1 AND date >= $2 AND date <= $3 AND status = 'busy' ORDER BY date, time",
-    [salonId, todayLj.toISOString().split('T')[0], nextWeek.toISOString().split('T')[0]]
+    [actualSalonId, todayLj.toISOString().split('T')[0], nextWeek.toISOString().split('T')[0]] // ← actualSalonId
   );
 
   try {
@@ -342,7 +354,7 @@ app.post('/chat', async (req, res) => {
         if (date && time) {
           const result = await pool.query(
             'DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3',
-            [salonId, date, time]
+            [actualSalonId, date, time] // ← actualSalonId
           );
           console.log('✅ Termin izbrisan - rows:', result.rowCount);
         }
@@ -363,13 +375,12 @@ app.post('/chat', async (req, res) => {
 
       const { rows: existing } = await pool.query(
         "SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3 AND status = 'busy'",
-        [salonId, booking.date, booking.time]
+        [actualSalonId, booking.date, booking.time] // ← actualSalonId
       );
       if (existing.length > 0) {
-        // Če je ista stranka - posodobi storitev
         if (existing[0].customer_email === finalEmail) {
           await pool.query(`UPDATE timeslots SET service=$1 WHERE salon_id=$2 AND date=$3 AND time=$4`,
-            [finalService, salonId, booking.date, booking.time]);
+            [finalService, actualSalonId, booking.date, booking.time]);
           const reply = raw.replace(/\[\[DELETE:[^\]]*\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
           return res.json({ reply, bookingDetected: { date: booking.date, time: booking.time, customerName: finalName, service: finalService, email: finalEmail, phone: finalPhone }});
         }
@@ -387,7 +398,7 @@ app.post('/chat', async (req, res) => {
         VALUES ($1, $2, $3, 'busy', $4, $5, $6, $7)
         ON CONFLICT (salon_id, date, time) DO UPDATE
         SET status = 'busy', customer_name = $4, customer_email = $5, customer_phone = $6, service = $7
-      `, [salonId, booking.date, booking.time, finalName, finalEmail, finalPhone, finalService]);
+      `, [actualSalonId, booking.date, booking.time, finalName, finalEmail, finalPhone, finalService]); 
 
       if (finalEmail) await sendConfirmationEmail(finalEmail, finalName, salon, booking.date, booking.time, finalService);
       if (salon.notification_email) await sendNotificationToSalon(salon, finalName, finalEmail, finalPhone, booking.date, finalService, booking.time);
