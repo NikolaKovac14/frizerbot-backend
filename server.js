@@ -339,6 +339,8 @@ app.post('/booking', async (req, res) => {
 // ─── CHAT ─────────────────────────────────────────────────────────────────────
 app.post('/chat', async (req, res) => {
   const { salonId, messages, customerInfo } = req.body;
+  const filteredMessages = (messages || []).filter(m => m && m.content && m.content.trim() !== '');
+  
   const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [salonId]);
   const salon = rows[0];
   if (!salon) return res.status(404).json({ error: 'Salon not found' });
@@ -356,7 +358,7 @@ app.post('/chat', async (req, res) => {
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 600,
       system: buildSystemPrompt(salon, busySlots, customerInfo),
-      messages: messages
+      messages: filteredMessages
     });
 
     const raw = data.content[0].text;
@@ -780,16 +782,22 @@ function buildChatPage(salon) {
         removeTyping();
         if (data.needInfo && !customerInfo) {
           addBotMsg(data.reply);
-          messages.push({ role: 'assistant', content: data.reply });
+          if (data.reply && data.reply.trim()) {
+            messages.push({ role: 'assistant', content: data.reply });
+          }
           showContactForm();
         } else if (data.bookingDetected) {
           addBotMsg(data.reply, data.bookingDetected);
-          messages.push({ role: 'assistant', content: data.reply });
+          if (data.reply && data.reply.trim()) {
+            messages.push({ role: 'assistant', content: data.reply });
+          }
           messages.push({ role: 'user', content: '[SISTEM: Rezervacija uspešno shranjena.]' });
           messages.push({ role: 'assistant', content: 'Rezervacija je potrjena.' });
         } else {
           addBotMsg(data.reply);
-          messages.push({ role: 'assistant', content: data.reply });
+          if (data.reply && data.reply.trim()) {
+            messages.push({ role: 'assistant', content: data.reply });
+          }
         }
       } catch(e) {
         removeTyping();
@@ -806,6 +814,8 @@ function buildChatPage(salon) {
 </html>`;
 }
 
+// Drop this entire function into server.js replacing the existing buildAdminPage function
+
 function buildAdminPage(salon) {
   const apiUrl = process.env.API_URL || 'https://bookwell.si';
   const scheduleJson = JSON.stringify(salon.schedule || DEFAULT_SCHEDULE);
@@ -815,284 +825,1029 @@ function buildAdminPage(salon) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin - ${salon.name}</title>
+  <title>Admin — ${salon.name}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f0eb; min-height: 100vh; }
-    .header { background: #1a1410; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
-    .header h1 { color: #c9a84c; font-size: 18px; }
-    .header p { color: #6b5f52; font-size: 12px; }
-    .tabs { display: flex; background: #fff; border-bottom: 1px solid #e5e7eb; }
-    .tab { padding: 12px 24px; cursor: pointer; font-size: 14px; color: #6b5f52; border-bottom: 2px solid transparent; }
-    .tab.active { color: #1a1410; border-bottom-color: #c9a84c; font-weight: 600; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-    .container { max-width: 800px; margin: 24px auto; padding: 0 16px; }
-    .date-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; background: #fff; padding: 12px 16px; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-    .date-nav button { background: #1a1410; color: #c9a84c; border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer; font-size: 16px; }
-    .date-nav h2 { flex: 1; text-align: center; font-size: 16px; color: #2d2520; }
-    .closed-banner { background: #fee2e2; border: 1px solid #f87171; border-radius: 12px; padding: 20px; text-align: center; color: #dc2626; font-size: 15px; font-weight: 500; }
-    .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-    .slot { background: #fff; border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; border: 2px solid #4ade80; transition: all 0.15s; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-    .slot.busy { border-color: #f87171; background: #fff5f5; }
-    .slot.bot-booking { border-color: #60a5fa; background: #eff6ff; }
-    .slot .time { font-size: 16px; font-weight: 600; color: #1a1410; }
-    .slot .status { font-size: 11px; margin-top: 4px; color: #16a34a; }
-    .slot.busy .status { color: #dc2626; }
-    .slot.bot-booking .status { color: #2563eb; }
-    .slot .customer { font-size: 11px; color: #6b5f52; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .legend { display: flex; gap: 16px; margin-bottom: 16px; font-size: 12px; color: #6b5f52; flex-wrap: wrap; }
-    .legend span { display: flex; align-items: center; gap: 6px; }
-    .dot { width: 10px; height: 10px; border-radius: 50%; }
-    .dot.free { background: #4ade80; }
-    .dot.busy { background: #f87171; }
-    .dot.bot { background: #60a5fa; }
-    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
-    .modal.open { display: flex; }
-    .modal-box { background: #fff; border-radius: 16px; padding: 24px; width: 320px; }
-    .modal-box h3 { margin-bottom: 16px; color: #1a1410; }
-    .modal-box label { display: block; font-size: 12px; color: #6b5f52; margin-bottom: 4px; margin-top: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-    .modal-box input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
-    .modal-info { background: #f9fafb; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #6b5f52; margin-top: 8px; line-height: 1.6; }
-    .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
-    .btn { flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; }
-    .btn-busy { background: #fee2e2; color: #dc2626; }
-    .btn-free { background: #dcfce7; color: #16a34a; }
-    .btn-cancel { background: #f3f4f6; color: #6b7280; }
-    .schedule-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-    .schedule-card h3 { font-size: 15px; color: #1a1410; margin-bottom: 16px; }
-    .day-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0ebe6; }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0806;
+      --surface: #111009;
+      --surface2: #1a1610;
+      --surface3: #221e14;
+      --border: rgba(201,168,76,0.12);
+      --border2: rgba(255,255,255,0.06);
+      --gold: #c9a84c;
+      --gold2: #e8c96a;
+      --gold-dim: rgba(201,168,76,0.15);
+      --gold-glow: rgba(201,168,76,0.08);
+      --text: #f0ebe0;
+      --text2: #9b8f7e;
+      --text3: #5a5047;
+      --green: #4ade80;
+      --green-bg: rgba(74,222,128,0.1);
+      --red: #f87171;
+      --red-bg: rgba(248,113,113,0.1);
+      --blue: #60a5fa;
+      --blue-bg: rgba(96,165,250,0.1);
+      --amber: #fbbf24;
+      --amber-bg: rgba(251,191,36,0.1);
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    html { background: var(--bg); }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      overflow-x: hidden;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 50;
+    }
+
+    .sidebar-logo {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid var(--border2);
+    }
+    .sidebar-logo .brand {
+      font-family: 'Playfair Display', serif;
+      font-size: 18px;
+      color: var(--gold2);
+      letter-spacing: -0.3px;
+    }
+    .sidebar-logo .salon-name {
+      font-size: 12px;
+      color: var(--text3);
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar-nav {
+      padding: 16px 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text2);
+      transition: all 0.15s;
+      border: 1px solid transparent;
+      text-decoration: none;
+    }
+    .nav-item:hover {
+      background: var(--gold-glow);
+      color: var(--text);
+    }
+    .nav-item.active {
+      background: var(--gold-dim);
+      border-color: var(--border);
+      color: var(--gold);
+      font-weight: 500;
+    }
+    .nav-icon { font-size: 15px; width: 20px; text-align: center; }
+
+    .sidebar-footer {
+      padding: 16px 12px;
+      border-top: 1px solid var(--border2);
+    }
+    .chat-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--gold-dim);
+      border: 1px solid var(--border);
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .chat-link:hover { background: rgba(201,168,76,0.22); }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s ease infinite;
+      margin-left: auto;
+    }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    /* ── MAIN ── */
+    .main {
+      margin-left: 220px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      height: 64px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border2);
+      display: flex;
+      align-items: center;
+      padding: 0 28px;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .topbar-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 18px;
+      color: var(--text);
+    }
+    .topbar-sub {
+      font-size: 12px;
+      color: var(--text3);
+      margin-left: 4px;
+    }
+
+    .date-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+    .date-btn {
+      width: 34px; height: 34px;
+      border-radius: var(--radius-sm);
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text2);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .date-btn:hover { border-color: var(--border); color: var(--gold); }
+
+    .date-display {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      color: var(--text);
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      padding: 7px 14px;
+      min-width: 200px;
+      text-align: center;
+    }
+
+    .today-btn {
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      background: var(--gold-dim);
+      border: 1px solid var(--border);
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .today-btn:hover { background: rgba(201,168,76,0.22); }
+
+    /* ── CONTENT ── */
+    .content {
+      padding: 28px;
+      flex: 1;
+    }
+
+    /* ── STATS ROW ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.4s ease both;
+    }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .stat-card:hover { border-color: var(--border); }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      border-radius: 2px 2px 0 0;
+    }
+    .stat-card.s-total::before { background: var(--gold); }
+    .stat-card.s-free::before { background: var(--green); }
+    .stat-card.s-busy::before { background: var(--red); }
+    .stat-card.s-bot::before { background: var(--blue); }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    .stat-value {
+      font-family: 'Playfair Display', serif;
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+    .stat-card.s-total .stat-value { color: var(--gold); }
+    .stat-card.s-free .stat-value { color: var(--green); }
+    .stat-card.s-busy .stat-value { color: var(--red); }
+    .stat-card.s-bot .stat-value { color: var(--blue); }
+
+    /* ── SLOTS SECTION ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+    .legend {
+      display: flex;
+      gap: 16px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text3);
+    }
+    .legend-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+
+    .closed-banner {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 48px;
+      text-align: center;
+      color: var(--text3);
+      font-size: 15px;
+    }
+    .closed-banner .icon { font-size: 32px; margin-bottom: 12px; }
+
+    /* ── SLOTS GRID ── */
+    .slots-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .slot {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+    .slot::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      border-radius: 3px 0 0 3px;
+    }
+    .slot.free::before { background: var(--green); }
+    .slot.busy::before { background: var(--red); }
+    .slot.bot::before { background: var(--blue); }
+
+    .slot:hover {
+      border-color: var(--border);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .slot.free:hover { border-color: rgba(74,222,128,0.3); }
+    .slot.busy:hover { border-color: rgba(248,113,113,0.3); }
+    .slot.bot:hover { border-color: rgba(96,165,250,0.3); }
+
+    .slot-time {
+      font-family: 'DM Mono', monospace;
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .slot-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 500;
+      padding: 3px 7px;
+      border-radius: 100px;
+      margin-bottom: 8px;
+    }
+    .slot.free .slot-badge { background: var(--green-bg); color: var(--green); }
+    .slot.busy .slot-badge { background: var(--red-bg); color: var(--red); }
+    .slot.bot .slot-badge { background: var(--blue-bg); color: var(--blue); }
+
+    .slot-customer {
+      font-size: 11px;
+      color: var(--text2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .slot-service {
+      font-size: 10px;
+      color: var(--text3);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── TAB PANELS ── */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ── SCHEDULE ── */
+    .schedule-card {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      overflow: hidden;
+      max-width: 600px;
+    }
+    .schedule-head {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border2);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .schedule-body { padding: 8px 0; }
+
+    .day-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border2);
+      transition: background 0.15s;
+    }
     .day-row:last-child { border-bottom: none; }
-    .day-name { width: 95px; font-size: 13px; font-weight: 500; color: #2d2520; }
-    .day-toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
-    .day-toggle input { opacity: 0; width: 0; height: 0; }
-    .day-toggle .slider { position: absolute; inset: 0; background: #ddd; border-radius: 22px; cursor: pointer; transition: .2s; }
-    .day-toggle input:checked + .slider { background: #4ade80; }
-    .day-toggle .slider:before { content: ''; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .2s; }
-    .day-toggle input:checked + .slider:before { transform: translateX(18px); }
-    .day-times { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6b5f52; }
-    .day-times input[type=time] { padding: 4px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; font-family: inherit; color: #1a1410; }
-    .day-times.disabled { opacity: 0.35; pointer-events: none; }
-    .save-schedule-btn { margin-top: 16px; background: #1a1410; color: #c9a84c; border: none; border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; }
-    .save-schedule-btn:hover { opacity: 0.85; }
-    .save-msg { display: none; text-align: center; color: #16a34a; font-size: 13px; margin-top: 10px; }
+    .day-row:hover { background: var(--surface2); }
+
+    .day-name {
+      width: 110px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+    }
+    .day-name.closed-day { color: var(--text3); }
+
+    /* TOGGLE */
+    .toggle-wrap { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+    .toggle-wrap input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track {
+      position: absolute; inset: 0;
+      background: var(--surface3);
+      border: 1px solid var(--border2);
+      border-radius: 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .toggle-wrap input:checked + .toggle-track {
+      background: var(--gold-dim);
+      border-color: var(--border);
+    }
+    .toggle-track::before {
+      content: '';
+      position: absolute;
+      width: 16px; height: 16px;
+      top: 3px; left: 3px;
+      background: var(--text3);
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+    .toggle-wrap input:checked + .toggle-track::before {
+      transform: translateX(18px);
+      background: var(--gold);
+    }
+
+    .time-range {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text2);
+    }
+    .time-range.disabled { opacity: 0.3; pointer-events: none; }
+    .time-sep { color: var(--text3); font-size: 12px; }
+    input[type=time] {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      padding: 6px 10px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type=time]:focus { border-color: var(--border); }
+
+    .save-btn {
+      margin: 20px 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-save {
+      background: var(--gold);
+      color: var(--bg);
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 11px 24px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-save:hover { background: var(--gold2); }
+    .save-confirm {
+      font-size: 12px;
+      color: var(--green);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .save-confirm.show { opacity: 1; }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      width: 380px;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+      animation: modalIn 0.2s ease both;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.95) translateY(8px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .modal-header {
+      padding: 24px 24px 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .modal-time {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      color: var(--gold);
+    }
+    .modal-date-label {
+      font-size: 12px;
+      color: var(--text3);
+      margin-top: 2px;
+    }
+    .modal-close {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text3);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .modal-close:hover { border-color: var(--border); color: var(--text); }
+
+    .modal-body { padding: 20px 24px; }
+
+    .customer-info-box {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .customer-info-box.show { display: block; }
+    .ci-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 4px;
+    }
+    .ci-row:last-child { margin-bottom: 0; }
+    .ci-icon { color: var(--text3); width: 14px; }
+
+    .field-group { margin-bottom: 14px; }
+    .field-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .field-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field-input:focus { border-color: var(--border); }
+    .field-input::placeholder { color: var(--text3); }
+
+    .modal-actions {
+      padding: 0 24px 24px;
+      display: flex;
+      gap: 8px;
+    }
+    .btn-modal {
+      flex: 1;
+      padding: 11px;
+      border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s;
+    }
+    .btn-cancel-modal {
+      background: var(--surface2);
+      border-color: var(--border2);
+      color: var(--text2);
+    }
+    .btn-cancel-modal:hover { border-color: var(--border); color: var(--text); }
+    .btn-free-modal {
+      background: var(--green-bg);
+      border-color: rgba(74,222,128,0.2);
+      color: var(--green);
+    }
+    .btn-free-modal:hover { background: rgba(74,222,128,0.2); }
+    .btn-busy-modal {
+      background: var(--red-bg);
+      border-color: rgba(248,113,113,0.2);
+      color: var(--red);
+    }
+    .btn-busy-modal:hover { background: rgba(248,113,113,0.2); }
+
+    /* ── REFRESH INDICATOR ── */
+    .refresh-ring {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text3);
+      margin-left: auto;
+      position: relative;
+    }
+    .refresh-ring.refreshing {
+      background: var(--gold);
+      box-shadow: 0 0 8px var(--gold);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .slots-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+      .content { padding: 16px; }
+      .topbar { padding: 0 16px; }
+    }
   </style>
 </head>
 <body>
-  <div class="header">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">BookWell</div>
+    <div class="salon-name">${salon.name}</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-item active" onclick="showPanel('termini')" id="nav-termini">
+      <span class="nav-icon">📅</span> Termini
+    </div>
+    <div class="nav-item" onclick="showPanel('urnik')" id="nav-urnik">
+      <span class="nav-icon">🕐</span> Delovni čas
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <a href="/${salon.type || 'salon'}/${salon.slug || salon.id}" class="chat-link" target="_blank">
+      <span>💬</span> Chat stran
+      <span class="live-dot"></span>
+    </a>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- TOPBAR -->
+  <div class="topbar">
     <div>
-      <h1>Admin: ${salon.name}</h1>
-      <p>Upravljanje terminov in urnika</p>
+      <span class="topbar-title" id="topbar-title">Termini</span>
+      <span class="topbar-sub" id="topbar-sub"></span>
     </div>
-    <a href="/${salon.type || 'salon'}/${salon.slug || salon.id}" style="color:#c9a84c;font-size:12px;text-decoration:none;">Oglej chat stran</a>
-  </div>
-
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('termini')">📅 Termini</div>
-    <div class="tab" onclick="switchTab('urnik')">🕐 Delovni čas</div>
-  </div>
-
-  <div class="tab-content active" id="tab-termini">
-    <div class="container">
-      <div class="date-nav">
-        <button id="prev">&#8249;</button>
-        <h2 id="dateTitle"></h2>
-        <button id="next">&#8250;</button>
-      </div>
-      <div class="legend">
-        <span><div class="dot free"></div> Prost</span>
-        <span><div class="dot busy"></div> Zaseden (ročno)</span>
-        <span><div class="dot bot"></div> Rezerviral bot</span>
-      </div>
-      <div id="slots-container"><div class="slots" id="slots"></div></div>
+    <div class="date-nav" id="date-nav-wrap">
+      <button class="date-btn" id="prev">&#8249;</button>
+      <div class="date-display" id="dateDisplay">—</div>
+      <button class="date-btn" id="next">&#8250;</button>
+      <button class="today-btn" id="todayBtn">Danes</button>
+      <div class="refresh-ring" id="refreshRing" title="Samodejno osveževanje"></div>
     </div>
   </div>
 
-  <div class="tab-content" id="tab-urnik">
-    <div class="container">
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- PANEL: TERMINI -->
+    <div class="panel active" id="panel-termini">
+      <div class="stats-row" id="statsRow">
+        <div class="stat-card s-total">
+          <div class="stat-label">Skupaj</div>
+          <div class="stat-value" id="st-total">—</div>
+        </div>
+        <div class="stat-card s-free">
+          <div class="stat-label">Prostih</div>
+          <div class="stat-value" id="st-free">—</div>
+        </div>
+        <div class="stat-card s-busy">
+          <div class="stat-label">Zasedenih</div>
+          <div class="stat-value" id="st-busy">—</div>
+        </div>
+        <div class="stat-card s-bot">
+          <div class="stat-label">Bot rezervacij</div>
+          <div class="stat-value" id="st-bot">—</div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">Urnik dneva</div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Prost</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Zaseden</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Bot</div>
+        </div>
+      </div>
+
+      <div id="slots-container">
+        <div class="slots-grid" id="slotsGrid"></div>
+      </div>
+    </div>
+
+    <!-- PANEL: URNIK -->
+    <div class="panel" id="panel-urnik">
       <div class="schedule-card">
-        <h3>Delovni čas salona</h3>
-        <div id="schedule-rows"></div>
-        <button class="save-schedule-btn" onclick="saveSchedule()">Shrani delovni čas</button>
-        <div class="save-msg" id="save-msg">✅ Delovni čas shranjen!</div>
+        <div class="schedule-head">Delovni čas salona</div>
+        <div class="schedule-body" id="scheduleBody"></div>
+        <div class="save-btn">
+          <button class="btn-save" onclick="saveSchedule()">Shrani spremembe</button>
+          <span class="save-confirm" id="saveConfirm">✓ Shranjeno</span>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="modal" id="modal">
-    <div class="modal-box">
-      <h3 id="modal-title">Termin</h3>
-      <div id="modal-info-section"></div>
-      <label>Ime stranke</label>
-      <input type="text" id="modal-customer" placeholder="Ime Priimek" />
-      <label>Storitev</label>
-      <input type="text" id="modal-service" placeholder="Ženski haircut..." />
-      <div class="modal-btns">
-        <button class="btn btn-cancel" id="modal-cancel">Preklic</button>
-        <button class="btn btn-free" id="modal-set-free">Prost</button>
-        <button class="btn btn-busy" id="modal-set-busy">Zaseden</button>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-time" id="modalTime">—</div>
+        <div class="modal-date-label" id="modalDateLabel">—</div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="customer-info-box" id="customerInfoBox">
+        <div class="ci-row"><span class="ci-icon">📧</span><span id="ci-email">—</span></div>
+        <div class="ci-row"><span class="ci-icon">📞</span><span id="ci-phone">—</span></div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Ime stranke</label>
+        <input type="text" class="field-input" id="modalName" placeholder="Ime Priimek" />
+      </div>
+      <div class="field-group">
+        <label class="field-label">Storitev</label>
+        <input type="text" class="field-input" id="modalService" placeholder="npr. Ženski haircut" />
       </div>
     </div>
+    <div class="modal-actions">
+      <button class="btn-modal btn-cancel-modal" onclick="closeModal()">Preklic</button>
+      <button class="btn-modal btn-free-modal" onclick="saveSlot('free')">Prost</button>
+      <button class="btn-modal btn-busy-modal" onclick="saveSlot('busy')">Zaseden</button>
+    </div>
   </div>
+</div>
 
-  <script>
-    const API_URL = '${apiUrl}';
-    const SALON_ID = '${salon.id}';
-    let currentDate = new Date();
-    let currentSlot = null;
-    let slotsData = {};
-    let schedule = ${scheduleJson};
+<script>
+  const API = '${apiUrl}';
+  const SID = '${salon.id}';
+  let currentDate = new Date();
+  let slotsData = {};
+  let schedule = ${scheduleJson};
+  let currentSlot = null;
+  let refreshTimer = null;
 
-    const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
-    const DAY_NAMES = { mon:'Ponedeljek', tue:'Torek', wed:'Sreda', thu:'Četrtek', fri:'Petek', sat:'Sobota', sun:'Nedelja' };
+  const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
+  const DAY_NAMES = { mon:'Ponedeljek', tue:'Torek', wed:'Sreda', thu:'Četrtek', fri:'Petek', sat:'Sobota', sun:'Nedelja' };
 
-    function generateSlots(from, to) {
-      const slots = [];
-      let [h, m] = from.split(':').map(Number);
-      const [eh, em] = to.split(':').map(Number);
-      while (h < eh || (h === eh && m < em)) {
-        slots.push(String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0'));
-        m += 30; if (m >= 60) { m -= 60; h++; }
-      }
-      return slots;
+  function fmt(d) { return d.toISOString().split('T')[0]; }
+  function fmtSl(d) {
+    return d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+  function getDayKey(d) { return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()]; }
+
+  function genSlots(from, to) {
+    const s = []; let [h,m] = from.split(':').map(Number);
+    const [eh,em] = to.split(':').map(Number);
+    while (h < eh || (h === eh && m < em)) {
+      s.push(String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'));
+      m += 30; if (m >= 60) { m -= 60; h++; }
+    }
+    return s;
+  }
+
+  /* ── PANEL SWITCH ── */
+  function showPanel(name) {
+    ['termini','urnik'].forEach(n => {
+      document.getElementById('panel-'+n).classList.toggle('active', n === name);
+      document.getElementById('nav-'+n).classList.toggle('active', n === name);
+    });
+    document.getElementById('topbar-title').textContent = name === 'termini' ? 'Termini' : 'Delovni čas';
+    document.getElementById('date-nav-wrap').style.display = name === 'termini' ? 'flex' : 'none';
+  }
+
+  /* ── LOAD SLOTS ── */
+  async function loadSlots(showRefresh) {
+    const ring = document.getElementById('refreshRing');
+    if (showRefresh) ring.classList.add('refreshing');
+
+    const dateStr = fmt(currentDate);
+    document.getElementById('dateDisplay').textContent = fmtSl(currentDate);
+    document.getElementById('topbar-sub').textContent = '';
+
+    const dayKey = getDayKey(currentDate);
+    const daySchedule = schedule[dayKey];
+    const container = document.getElementById('slots-container');
+
+    if (!daySchedule || !daySchedule.open) {
+      container.innerHTML = '<div class="closed-banner"><div class="icon">🚫</div>Ta dan je salon zaprt</div>';
+      updateStats(0, 0, 0, 0);
+      if (showRefresh) setTimeout(() => ring.classList.remove('refreshing'), 600);
+      return;
     }
 
-    function getDayKey(d) {
-      return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()];
-    }
-
-    function switchTab(name) {
-      document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik'][i] === name));
-      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-      document.getElementById('tab-' + name).classList.add('active');
-    }
-
-    function formatDate(d) { return d.toISOString().split('T')[0]; }
-    function formatDateSl(d) { return d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
-
-    async function loadSlots() {
-      const dateStr = formatDate(currentDate);
-      document.getElementById('dateTitle').textContent = formatDateSl(currentDate);
-      const dayKey = getDayKey(currentDate);
-      const daySchedule = schedule[dayKey];
-      const container = document.getElementById('slots-container');
-
-      if (!daySchedule || !daySchedule.open) {
-        container.innerHTML = '<div class="closed-banner">🚫 Ta dan je salon zaprt</div>';
-        return;
-      }
-
-      container.innerHTML = '<div class="slots" id="slots"></div>';
-      const res = await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots?date=' + dateStr);
+    try {
+      const res = await fetch(API + '/admin/' + SID + '/timeslots?date=' + dateStr);
       const data = await res.json();
       slotsData = {};
       data.forEach(s => { slotsData[s.time] = s; });
       renderSlots(daySchedule);
+    } catch(e) {}
+
+    if (showRefresh) setTimeout(() => ring.classList.remove('refreshing'), 600);
+  }
+
+  function renderSlots(daySchedule) {
+    const hours = genSlots(daySchedule.from, daySchedule.to);
+    const grid = document.createElement('div');
+    grid.className = 'slots-grid';
+
+    let freeCount = 0, busyCount = 0, botCount = 0;
+
+    hours.forEach(hour => {
+      const slot = slotsData[hour];
+      const isBusy = slot && slot.status === 'busy';
+      const isBot = isBusy && slot.customer_email;
+
+      if (isBot) botCount++;
+      else if (isBusy) busyCount++;
+      else freeCount++;
+
+      const el = document.createElement('div');
+      const cls = isBot ? 'bot' : isBusy ? 'busy' : 'free';
+      el.className = 'slot ' + cls;
+
+      const badgeText = isBot ? '🤖 Bot' : isBusy ? '● Zaseden' : '○ Prost';
+
+      el.innerHTML = \`
+        <div class="slot-time">\${hour}</div>
+        <div class="slot-badge">\${badgeText}</div>
+        \${slot?.customer_name ? '<div class="slot-customer">'+slot.customer_name+'</div>' : ''}
+        \${slot?.service ? '<div class="slot-service">'+slot.service+'</div>' : ''}
+      \`;
+      el.addEventListener('click', () => openModal(hour, slot));
+      grid.appendChild(el);
+    });
+
+    updateStats(hours.length, freeCount, busyCount, botCount);
+
+    const container = document.getElementById('slots-container');
+    container.innerHTML = '';
+    container.appendChild(grid);
+  }
+
+  function updateStats(total, free, busy, bot) {
+    document.getElementById('st-total').textContent = total;
+    document.getElementById('st-free').textContent = free;
+    document.getElementById('st-busy').textContent = busy;
+    document.getElementById('st-bot').textContent = bot;
+  }
+
+  /* ── MODAL ── */
+  function openModal(time, slot) {
+    currentSlot = time;
+    document.getElementById('modalTime').textContent = time;
+    document.getElementById('modalDateLabel').textContent = fmtSl(currentDate);
+    document.getElementById('modalName').value = slot?.customer_name || '';
+    document.getElementById('modalService').value = slot?.service || '';
+
+    const infoBox = document.getElementById('customerInfoBox');
+    if (slot?.customer_email) {
+      document.getElementById('ci-email').textContent = slot.customer_email;
+      document.getElementById('ci-phone').textContent = slot.customer_phone || '—';
+      infoBox.classList.add('show');
+    } else {
+      infoBox.classList.remove('show');
     }
 
-    function renderSlots(daySchedule) {
-      const hours = generateSlots(daySchedule.from, daySchedule.to);
-      const container = document.getElementById('slots');
-      if (!container) return;
-      container.innerHTML = '';
-      hours.forEach(hour => {
-        const slot = slotsData[hour];
-        const isBusy = slot && slot.status === 'busy';
-        const isBot = isBusy && slot.customer_email;
-        const div = document.createElement('div');
-        div.className = 'slot' + (isBusy ? (isBot ? ' bot-booking' : ' busy') : '');
-        div.innerHTML = '<div class="time">' + hour + '</div>' +
-          '<div class="status">' + (isBusy ? (isBot ? 'Bot rezervacija' : 'Zaseden') : 'Prost') + '</div>' +
-          (slot && slot.customer_name ? '<div class="customer">' + slot.customer_name + '</div>' : '') +
-          (slot && slot.service ? '<div class="customer">' + slot.service + '</div>' : '');
-        div.addEventListener('click', () => openModal(hour, slot));
-        container.appendChild(div);
-      });
-    }
+    document.getElementById('modalOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('modalName').focus(), 100);
+  }
 
-    function openModal(time, slot) {
-      currentSlot = time;
-      document.getElementById('modal-title').textContent = 'Termin ob ' + time;
-      document.getElementById('modal-customer').value = slot ? (slot.customer_name || '') : '';
-      document.getElementById('modal-service').value = slot ? (slot.service || '') : '';
-      const infoSection = document.getElementById('modal-info-section');
-      infoSection.innerHTML = (slot && slot.customer_email)
-        ? '<div class="modal-info">📧 ' + slot.customer_email + '<br>📞 ' + (slot.customer_phone || '-') + '</div>'
-        : '';
-      document.getElementById('modal').classList.add('open');
-    }
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+  }
 
-    async function saveSlot(status) {
-      const customerName = document.getElementById('modal-customer').value;
-      const service = document.getElementById('modal-service').value;
-      await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: formatDate(currentDate), time: currentSlot, status, customerName, service })
-      });
-      document.getElementById('modal').classList.remove('open');
-      loadSlots();
-    }
+  async function saveSlot(status) {
+    const name = document.getElementById('modalName').value;
+    const service = document.getElementById('modalService').value;
+    await fetch(API + '/admin/' + SID + '/timeslots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: fmt(currentDate), time: currentSlot, status, customerName: name, service })
+    });
+    closeModal();
+    loadSlots(false);
+  }
 
-    function buildScheduleUI() {
-      const container = document.getElementById('schedule-rows');
-      container.innerHTML = '';
-      DAY_KEYS.forEach(key => {
-        const d = schedule[key] || { open: false, from: '08:00', to: '20:00' };
-        const row = document.createElement('div');
-        row.className = 'day-row';
-        row.innerHTML = \`
-          <div class="day-name">\${DAY_NAMES[key]}</div>
-          <label class="day-toggle">
-            <input type="checkbox" id="open-\${key}" \${d.open ? 'checked' : ''} onchange="toggleDay('\${key}')">
-            <span class="slider"></span>
-          </label>
-          <div class="day-times \${d.open ? '' : 'disabled'}" id="times-\${key}">
-            <input type="time" id="from-\${key}" value="\${d.from}" step="1800">
-            <span style="color:#aaa">–</span>
-            <input type="time" id="to-\${key}" value="\${d.to}" step="1800">
-          </div>
-        \`;
-        container.appendChild(row);
-      });
-    }
+  /* ── SCHEDULE ── */
+  function buildScheduleUI() {
+    const body = document.getElementById('scheduleBody');
+    body.innerHTML = '';
+    DAY_KEYS.forEach(key => {
+      const d = schedule[key] || { open: false, from: '08:00', to: '20:00' };
+      const row = document.createElement('div');
+      row.className = 'day-row';
+      row.innerHTML = \`
+        <div class="day-name \${d.open ? '' : 'closed-day'}" id="dn-\${key}">\${DAY_NAMES[key]}</div>
+        <label class="toggle-wrap">
+          <input type="checkbox" id="open-\${key}" \${d.open ? 'checked' : ''} onchange="toggleDay('\${key}')">
+          <span class="toggle-track"></span>
+        </label>
+        <div class="time-range \${d.open ? '' : 'disabled'}" id="tr-\${key}">
+          <input type="time" id="from-\${key}" value="\${d.from}" step="1800">
+          <span class="time-sep">→</span>
+          <input type="time" id="to-\${key}" value="\${d.to}" step="1800">
+        </div>
+      \`;
+      body.appendChild(row);
+    });
+  }
 
-    function toggleDay(key) {
-      const isOpen = document.getElementById('open-' + key).checked;
-      document.getElementById('times-' + key).className = 'day-times' + (isOpen ? '' : ' disabled');
-    }
+  function toggleDay(key) {
+    const open = document.getElementById('open-' + key).checked;
+    document.getElementById('tr-' + key).className = 'time-range' + (open ? '' : ' disabled');
+    document.getElementById('dn-' + key).className = 'day-name' + (open ? '' : ' closed-day');
+  }
 
-    async function saveSchedule() {
-      const newSchedule = {};
-      DAY_KEYS.forEach(key => {
-        newSchedule[key] = {
-          open: document.getElementById('open-' + key).checked,
-          from: document.getElementById('from-' + key).value || '08:00',
-          to: document.getElementById('to-' + key).value || '20:00'
-        };
-      });
-      await fetch(API_URL + '/admin/' + SALON_ID + '/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSchedule)
-      });
-      schedule = newSchedule;
-      const msg = document.getElementById('save-msg');
-      msg.style.display = 'block';
-      setTimeout(() => msg.style.display = 'none', 2500);
-      loadSlots();
-    }
+  async function saveSchedule() {
+    const newSchedule = {};
+    DAY_KEYS.forEach(key => {
+      newSchedule[key] = {
+        open: document.getElementById('open-' + key).checked,
+        from: document.getElementById('from-' + key).value || '08:00',
+        to: document.getElementById('to-' + key).value || '20:00'
+      };
+    });
+    await fetch(API + '/admin/' + SID + '/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSchedule)
+    });
+    schedule = newSchedule;
+    const c = document.getElementById('saveConfirm');
+    c.classList.add('show');
+    setTimeout(() => c.classList.remove('show'), 2500);
+    loadSlots(false);
+  }
 
-    document.getElementById('modal-cancel').addEventListener('click', () => document.getElementById('modal').classList.remove('open'));
-    document.getElementById('modal-set-busy').addEventListener('click', () => saveSlot('busy'));
-    document.getElementById('modal-set-free').addEventListener('click', () => saveSlot('free'));
-    document.getElementById('prev').addEventListener('click', () => { currentDate.setDate(currentDate.getDate() - 1); loadSlots(); });
-    document.getElementById('next').addEventListener('click', () => { currentDate.setDate(currentDate.getDate() + 1); loadSlots(); });
+  /* ── EVENTS ── */
+  document.getElementById('prev').addEventListener('click', () => {
+    currentDate.setDate(currentDate.getDate() - 1); loadSlots(true);
+  });
+  document.getElementById('next').addEventListener('click', () => {
+    currentDate.setDate(currentDate.getDate() + 1); loadSlots(true);
+  });
+  document.getElementById('todayBtn').addEventListener('click', () => {
+    currentDate = new Date(); loadSlots(true);
+  });
+  document.getElementById('modalOverlay').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+  });
 
-    loadSlots();
-    buildScheduleUI();
-    setInterval(loadSlots, 30000);
-  </script>
+  // Init
+  loadSlots(true);
+  buildScheduleUI();
+
+  // Auto-refresh every 30s
+  refreshTimer = setInterval(() => loadSlots(true), 30000);
+</script>
 </body>
 </html>`;
 }
