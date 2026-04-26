@@ -442,11 +442,11 @@ app.get('/salons', async (req, res) => {
 });
 
 app.post('/salons', async (req, res) => {
-  const { name, address, phone, hours, services, notificationEmail } = req.body;
+  const { name, address, phone, hours, services, notificationEmail, type } = req.body;
   const id = 'salon_' + Date.now();
   await pool.query(
-    'INSERT INTO salons (id, name, address, phone, hours, services, notification_email, schedule) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-    [id, name, address, phone, hours, services, notificationEmail, JSON.stringify(DEFAULT_SCHEDULE)]
+    'INSERT INTO salons (id, name, address, phone, hours, services, notification_email, schedule, type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+    [id, name, address, phone, hours, services, notificationEmail, JSON.stringify(DEFAULT_SCHEDULE), type || 'salon']
   );
   res.json({ success: true, salonId: id });
 });
