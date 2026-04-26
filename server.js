@@ -98,6 +98,7 @@ async function initDB() {
     )
   `);
   await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE`);
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'salon'`);
   const { rows } = await pool.query('SELECT id FROM salons WHERE id = $1', ['salon_1']);
   if (rows.length === 0) {
     await pool.query(`
@@ -238,6 +239,20 @@ app.get('/salon/:id', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [req.params.id]);
   const salon = rows[0];
   if (!salon) return res.status(404).send('<h1>Salon not found</h1>');
+  res.send(buildChatPage(salon));
+});
+
+app.get('/studio/:id', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [req.params.id]);
+  const salon = rows[0];
+  if (!salon) return res.status(404).send('<h1>Not found</h1>');
+  res.send(buildChatPage(salon));
+});
+
+app.get('/bar/:id', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [req.params.id]);
+  const salon = rows[0];
+  if (!salon) return res.status(404).send('<h1>Not found</h1>');
   res.send(buildChatPage(salon));
 });
 
@@ -869,7 +884,7 @@ function buildAdminPage(salon) {
       <h1>Admin: ${salon.name}</h1>
       <p>Upravljanje terminov in urnika</p>
     </div>
-    <a href="/salon/${salon.id}" style="color:#c9a84c;font-size:12px;text-decoration:none;">Oglej chat stran</a>
+    <a href="/${salon.type || 'salon'}/${salon.slug || salon.id}" style="color:#c9a84c;font-size:12px;text-decoration:none;">Oglej chat stran</a>
   </div>
 
   <div class="tabs">
