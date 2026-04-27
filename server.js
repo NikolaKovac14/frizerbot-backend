@@ -823,665 +823,851 @@ function buildAdminPage(salon) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${salon.name} · Admin</title>
+  <title>Admin · ${salon.name}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg: #ffffff;
-      --bg-2: #fafafa;
-      --bg-3: #f5f5f5;
-      --border: #eeeeee;
-      --border-2: #e0e0e0;
-      --text: #0a0a0a;
-      --text-2: #6b6b6b;
-      --text-3: #a0a0a0;
-      --accent-free: #16a34a;
-      --accent-busy: #dc2626;
-      --accent-bot: #2563eb;
-      --accent-free-bg: #f0fdf4;
-      --accent-busy-bg: #fef2f2;
-      --accent-bot-bg: #eff6ff;
-      --mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Cascadia Code', ui-monospace, monospace;
-      --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
-    }
-    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    /* ─────────────────────────────────────────────────────────────────────────────────── */
+    /* LUXURY BOUTIQUE SALON ADMIN — WARM, HANDCRAFTED, PREMIUM AESTHETIC */
+    /* ─────────────────────────────────────────────────────────────────────────────────── */
 
-    /* ── TOPBAR ── */
-    .topbar {
-      height: 48px;
-      border-bottom: 1px solid var(--border);
+    :root {
+      /* Warm palette: cream, amber, gold, terracotta, taupe */
+      --bg-primary: #faf8f4;
+      --bg-card: #fff9f5;
+      --bg-hover: #f5f1ed;
+      --border-warm: #ede4d9;
+      --border-soft: #f0e8e0;
+      --accent-amber: #c9884a;
+      --accent-gold: #d4a574;
+      --accent-rose: #d4897a;
+      --text-primary: #3d3530;
+      --text-secondary: #8b7d72;
+      --text-tertiary: #b8aaa0;
+      --status-free: #8ba863;
+      --status-busy: #c97970;
+      --status-bot: #7b9ec4;
+      --success: #7fa878;
+      --success-bg: #f0f7ed;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ─── TYPOGRAPHY ─────────────────────────────────────────────────────────────────── */
+    h1, h2, h3, h4, h5, h6 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+
+    h1 { font-size: 32px; line-height: 1.2; }
+    h2 { font-size: 24px; line-height: 1.25; }
+    h3 { font-size: 18px; line-height: 1.3; }
+
+    /* ─── HEADER ──────────────────────────────────────────────────────────────────────── */
+    .header {
+      background: linear-gradient(135deg, #3d3530 0%, #4a453f 100%);
+      padding: 24px 32px;
       display: flex;
       align-items: center;
-      padding: 0 20px;
-      gap: 0;
+      gap: 24px;
       position: sticky;
       top: 0;
-      background: var(--bg);
       z-index: 100;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     }
-    .topbar-brand {
-      font-size: 13px;
+
+    .header-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 26px;
       font-weight: 600;
-      letter-spacing: -0.01em;
-      color: var(--text);
+      color: var(--accent-gold);
+      letter-spacing: 0.03em;
+      white-space: nowrap;
     }
-    .topbar-sep {
-      color: var(--border-2);
-      margin: 0 8px;
-      font-weight: 300;
-      font-size: 16px;
-    }
-    .topbar-salon {
-      font-size: 13px;
-      color: var(--text-2);
-    }
-    .topbar-right {
-      margin-left: auto;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .topbar-badge {
-      font-size: 10px;
-      font-weight: 500;
-      letter-spacing: 0.06em;
+
+    .header-sep { flex: 1; }
+
+    .header-badge {
+      background: rgba(212, 165, 116, 0.15);
+      border: 1px solid rgba(212, 165, 116, 0.3);
+      color: var(--accent-gold);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      background: var(--bg-3);
-      border: 1px solid var(--border-2);
-      color: var(--text-2);
-      padding: 2px 7px;
-      border-radius: 3px;
+      padding: 6px 14px;
+      border-radius: 20px;
     }
-    .topbar-link {
-      height: 28px;
-      padding: 0 10px;
+
+    .header-link {
+      color: rgba(255, 255, 255, 0.5);
       font-size: 12px;
-      color: var(--text-2);
       text-decoration: none;
       display: flex;
       align-items: center;
-      gap: 5px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      transition: border-color 0.1s, color 0.1s;
-      margin-left: 8px;
-    }
-    .topbar-link:hover { border-color: var(--border-2); color: var(--text); }
-    .topbar-link svg { width: 11px; height: 11px; }
-
-    /* ── NAV ── */
-    .subnav {
-      height: 37px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: stretch;
-      padding: 0 20px;
-      gap: 0;
-      background: var(--bg);
-    }
-    .snav-tab {
-      display: flex;
-      align-items: center;
       gap: 6px;
-      padding: 0 12px;
-      font-size: 12px;
-      color: var(--text-3);
-      cursor: pointer;
-      border-bottom: 1px solid transparent;
-      transition: color 0.1s;
-      user-select: none;
-      letter-spacing: 0.01em;
-      margin-bottom: -1px;
+      transition: color 0.2s ease;
     }
-    .snav-tab:hover { color: var(--text-2); }
-    .snav-tab.active { color: var(--text); border-bottom-color: var(--text); }
-    .snav-tab svg { width: 12px; height: 12px; flex-shrink: 0; }
 
-    /* ── LAYOUT ── */
-    .tab-pane { display: none; }
-    .tab-pane.active { display: block; }
-    .page { max-width: 840px; margin: 0 auto; padding: 28px 20px; }
+    .header-link:hover { color: var(--accent-gold); }
+    .header-link svg { width: 13px; height: 13px; }
 
-    /* ── TOOLBAR ROW ── */
-    .toolbar {
+    /* ─── NAVIGATION TABS ─────────────────────────────────────────────────────────────── */
+    .nav {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-warm);
+      padding: 0 32px;
+      display: flex;
+      gap: 0;
+    }
+
+    .nav-tab {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 20px;
+      padding: 16px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s ease;
+      user-select: none;
+      letter-spacing: 0.01em;
     }
-    .nav-btn {
-      width: 28px;
-      height: 28px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
+
+    .nav-tab:hover {
+      color: var(--text-primary);
+    }
+
+    .nav-tab.active {
+      color: var(--accent-amber);
+      border-bottom-color: var(--accent-amber);
+    }
+
+    .nav-tab svg {
+      width: 15px;
+      height: 15px;
+      opacity: 0.6;
+    }
+
+    .nav-tab.active svg { opacity: 1; }
+
+    /* ─── LAYOUT ──────────────────────────────────────────────────────────────────────── */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 32px;
+    }
+
+    /* ─── DATE NAVIGATION ─────────────────────────────────────────────────────────────── */
+    .date-nav {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .date-nav-btn {
+      width: 40px;
+      height: 40px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-warm);
+      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      color: var(--text-3);
-      transition: border-color 0.1s, color 0.1s;
+      color: var(--accent-amber);
+      transition: all 0.2s ease;
       flex-shrink: 0;
     }
-    .nav-btn:hover { border-color: var(--border-2); color: var(--text); }
-    .nav-btn svg { width: 14px; height: 14px; }
-    .date-display {
-      font-family: var(--mono);
-      font-size: 13px;
-      color: var(--text);
-      letter-spacing: 0.02em;
-      min-width: 220px;
-      text-align: center;
+
+    .date-nav-btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent-amber);
+      transform: scale(1.05);
     }
-    .today-btn {
-      height: 28px;
-      padding: 0 10px;
-      font-size: 11px;
+
+    .date-nav-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .date-label {
+      flex: 1;
+      text-align: center;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 24px;
       font-weight: 500;
+      color: var(--text-primary);
+      letter-spacing: 0.02em;
+    }
+
+    .date-today-btn {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      background: var(--bg-card);
+      border: 1px solid var(--border-warm);
+      border-radius: 8px;
+      padding: 7px 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .date-today-btn:hover {
+      background: var(--bg-hover);
+      color: var(--accent-amber);
+      border-color: var(--accent-amber);
+    }
+
+    /* ─── STATS CHIPS ─────────────────────────────────────────────────────────────────── */
+    .stats-row {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+
+    .stat-chip {
+      background: var(--bg-card);
+      border: 1px solid var(--border-warm);
+      border-radius: 14px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 110px;
+      transition: all 0.2s ease;
+    }
+
+    .stat-chip:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent-amber);
+      transform: translateY(-2px);
+    }
+
+    .stat-value {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--accent-amber);
+      line-height: 1;
+      letter-spacing: 0.01em;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-tertiary);
+      font-weight: 600;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: var(--text-2);
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      cursor: pointer;
-      transition: border-color 0.1s, color 0.1s;
-      font-family: var(--sans);
-    }
-    .today-btn:hover { border-color: var(--border-2); color: var(--text); }
-
-    /* ── STATS INLINE ── */
-    .stats-inline {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      margin-bottom: 20px;
-      padding: 10px 14px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      background: var(--bg-2);
-    }
-    .si-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-    }
-    .si-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .si-num {
-      font-family: var(--mono);
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--text);
-    }
-    .si-label {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-3);
-    }
-    .si-div {
-      width: 1px;
-      height: 12px;
-      background: var(--border);
+      margin-top: 2px;
     }
 
-    /* ── LEGEND ── */
+    /* ─── LEGEND ──────────────────────────────────────────────────────────────────────── */
     .legend {
       display: flex;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 16px;
+      gap: 24px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      padding: 14px 16px;
+      background: var(--success-bg);
+      border-radius: 12px;
+      border: 1px solid var(--border-warm);
     }
-    .leg-item {
+
+    .legend-item {
       display: flex;
       align-items: center;
-      gap: 5px;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-3);
-    }
-    .leg-bar {
-      width: 3px;
-      height: 10px;
-      border-radius: 1px;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
     }
 
-    /* ── CLOSED STATE ── */
-    .closed-state {
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 40px 24px;
-      text-align: center;
-      background: var(--bg-2);
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
     }
-    .closed-state .cs-label {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-3);
+
+    .legend-dot.free { background: var(--status-free); }
+    .legend-dot.busy { background: var(--status-busy); }
+    .legend-dot.bot { background: var(--status-bot); }
+
+    /* ─── CLOSED BANNER ───────────────────────────────────────────────────────────────── */
+    .closed-banner {
+      background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-hover) 100%);
+      border: 1px solid var(--border-warm);
+      border-radius: 18px;
+      padding: 56px 32px;
+      text-align: center;
+    }
+
+    .closed-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .closed-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      font-weight: 500;
+      color: var(--text-primary);
       margin-bottom: 6px;
     }
-    .closed-state .cs-text {
-      font-size: 14px;
-      color: var(--text-2);
+
+    .closed-sub {
+      font-size: 13px;
+      color: var(--text-secondary);
     }
 
-    /* ── SLOT GRID ── */
+    /* ─── SLOTS GRID ──────────────────────────────────────────────────────────────────── */
     .slots-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      border-radius: 4px;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 12px;
+    }
+
+    .slot-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-warm);
+      border-radius: 14px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
       overflow: hidden;
     }
-    .slot-card {
-      background: var(--bg);
-      padding: 12px 14px;
-      cursor: pointer;
-      border-left: 3px solid #e5e7eb;
-      transition: background 0.08s;
-      position: relative;
+
+    .slot-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--status-free);
+      transition: background 0.2s ease;
     }
-    .slot-card:hover { background: var(--bg-2); }
-    .slot-card.free { border-left-color: var(--accent-free); }
-    .slot-card.busy { border-left-color: var(--accent-busy); }
-    .slot-card.bot  { border-left-color: var(--accent-bot); }
+
+    .slot-card.busy::before { background: var(--status-busy); }
+    .slot-card.bot::before { background: var(--status-bot); }
+
+    .slot-card:hover {
+      border-color: var(--accent-amber);
+      background: var(--bg-hover);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    }
+
     .slot-time {
-      font-family: var(--mono);
-      font-size: 16px;
-      font-weight: 500;
-      color: var(--text);
-      letter-spacing: -0.01em;
-      line-height: 1;
-      margin-bottom: 5px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: 0.01em;
+      margin-bottom: 6px;
     }
-    .slot-tag {
+
+    .slot-status {
+      display: inline-block;
       font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-weight: 500;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(139, 168, 99, 0.15);
+      color: var(--status-free);
     }
-    .slot-card.free .slot-tag { color: var(--accent-free); }
-    .slot-card.busy .slot-tag { color: var(--accent-busy); }
-    .slot-card.bot  .slot-tag { color: var(--accent-bot); }
+
+    .slot-card.busy .slot-status {
+      background: rgba(201, 121, 112, 0.15);
+      color: var(--status-busy);
+    }
+
+    .slot-card.bot .slot-status {
+      background: rgba(123, 158, 196, 0.15);
+      color: var(--status-bot);
+    }
+
     .slot-name {
-      font-size: 11px;
-      color: var(--text-2);
-      margin-top: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 8px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      font-weight: 500;
     }
-    .slot-svc {
-      font-size: 10px;
-      color: var(--text-3);
+
+    .slot-service {
+      font-size: 11px;
+      color: var(--text-tertiary);
       margin-top: 2px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    /* ── MODAL ── */
-    .overlay {
+    /* ─── MODAL ───────────────────────────────────────────────────────────────────────── */
+    .modal-overlay {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.3);
+      background: rgba(0, 0, 0, 0.35);
       z-index: 200;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 24px;
+      backdrop-filter: blur(3px);
     }
-    .overlay.open { display: flex; }
+
+    .modal-overlay.open { display: flex; }
+
     .modal {
-      background: var(--bg);
-      border: 1px solid var(--border-2);
-      border-radius: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-warm);
+      border-radius: 18px;
       width: 100%;
-      max-width: 360px;
+      max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
       overflow: hidden;
     }
-    .modal-head {
-      border-bottom: 1px solid var(--border);
-      padding: 16px 18px;
-      display: flex;
-      align-items: baseline;
-      gap: 10px;
+
+    .modal-header {
+      background: linear-gradient(135deg, #3d3530 0%, #4a453f 100%);
+      padding: 24px;
     }
-    .modal-time-mono {
-      font-family: var(--mono);
-      font-size: 24px;
-      font-weight: 500;
-      color: var(--text);
-      letter-spacing: -0.02em;
-      line-height: 1;
-    }
-    .modal-date-mono {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--text-3);
+
+    .modal-time {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 32px;
+      font-weight: 600;
+      color: var(--accent-gold);
       letter-spacing: 0.02em;
     }
-    .modal-body { padding: 16px 18px; }
-    .modal-meta {
-      display: none;
-      background: var(--bg-2);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 10px 12px;
-      margin-bottom: 14px;
-    }
-    .modal-meta.show { display: block; }
-    .meta-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+
+    .modal-date-label {
       font-size: 11px;
-      color: var(--text-2);
-      line-height: 1.8;
-    }
-    .meta-row span:first-child { font-family: var(--mono); font-size: 10px; color: var(--text-3); width: 14px; text-align: center; }
-    .field-label {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-3);
-      margin-bottom: 4px;
-      margin-top: 12px;
-    }
-    .field-label:first-of-type { margin-top: 0; }
-    .field-input {
-      width: 100%;
-      padding: 7px 10px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      font-size: 13px;
-      font-family: var(--sans);
-      color: var(--text);
-      background: var(--bg);
-      outline: none;
-      transition: border-color 0.1s;
-    }
-    .field-input:focus { border-color: var(--border-2); }
-    .modal-actions {
-      display: flex;
-      gap: 6px;
-      margin-top: 16px;
-      padding-top: 14px;
-      border-top: 1px solid var(--border);
-    }
-    .m-btn {
-      flex: 1;
-      height: 30px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 500;
+      color: rgba(255, 255, 255, 0.45);
+      margin-top: 4px;
       letter-spacing: 0.04em;
       text-transform: uppercase;
-      cursor: pointer;
-      font-family: var(--sans);
-      background: var(--bg);
-      color: var(--text-2);
-      transition: border-color 0.1s, background 0.1s, color 0.1s;
     }
-    .m-btn:hover { border-color: var(--border-2); color: var(--text); }
-    .m-btn.free-btn { color: var(--accent-free); border-color: #bbf7d0; background: var(--accent-free-bg); }
-    .m-btn.free-btn:hover { border-color: #86efac; }
-    .m-btn.busy-btn { color: var(--accent-busy); border-color: #fecaca; background: var(--accent-busy-bg); }
-    .m-btn.busy-btn:hover { border-color: #f87171; }
 
-    /* ── SCHEDULE ── */
-    .sched-card {
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      overflow: hidden;
-      background: var(--bg);
+    .modal-body { padding: 24px; }
+
+    .modal-info-card {
+      background: linear-gradient(135deg, var(--success-bg) 0%, rgba(212, 165, 116, 0.05) 100%);
+      border: 1px solid var(--border-warm);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 18px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.8;
+      display: none;
     }
-    .sched-card-head {
-      padding: 14px 18px;
-      border-bottom: 1px solid var(--border);
+
+    .modal-info-card.visible { display: block; }
+
+    .modal-info-row {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
     }
-    .sched-card-title {
+
+    .modal-info-row span:first-child { font-size: 14px; }
+
+    .modal-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: 6px;
+      margin-top: 14px;
+    }
+
+    .modal-label:first-of-type { margin-top: 0; }
+
+    .modal-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border-warm);
+      border-radius: 10px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text-primary);
+      background: var(--bg-primary);
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .modal-input:focus {
+      border-color: var(--accent-amber);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(201, 136, 74, 0.1);
+    }
+
+    .modal-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border-warm);
+    }
+
+    .modal-btn {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: none;
       font-size: 12px;
       font-weight: 600;
-      color: var(--text);
-      letter-spacing: 0.01em;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
     }
-    .sched-card-sub {
-      font-size: 11px;
-      color: var(--text-3);
-      margin-top: 1px;
+
+    .modal-btn:hover { transform: translateY(-1px); }
+
+    .btn-cancel {
+      background: var(--bg-hover);
+      color: var(--text-secondary);
     }
+
+    .btn-free {
+      background: rgba(139, 168, 99, 0.15);
+      color: var(--status-free);
+    }
+
+    .btn-free:hover { background: rgba(139, 168, 99, 0.25); }
+
+    .btn-busy {
+      background: rgba(201, 121, 112, 0.15);
+      color: var(--status-busy);
+    }
+
+    .btn-busy:hover { background: rgba(201, 121, 112, 0.25); }
+
+    /* ─── SCHEDULE CARD ───────────────────────────────────────────────────────────────── */
+    .schedule-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-warm);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    }
+
+    .schedule-header {
+      padding: 24px;
+      border-bottom: 1px solid var(--border-warm);
+      background: linear-gradient(135deg, rgba(212, 165, 116, 0.05) 0%, transparent 100%);
+    }
+
+    .schedule-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 20px;
+      font-weight: 500;
+      color: var(--text-primary);
+      letter-spacing: 0.02em;
+    }
+
+    .schedule-subtitle {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
     .day-row {
       display: flex;
       align-items: center;
-      gap: 14px;
-      padding: 10px 18px;
-      border-bottom: 1px solid var(--border);
-      transition: background 0.08s;
+      gap: 18px;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-soft);
+      transition: background 0.15s ease;
     }
+
     .day-row:last-child { border-bottom: none; }
-    .day-row:hover { background: var(--bg-2); }
+    .day-row:hover { background: var(--bg-hover); }
+
     .day-name {
-      font-size: 12px;
+      width: 110px;
+      font-size: 13px;
       font-weight: 500;
-      color: var(--text-2);
-      width: 96px;
-      flex-shrink: 0;
+      color: var(--text-primary);
+      letter-spacing: 0.01em;
     }
+
     .toggle-wrap {
       position: relative;
-      width: 34px;
-      height: 18px;
+      width: 44px;
+      height: 24px;
       flex-shrink: 0;
     }
-    .toggle-wrap input { opacity: 0; width: 0; height: 0; position: absolute; }
-    .toggle-track {
+
+    .toggle-wrap input { opacity: 0; width: 0; height: 0; }
+
+    .toggle-slider {
       position: absolute;
       inset: 0;
-      background: var(--bg-3);
-      border: 1px solid var(--border-2);
-      border-radius: 100px;
+      background: var(--border-warm);
+      border-radius: 24px;
       cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
+      transition: background 0.3s ease;
     }
-    .toggle-wrap input:checked ~ .toggle-track { background: var(--text); border-color: var(--text); }
-    .toggle-thumb {
+
+    .toggle-wrap input:checked + .toggle-slider {
+      background: var(--accent-amber);
+    }
+
+    .toggle-slider::before {
+      content: '';
       position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 12px;
-      height: 12px;
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
       background: #fff;
       border-radius: 50%;
-      transition: transform 0.15s;
-      pointer-events: none;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+      transition: transform 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
     }
-    .toggle-wrap input:checked ~ .toggle-thumb { transform: translateX(16px); }
+
+    .toggle-wrap input:checked + .toggle-slider::before {
+      transform: translateX(20px);
+    }
+
     .day-times {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      color: var(--text-3);
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      flex: 1;
     }
-    .day-times.off { opacity: 0.3; pointer-events: none; }
-    .day-times input[type=time] {
-      padding: 4px 8px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
+
+    .day-times.disabled {
+      opacity: 0.3;
+      pointer-events: none;
+    }
+
+    .day-times input[type="time"] {
+      padding: 7px 11px;
+      border: 1px solid var(--border-warm);
+      border-radius: 9px;
       font-size: 12px;
-      font-family: var(--mono);
-      color: var(--text);
-      background: var(--bg);
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text-primary);
+      background: var(--bg-primary);
       outline: none;
-      transition: border-color 0.1s;
+      transition: all 0.2s ease;
     }
-    .day-times input[type=time]:focus { border-color: var(--border-2); }
-    .day-sep { color: var(--border-2); }
-    .sched-card-foot {
-      padding: 12px 18px;
-      border-top: 1px solid var(--border);
+
+    .day-times input[type="time"]:focus {
+      border-color: var(--accent-amber);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(201, 136, 74, 0.1);
+    }
+
+    .day-sep {
+      color: var(--text-tertiary);
+      font-weight: 300;
+    }
+
+    .schedule-footer {
+      padding: 18px 24px;
+      border-top: 1px solid var(--border-warm);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: var(--bg-2);
+      background: linear-gradient(135deg, rgba(212, 165, 116, 0.03) 0%, transparent 100%);
     }
+
     .save-btn {
-      height: 30px;
-      padding: 0 16px;
-      background: var(--text);
+      background: var(--accent-amber);
       color: #fff;
       border: none;
-      border-radius: 4px;
+      border-radius: 10px;
+      padding: 10px 22px;
       font-size: 12px;
-      font-weight: 500;
-      font-family: var(--sans);
+      font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
       cursor: pointer;
+      transition: all 0.2s ease;
       letter-spacing: 0.02em;
-      transition: opacity 0.1s;
+      text-transform: uppercase;
     }
-    .save-btn:hover { opacity: 0.8; }
-    .save-ok {
-      font-size: 11px;
-      color: var(--accent-free);
-      font-weight: 500;
-      display: none;
-      align-items: center;
-      gap: 5px;
-      letter-spacing: 0.02em;
-    }
-    .save-ok.show { display: flex; }
-    .save-ok svg { width: 12px; height: 12px; }
 
-    /* ── RESPONSIVE ── */
-    @media (max-width: 600px) {
-      .topbar, .subnav { padding: 0 14px; }
-      .page { padding: 20px 14px; }
-      .slots-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
-      .day-row { padding: 10px 14px; }
-      .day-name { width: 72px; }
+    .save-btn:hover {
+      background: var(--accent-gold);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(201, 136, 74, 0.25);
+    }
+
+    .save-msg {
+      display: none;
+      font-size: 12px;
+      color: var(--success);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .save-msg.visible {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ─── SCROLLBAR ───────────────────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-warm);
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent-amber); }
+
+    /* ─── RESPONSIVE ───────────────────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .header { padding: 16px 20px; }
+      .nav { padding: 0 20px; }
+      .page { padding: 24px 16px; }
+      .date-label { font-size: 18px; }
+      .slots-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+      .day-row { padding: 14px 16px; gap: 12px; }
+      .day-name { width: 80px; font-size: 12px; }
+      .schedule-header, .schedule-footer { padding: 16px; }
+      .modal { max-width: 90%; }
     }
   </style>
 </head>
 <body>
 
-  <div class="topbar">
-    <span class="topbar-brand">BookWell</span>
-    <span class="topbar-sep">/</span>
-    <span class="topbar-salon">${salon.name}</span>
-    <div class="topbar-right">
-      <span class="topbar-badge">Admin</span>
-      <a href="/${salon.type || 'salon'}/${salon.slug || salon.id}" class="topbar-link">
-        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M4.5 1.5H2a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5V7.5M7 1.5h3.5m0 0v3.5m0-3.5L5 7"/>
-        </svg>
-        Oglej
-      </a>
-    </div>
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-logo">${salon.name}</div>
+    <div class="header-sep"></div>
+    <div class="header-badge">Admin</div>
+    <a href="/${salon.type || 'salon'}/${salon.slug || salon.id}" class="header-link">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9M9 2h5m0 0v5m0-5L7 10"/>
+      </svg>
+      Oglej stran
+    </a>
   </div>
 
-  <nav class="subnav">
-    <div class="snav-tab active" onclick="switchTab('termini')">
-      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
-        <rect x="1.5" y="2" width="9" height="8.5" rx="1"/><path d="M4 1v2M8 1v2M1.5 5.5h9"/>
+  <!-- NAVIGATION TABS -->
+  <nav class="nav">
+    <div class="nav-tab active" onclick="switchTab('termini')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1v3M11 1v3M2 7h12"/>
       </svg>
       Termini
     </div>
-    <div class="snav-tab" onclick="switchTab('urnik')">
-      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
-        <circle cx="6" cy="6" r="4.5"/><path d="M6 3.5v2.8l1.5 1.2"/>
+    <div class="nav-tab" onclick="switchTab('urnik')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2 1.5"/>
       </svg>
       Delovni čas
     </div>
   </nav>
 
   <!-- TERMINI TAB -->
-  <div class="tab-pane active" id="tab-termini">
+  <div class="tab-content active" id="tab-termini">
     <div class="page">
 
-      <div class="toolbar">
-        <button class="nav-btn" id="prev">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6">
-            <path d="M8.5 3L5 7l3.5 4"/>
+      <div class="date-nav">
+        <button class="date-nav-btn" id="prev" title="Prejšnji dan">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 4L6 8l4 4"/>
           </svg>
         </button>
-        <div class="date-display" id="dateTitle"></div>
-        <button class="today-btn" id="todayBtn">Today</button>
-        <button class="nav-btn" id="next">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6">
-            <path d="M5.5 3L9 7l-3.5 4"/>
+        <div class="date-label" id="dateTitle"></div>
+        <button class="date-today-btn" id="today">Danes</button>
+        <button class="date-nav-btn" id="next" title="Naslednji dan">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 4l4 4-4 4"/>
           </svg>
         </button>
       </div>
 
-      <div class="stats-inline" id="stats-inline" style="display:none"></div>
+      <div class="stats-row" id="stats-row"></div>
 
       <div class="legend">
-        <div class="leg-item"><div class="leg-bar" style="background:var(--accent-free)"></div> Prost</div>
-        <div class="leg-item"><div class="leg-bar" style="background:var(--accent-busy)"></div> Zaseden</div>
-        <div class="leg-item"><div class="leg-bar" style="background:var(--accent-bot)"></div> Bot</div>
+        <div class="legend-item"><div class="legend-dot free"></div> Prost termin</div>
+        <div class="legend-item"><div class="legend-dot busy"></div> Zaseden (ročno)</div>
+        <div class="legend-item"><div class="legend-dot bot"></div> Rezerviral asistent</div>
       </div>
 
       <div id="slots-container"></div>
+
     </div>
   </div>
 
   <!-- URNIK TAB -->
-  <div class="tab-pane" id="tab-urnik">
+  <div class="tab-content" id="tab-urnik">
     <div class="page">
-      <div class="sched-card">
-        <div class="sched-card-head">
-          <div>
-            <div class="sched-card-title">Delovni čas</div>
-            <div class="sched-card-sub">Določa razpoložljivost terminov v klepetu</div>
-          </div>
+      <div class="schedule-card">
+        <div class="schedule-header">
+          <div class="schedule-title">Delovni čas</div>
+          <div class="schedule-subtitle">Nastavljeni urniki določajo razpoložljive termine</div>
         </div>
-        <div id="sched-rows"></div>
-        <div class="sched-card-foot">
-          <div class="save-ok" id="save-ok">
-            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M2 6l3 3 5-5"/>
+        <div id="schedule-rows"></div>
+        <div class="schedule-footer">
+          <div class="save-msg" id="save-msg">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 8l3.5 3.5L13 4"/>
             </svg>
             Shranjeno
           </div>
-          <button class="save-btn" onclick="saveSchedule()">Shrani</button>
+          <button class="save-btn" onclick="saveSchedule()">Shrani spremembe</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- MODAL -->
-  <div class="overlay" id="overlay">
+  <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
-      <div class="modal-head">
-        <div class="modal-time-mono" id="m-time"></div>
-        <div class="modal-date-mono" id="m-date"></div>
+      <div class="modal-header">
+        <div class="modal-time" id="modal-time-display"></div>
+        <div class="modal-date-label" id="modal-date-label"></div>
       </div>
       <div class="modal-body">
-        <div class="modal-meta" id="m-meta"></div>
-        <div class="field-label">Ime stranke</div>
-        <input class="field-input" type="text" id="m-customer" placeholder="Ime Priimek" />
-        <div class="field-label">Storitev</div>
-        <input class="field-input" type="text" id="m-service" placeholder="npr. Ženski haircut" />
+        <div class="modal-info-card" id="modal-info-card"></div>
+        <div class="modal-label">Ime stranke</div>
+        <input class="modal-input" type="text" id="modal-customer" placeholder="Ime Priimek" />
+        <div class="modal-label">Storitev</div>
+        <input class="modal-input" type="text" id="modal-service" placeholder="npr. Ženski haircut" />
         <div class="modal-actions">
-          <button class="m-btn" id="m-cancel">Preklic</button>
-          <button class="m-btn free-btn" id="m-free">Prost</button>
-          <button class="m-btn busy-btn" id="m-busy">Zaseden</button>
+          <button class="modal-btn btn-cancel" id="modal-cancel">Preklic</button>
+          <button class="modal-btn btn-free" id="modal-set-free">Prost</button>
+          <button class="modal-btn btn-busy" id="modal-set-busy">Zaseden</button>
         </div>
       </div>
     </div>
@@ -1490,63 +1676,64 @@ function buildAdminPage(salon) {
   <script>
     const API_URL = '${apiUrl}';
     const SALON_ID = '${salon.id}';
-    const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
-    const DAY_NAMES = { mon:'Ponedeljek', tue:'Torek', wed:'Sreda', thu:'Četrtek', fri:'Petek', sat:'Sobota', sun:'Nedelja' };
-
     let currentDate = new Date();
     let currentSlot = null;
     let slotsData = {};
     let schedule = ${scheduleJson};
 
-    function genSlots(from, to) {
-      const out = [];
+    const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
+    const DAY_NAMES_SL = { mon:'Ponedeljek', tue:'Torek', wed:'Sreda', thu:'Četrtek', fri:'Petek', sat:'Sobota', sun:'Nedelja' };
+
+    function generateSlots(from, to) {
+      const slots = [];
       let [h, m] = from.split(':').map(Number);
       const [eh, em] = to.split(':').map(Number);
       while (h < eh || (h === eh && m < em)) {
-        out.push(String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0'));
+        slots.push(String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0'));
         m += 30; if (m >= 60) { m -= 60; h++; }
       }
-      return out;
+      return slots;
     }
 
     function getDayKey(d) {
       return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()];
     }
 
-    function fmtDate(d) { return d.toISOString().split('T')[0]; }
-
-    function fmtDateMono(d) {
-      return d.toLocaleDateString('sl-SI', { weekday: 'short', day: 'numeric', month: 'numeric', year: 'numeric' })
-        .toUpperCase();
-    }
-
-    function isToday(d) {
-      return d.toDateString() === new Date().toDateString();
-    }
-
     function switchTab(name) {
-      document.querySelectorAll('.snav-tab').forEach((t,i) =>
+      document.querySelectorAll('.nav-tab').forEach((t, i) =>
         t.classList.toggle('active', ['termini','urnik'][i] === name));
-      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
     }
 
+    function formatDate(d) { return d.toISOString().split('T')[0]; }
+
+    function formatDateSl(d) {
+      return d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function isToday(d) {
+      const now = new Date();
+      return d.toDateString() === now.toDateString();
+    }
+
     async function loadSlots() {
-      const dateStr = fmtDate(currentDate);
-      const todayStr = isToday(currentDate) ? ' · DANES' : '';
-      document.getElementById('dateTitle').textContent = fmtDateMono(currentDate) + todayStr;
+      const dateStr = formatDate(currentDate);
+      const label = document.getElementById('dateTitle');
+      label.textContent = formatDateSl(currentDate) + (isToday(currentDate) ? ' · danes' : '');
 
       const dayKey = getDayKey(currentDate);
-      const ds = schedule[dayKey];
+      const daySchedule = schedule[dayKey];
       const container = document.getElementById('slots-container');
 
-      if (!ds || !ds.open) {
-        document.getElementById('stats-inline').style.display = 'none';
+      if (!daySchedule || !daySchedule.open) {
         container.innerHTML = \`
-          <div class="closed-state">
-            <div class="cs-label">Delovni čas</div>
-            <div class="cs-text">Salon je ta dan zaprt</div>
+          <div class="closed-banner">
+            <span class="closed-icon">🚫</span>
+            <div class="closed-title">Salon je zaprt</div>
+            <div class="closed-sub">Ta dan ni delovnega časa</div>
           </div>\`;
+        document.getElementById('stats-row').innerHTML = '';
         return;
       }
 
@@ -1555,110 +1742,92 @@ function buildAdminPage(salon) {
       slotsData = {};
       data.forEach(s => { slotsData[s.time] = s; });
 
-      const hours = genSlots(ds.from, ds.to);
-      const busyCount = hours.filter(h => slotsData[h]?.status === 'busy').length;
-      const botCount = hours.filter(h => slotsData[h]?.status === 'busy' && slotsData[h]?.customer_email).length;
+      const hours = generateSlots(daySchedule.from, daySchedule.to);
+      const busyCount = hours.filter(h => slotsData[h] && slotsData[h].status === 'busy').length;
+      const botCount = hours.filter(h => slotsData[h] && slotsData[h].status === 'busy' && slotsData[h].customer_email).length;
       const freeCount = hours.length - busyCount;
 
-      const si = document.getElementById('stats-inline');
-      si.style.display = 'flex';
-      si.innerHTML = \`
-        <div class="si-item">
-          <div class="si-dot" style="background:#a1a1aa"></div>
-          <span class="si-num">\${hours.length}</span>
-          <span class="si-label">skupaj</span>
-        </div>
-        <div class="si-div"></div>
-        <div class="si-item">
-          <div class="si-dot" style="background:var(--accent-free)"></div>
-          <span class="si-num" style="color:var(--accent-free)">\${freeCount}</span>
-          <span class="si-label">prostih</span>
-        </div>
-        <div class="si-div"></div>
-        <div class="si-item">
-          <div class="si-dot" style="background:var(--accent-busy)"></div>
-          <span class="si-num" style="color:var(--accent-busy)">\${busyCount}</span>
-          <span class="si-label">zasedenih</span>
-        </div>
-        <div class="si-div"></div>
-        <div class="si-item">
-          <div class="si-dot" style="background:var(--accent-bot)"></div>
-          <span class="si-num" style="color:var(--accent-bot)">\${botCount}</span>
-          <span class="si-label">bot</span>
-        </div>
+      document.getElementById('stats-row').innerHTML = \`
+        <div class="stat-chip"><div class="stat-value">\${hours.length}</div><div class="stat-label">Skupaj</div></div>
+        <div class="stat-chip"><div class="stat-value" style="color:var(--status-free)">\${freeCount}</div><div class="stat-label">Prostih</div></div>
+        <div class="stat-chip"><div class="stat-value" style="color:var(--status-busy)">\${busyCount}</div><div class="stat-label">Zasedenih</div></div>
+        <div class="stat-chip"><div class="stat-value" style="color:var(--status-bot)">\${botCount}</div><div class="stat-label">Bot rezervacij</div></div>
       \`;
 
-      container.innerHTML = '';
-      const grid = document.createElement('div');
-      grid.className = 'slots-grid';
+      container.innerHTML = '<div class="slots-grid" id="slots"></div>';
+      renderSlots(hours);
+    }
 
+    function renderSlots(hours) {
+      const grid = document.getElementById('slots');
+      if (!grid) return;
+      grid.innerHTML = '';
       hours.forEach(hour => {
         const slot = slotsData[hour];
-        const isBusy = slot?.status === 'busy';
-        const isBot = isBusy && slot?.customer_email;
-        const cls = isBusy ? (isBot ? 'bot' : 'busy') : 'free';
-        const tag = isBusy ? (isBot ? 'Bot' : 'Zaseden') : 'Prost';
+        const isBusy = slot && slot.status === 'busy';
+        const isBot = isBusy && slot.customer_email;
+        const cls = isBusy ? (isBot ? 'bot' : 'busy') : '';
 
         const card = document.createElement('div');
         card.className = 'slot-card ' + cls;
-        card.innerHTML =
-          \`<div class="slot-time">\${hour}</div>\` +
-          \`<div class="slot-tag">\${tag}</div>\` +
-          (slot?.customer_name ? \`<div class="slot-name">\${slot.customer_name}</div>\` : '') +
-          (slot?.service ? \`<div class="slot-svc">\${slot.service}</div>\` : '');
+        card.innerHTML = \`
+          <div class="slot-time">\${hour}</div>
+          <div class="slot-status">\${isBusy ? (isBot ? 'Bot' : 'Zaseden') : 'Prost'}</div>
+          \${slot && slot.customer_name ? \`<div class="slot-name">\${slot.customer_name}</div>\` : ''}
+          \${slot && slot.service ? \`<div class="slot-service">\${slot.service}</div>\` : ''}
+        \`;
         card.addEventListener('click', () => openModal(hour, slot));
         grid.appendChild(card);
       });
-
-      container.appendChild(grid);
     }
 
     function openModal(time, slot) {
       currentSlot = time;
-      document.getElementById('m-time').textContent = time;
-      document.getElementById('m-date').textContent = fmtDateMono(currentDate);
-      document.getElementById('m-customer').value = slot?.customer_name || '';
-      document.getElementById('m-service').value = slot?.service || '';
+      document.getElementById('modal-time-display').textContent = time;
+      document.getElementById('modal-date-label').textContent = formatDateSl(currentDate);
+      document.getElementById('modal-customer').value = slot?.customer_name || '';
+      document.getElementById('modal-service').value = slot?.service || '';
 
-      const meta = document.getElementById('m-meta');
-      if (slot?.customer_email) {
-        meta.className = 'modal-meta show';
-        meta.innerHTML =
-          \`<div class="meta-row"><span>@</span><span>\${slot.customer_email}</span></div>\` +
-          \`<div class="meta-row"><span>#</span><span>\${slot.customer_phone || '—'}</span></div>\`;
+      const infoCard = document.getElementById('modal-info-card');
+      if (slot && slot.customer_email) {
+        infoCard.className = 'modal-info-card visible';
+        infoCard.innerHTML = \`
+          <div class="modal-info-row"><span>✉️</span><span>\${slot.customer_email}</span></div>
+          <div class="modal-info-row"><span>📞</span><span>\${slot.customer_phone || '–'}</span></div>
+        \`;
       } else {
-        meta.className = 'modal-meta';
+        infoCard.className = 'modal-info-card';
+        infoCard.innerHTML = '';
       }
-      document.getElementById('overlay').classList.add('open');
+      document.getElementById('modal-overlay').classList.add('open');
     }
 
     async function saveSlot(status) {
-      const customerName = document.getElementById('m-customer').value;
-      const service = document.getElementById('m-service').value;
+      const customerName = document.getElementById('modal-customer').value;
+      const service = document.getElementById('modal-service').value;
       await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: fmtDate(currentDate), time: currentSlot, status, customerName, service })
+        body: JSON.stringify({ date: formatDate(currentDate), time: currentSlot, status, customerName, service })
       });
-      document.getElementById('overlay').classList.remove('open');
+      document.getElementById('modal-overlay').classList.remove('open');
       loadSlots();
     }
 
     function buildScheduleUI() {
-      const container = document.getElementById('sched-rows');
+      const container = document.getElementById('schedule-rows');
       container.innerHTML = '';
       DAY_KEYS.forEach(key => {
         const d = schedule[key] || { open: false, from: '08:00', to: '20:00' };
         const row = document.createElement('div');
         row.className = 'day-row';
         row.innerHTML = \`
-          <div class="day-name">\${DAY_NAMES[key]}</div>
+          <div class="day-name">\${DAY_NAMES_SL[key]}</div>
           <label class="toggle-wrap">
             <input type="checkbox" id="open-\${key}" \${d.open ? 'checked' : ''} onchange="toggleDay('\${key}')">
-            <span class="toggle-track"></span>
-            <span class="toggle-thumb"></span>
+            <span class="toggle-slider"></span>
           </label>
-          <div class="day-times \${d.open ? '' : 'off'}" id="times-\${key}">
+          <div class="day-times \${d.open ? '' : 'disabled'}" id="times-\${key}">
             <input type="time" id="from-\${key}" value="\${d.from}" step="1800">
             <span class="day-sep">–</span>
             <input type="time" id="to-\${key}" value="\${d.to}" step="1800">
@@ -1669,14 +1838,15 @@ function buildAdminPage(salon) {
     }
 
     function toggleDay(key) {
-      const open = document.getElementById('open-' + key).checked;
-      document.getElementById('times-' + key).className = 'day-times' + (open ? '' : ' off');
+      const isOpen = document.getElementById('open-' + key).checked;
+      const timesEl = document.getElementById('times-' + key);
+      timesEl.className = 'day-times' + (isOpen ? '' : ' disabled');
     }
 
     async function saveSchedule() {
-      const ns = {};
+      const newSchedule = {};
       DAY_KEYS.forEach(key => {
-        ns[key] = {
+        newSchedule[key] = {
           open: document.getElementById('open-' + key).checked,
           from: document.getElementById('from-' + key).value || '08:00',
           to: document.getElementById('to-' + key).value || '20:00'
@@ -1685,41 +1855,44 @@ function buildAdminPage(salon) {
       await fetch(API_URL + '/admin/' + SALON_ID + '/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ns)
+        body: JSON.stringify(newSchedule)
       });
-      schedule = ns;
-      const ok = document.getElementById('save-ok');
-      ok.classList.add('show');
-      setTimeout(() => ok.classList.remove('show'), 2500);
+      schedule = newSchedule;
+      const msg = document.getElementById('save-msg');
+      msg.classList.add('visible');
+      setTimeout(() => msg.classList.remove('visible'), 2500);
       loadSlots();
     }
 
-    // ── Events ──
-    document.getElementById('m-cancel').addEventListener('click', () =>
-      document.getElementById('overlay').classList.remove('open'));
-    document.getElementById('overlay').addEventListener('click', e => {
-      if (e.target === document.getElementById('overlay'))
-        document.getElementById('overlay').classList.remove('open');
+    // EVENTS
+    document.getElementById('modal-cancel').addEventListener('click', () =>
+      document.getElementById('modal-overlay').classList.remove('open'));
+    document.getElementById('modal-overlay').addEventListener('click', e => {
+      if (e.target === document.getElementById('modal-overlay'))
+        document.getElementById('modal-overlay').classList.remove('open');
     });
-    document.getElementById('m-free').addEventListener('click', () => saveSlot('free'));
-    document.getElementById('m-busy').addEventListener('click', () => saveSlot('busy'));
+    document.getElementById('modal-set-busy').addEventListener('click', () => saveSlot('busy'));
+    document.getElementById('modal-set-free').addEventListener('click', () => saveSlot('free'));
     document.getElementById('prev').addEventListener('click', () => {
-      currentDate.setDate(currentDate.getDate() - 1); loadSlots();
+      currentDate.setDate(currentDate.getDate() - 1);
+      loadSlots();
     });
     document.getElementById('next').addEventListener('click', () => {
-      currentDate.setDate(currentDate.getDate() + 1); loadSlots();
+      currentDate.setDate(currentDate.getDate() + 1);
+      loadSlots();
     });
-    document.getElementById('todayBtn').addEventListener('click', () => {
-      currentDate = new Date(); loadSlots();
+    document.getElementById('today').addEventListener('click', () => {
+      currentDate = new Date();
+      loadSlots();
     });
 
-    // ── Init ──
+    // INIT
     loadSlots();
     buildScheduleUI();
     setInterval(loadSlots, 30000);
   </script>
 </body>
-</html>`;
+</html>\`;
 }
 
 app.get('/', (req, res) => {
