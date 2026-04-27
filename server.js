@@ -6,10 +6,19 @@ const cors = require('cors');
 const Anthropic = require('@anthropic-ai/sdk');
 const { Pool } = require('pg');
 const sgMail = require('@sendgrid/mail');
+const session = require('express-session');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'bookwell-secret-2024',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 24 * 60 * 60 * 1000 }
+}));
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -19,7 +28,6 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Privzeti urnik: pon-pet 8-20, sob 8-14, ned zaprto
 const DEFAULT_SCHEDULE = {
   mon: { open: true,  from: '08:00', to: '20:00' },
   tue: { open: true,  from: '08:00', to: '20:00' },
@@ -30,7 +38,6 @@ const DEFAULT_SCHEDULE = {
   sun: { open: false, from: '08:00', to: '16:00' }
 };
 
-// Vrne seznam terminov na pol ure za določen datum glede na urnik salona
 function getHoursForDate(schedule, dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
   const dayMap = ['sun','mon','tue','wed','thu','fri','sat'];
@@ -40,7 +47,6 @@ function getHoursForDate(schedule, dateStr) {
   return generateHalfHourSlots(daySchedule.from, daySchedule.to);
 }
 
-// Generira termine na pol ure med from in to
 function generateHalfHourSlots(from, to) {
   const slots = [];
   let [h, m] = (from || '08:00').split(':').map(Number);
@@ -53,7 +59,6 @@ function generateHalfHourSlots(from, to) {
   return slots;
 }
 
-// Berljiv prikaz urnika za system prompt
 function scheduleToText(schedule) {
   const s = schedule || DEFAULT_SCHEDULE;
   const dayNames = { mon: 'Ponedeljek', tue: 'Torek', wed: 'Sreda', thu: 'Četrtek', fri: 'Petek', sat: 'Sobota', sun: 'Nedelja' };
@@ -80,7 +85,6 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
-  // Dodaj schedule kolono če še ne obstaja (za obstoječe baze)
   await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS schedule JSONB DEFAULT NULL`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS timeslots (
@@ -99,6 +103,8 @@ async function initDB() {
   `);
   await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE`);
   await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'salon'`);
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS admin_username TEXT`);
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS admin_password TEXT`);
   const { rows } = await pool.query('SELECT id FROM salons WHERE id = $1', ['salon_1']);
   if (rows.length === 0) {
     await pool.query(`
@@ -113,6 +119,16 @@ async function initDB() {
     ]);
   }
   console.log('DB inicializiran');
+}
+
+// ─── AUTH MIDDLEWARE ──────────────────────────────────────────────────────────
+async function requireAdminAuth(req, res, next) {
+  const salonId = req.params.id;
+  const { rows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [salonId]);
+  const salon = rows[0];
+  if (!salon) return res.status(404).send('<h1>Salon not found</h1>');
+  if (req.session.adminSalonId === salon.id) return next();
+  res.redirect(`/admin-login/${salonId}`);
 }
 
 // ─── EMAIL FUNKCIJE ──────────────────────────────────────────────────────────
@@ -256,15 +272,67 @@ app.get('/bar/:id', async (req, res) => {
   res.send(buildChatPage(salon));
 });
 
+// ─── LOGIN / LOGOUT ───────────────────────────────────────────────────────────
+app.get('/admin-login/:id', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salon = rows[0];
+  if (!salon) return res.status(404).send('<h1>Salon not found</h1>');
+  if (!salon.admin_password) return res.send(buildSetupPage(salon));
+  res.send(buildLoginPage(salon));
+});
+
+app.post('/admin-login/:id', async (req, res) => {
+  const { username, password } = req.body;
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salon = rows[0];
+  if (!salon) return res.status(404).json({ error: 'Not found' });
+  if (!salon.admin_password) return res.status(400).json({ error: 'Račun še ni nastavljen' });
+
+  const validUser = username === salon.admin_username;
+  const validPass = await bcrypt.compare(password, salon.admin_password);
+
+  if (!validUser || !validPass) {
+    return res.status(401).json({ error: 'Napačno uporabniško ime ali geslo' });
+  }
+
+  req.session.adminSalonId = salon.id;
+  res.json({ success: true, redirect: `/admin/${req.params.id}` });
+});
+
+app.post('/admin-setup/:id', async (req, res) => {
+  const { username, password } = req.body;
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salon = rows[0];
+  if (!salon) return res.status(404).json({ error: 'Not found' });
+  if (salon.admin_password) return res.status(400).json({ error: 'Račun je že nastavljen' });
+  if (!username || !password || password.length < 6) {
+    return res.status(400).json({ error: 'Geslo mora biti vsaj 6 znakov' });
+  }
+
+  const hashed = await bcrypt.hash(password, 10);
+  await pool.query(
+    'UPDATE salons SET admin_username = $1, admin_password = $2 WHERE id = $3',
+    [username, hashed, salon.id]
+  );
+
+  req.session.adminSalonId = salon.id;
+  res.json({ success: true, redirect: `/admin/${req.params.id}` });
+});
+
+app.get('/admin-logout/:id', (req, res) => {
+  req.session.destroy();
+  res.redirect(`/admin-login/${req.params.id}`);
+});
+
 // ─── ADMIN PANEL ──────────────────────────────────────────────────────────────
-app.get('/admin/:id', async (req, res) => {
+app.get('/admin/:id', requireAdminAuth, async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
   const salon = rows[0];
   if (!salon) return res.status(404).send('<h1>Salon not found</h1>');
   res.send(buildAdminPage(salon));
 });
 
-app.get('/admin/:id/timeslots', async (req, res) => {
+app.get('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
   const { date } = req.query;
   const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
   const salonId = salonRows[0]?.id || req.params.id;
@@ -275,7 +343,7 @@ app.get('/admin/:id/timeslots', async (req, res) => {
   res.json(rows);
 });
 
-app.post('/admin/:id/timeslots', async (req, res) => {
+app.post('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
   const { date, time, status, customerName, service } = req.body;
   const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
   const salonId = salonRows[0]?.id || req.params.id;
@@ -293,14 +361,14 @@ app.post('/admin/:id/timeslots', async (req, res) => {
 });
 
 // ─── SCHEDULE ENDPOINT ────────────────────────────────────────────────────────
-app.get('/admin/:id/schedule', async (req, res) => {
+app.get('/admin/:id/schedule', requireAdminAuth, async (req, res) => {
   const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
   const salonId = salonRows[0]?.id || req.params.id;
   const { rows } = await pool.query('SELECT schedule FROM salons WHERE id = $1', [salonId]);
   res.json(rows[0]?.schedule || DEFAULT_SCHEDULE);
 });
 
-app.post('/admin/:id/schedule', async (req, res) => {
+app.post('/admin/:id/schedule', requireAdminAuth, async (req, res) => {
   const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
   const salonId = salonRows[0]?.id || req.params.id;
   await pool.query('UPDATE salons SET schedule = $1 WHERE id = $2', [JSON.stringify(req.body), salonId]);
@@ -340,7 +408,7 @@ app.post('/booking', async (req, res) => {
 app.post('/chat', async (req, res) => {
   const { salonId, messages, customerInfo } = req.body;
   const filteredMessages = (messages || []).filter(m => m && m.content && m.content.trim() !== '');
-  
+
   const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [salonId]);
   const salon = rows[0];
   if (!salon) return res.status(404).json({ error: 'Salon not found' });
@@ -350,7 +418,7 @@ app.post('/chat', async (req, res) => {
   const nextWeek = new Date(todayLj.getTime() + 7 * 24 * 60 * 60 * 1000);
   const { rows: busySlots } = await pool.query(
     "SELECT date, time FROM timeslots WHERE salon_id = $1 AND date >= $2 AND date <= $3 AND status = 'busy' ORDER BY date, time",
-    [actualSalonId, todayLj.toISOString().split('T')[0], nextWeek.toISOString().split('T')[0]] // ← actualSalonId
+    [actualSalonId, todayLj.toISOString().split('T')[0], nextWeek.toISOString().split('T')[0]]
   );
 
   try {
@@ -371,7 +439,7 @@ app.post('/chat', async (req, res) => {
         if (date && time) {
           const result = await pool.query(
             'DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3',
-            [actualSalonId, date, time] // ← actualSalonId
+            [actualSalonId, date, time]
           );
           console.log('✅ Termin izbrisan - rows:', result.rowCount);
         }
@@ -392,8 +460,15 @@ app.post('/chat', async (req, res) => {
 
       const { rows: existing } = await pool.query(
         "SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3 AND status = 'busy'",
-        [actualSalonId, booking.date, booking.time] // ← actualSalonId
+        [actualSalonId, booking.date, booking.time]
       );
+
+      const cInfo = customerInfo || {};
+      const finalName = booking.customerName || cInfo.name || 'Neznano';
+      const finalEmail = cInfo.email || booking.customerEmail || '';
+      const finalPhone = cInfo.phone || booking.customerPhone || '';
+      const finalService = booking.service || 'Storitev';
+
       if (existing.length > 0) {
         if (existing[0].customer_email === finalEmail) {
           await pool.query(`UPDATE timeslots SET service=$1 WHERE salon_id=$2 AND date=$3 AND time=$4`,
@@ -404,18 +479,12 @@ app.post('/chat', async (req, res) => {
         return res.json({ reply: 'Oprostite, ta termin je bil ravnokar zaseden. Izberite drug termin.', bookingDetected: null });
       }
 
-      const cInfo = customerInfo || {};
-      const finalName = booking.customerName || cInfo.name || 'Neznano';
-      const finalEmail = cInfo.email || booking.customerEmail || '';
-      const finalPhone = cInfo.phone || booking.customerPhone || '';
-      const finalService = booking.service || 'Storitev';
-
       await pool.query(`
         INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, customer_phone, service)
         VALUES ($1, $2, $3, 'busy', $4, $5, $6, $7)
         ON CONFLICT (salon_id, date, time) DO UPDATE
         SET status = 'busy', customer_name = $4, customer_email = $5, customer_phone = $6, service = $7
-      `, [actualSalonId, booking.date, booking.time, finalName, finalEmail, finalPhone, finalService]); 
+      `, [actualSalonId, booking.date, booking.time, finalName, finalEmail, finalPhone, finalService]);
 
       if (finalEmail) await sendConfirmationEmail(finalEmail, finalName, salon, booking.date, booking.time, finalService);
       if (salon.notification_email) await sendNotificationToSalon(salon, finalName, finalEmail, finalPhone, booking.date, finalService, booking.time);
@@ -485,11 +554,10 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
     const dateStr = d.toISOString().split('T')[0];
     const dayName = d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'numeric' });
     const allHours = getHoursForDate(schedule, dateStr);
-    if (allHours.length === 0) continue; // zaprt dan
+    if (allHours.length === 0) continue;
     const busy = busyByDate[dateStr] || new Set();
     let free = allHours.filter(h => !busy.has(h));
 
-    // Za danes: samo termini v prihodnosti
     if (dateStr === todayDateStr) {
       free = free.filter(h => {
         const [hh, mm] = h.split(':').map(Number);
@@ -611,6 +679,147 @@ KRITIČNO:
 - NE POTRJUJ terminov ki niso v seznamu prostih terminov`;
   }
 }
+
+function buildLoginPage(salon) {
+  return `<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prijava · ${salon.name}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: system-ui, sans-serif; background: #f7f7f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { background: #fff; border: 1px solid #e0e0e0; width: 100%; max-width: 380px; overflow: hidden; }
+    .card-head { background: #0a0a0a; padding: 32px 36px; }
+    .card-head h1 { font-family: 'Playfair Display', serif; font-size: 22px; color: #fff; margin-bottom: 4px; }
+    .card-head p { font-size: 12px; color: rgba(255,255,255,0.4); letter-spacing: 0.08em; text-transform: uppercase; }
+    .card-body { padding: 32px 36px; }
+    .field { margin-bottom: 20px; }
+    .field label { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #888; margin-bottom: 6px; }
+    .field input { width: 100%; padding: 10px 14px; border: 1px solid #e0e0e0; font-size: 14px; font-family: inherit; background: #f7f7f5; outline: none; transition: border 0.15s; }
+    .field input:focus { border-color: #0a0a0a; background: #fff; }
+    .btn { width: 100%; padding: 12px; background: #c9984a; border: none; color: #fff; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; font-family: inherit; cursor: pointer; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.85; }
+    .err { background: #fee2e2; border-left: 3px solid #ef4444; padding: 10px 14px; font-size: 13px; color: #991b1b; margin-bottom: 18px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="card-head">
+      <h1>${salon.name}</h1>
+      <p>Admin Panel · Prijava</p>
+    </div>
+    <div class="card-body">
+      <div class="err" id="err"></div>
+      <div class="field">
+        <label>Uporabniško ime</label>
+        <input type="text" id="username" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label>Geslo</label>
+        <input type="password" id="password" autocomplete="current-password" />
+      </div>
+      <button class="btn" onclick="doLogin()">Prijava</button>
+    </div>
+  </div>
+  <script>
+    document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+    async function doLogin() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const err = document.getElementById('err');
+      err.style.display = 'none';
+      if (!username || !password) { err.textContent = 'Izpolnite vsa polja.'; err.style.display = 'block'; return; }
+      const res = await fetch(window.location.pathname, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (data.success) { window.location.href = data.redirect; }
+      else { err.textContent = data.error || 'Napaka pri prijavi.'; err.style.display = 'block'; }
+    }
+  </script>
+</body>
+</html>`;
+}
+
+function buildSetupPage(salon) {
+  return `<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nastavitev računa · ${salon.name}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: system-ui, sans-serif; background: #f7f7f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { background: #fff; border: 1px solid #e0e0e0; width: 100%; max-width: 400px; overflow: hidden; }
+    .card-head { background: #0a0a0a; padding: 32px 36px; }
+    .card-head h1 { font-family: 'Playfair Display', serif; font-size: 22px; color: #fff; margin-bottom: 4px; }
+    .card-head p { font-size: 12px; color: rgba(255,255,255,0.4); letter-spacing: 0.08em; text-transform: uppercase; }
+    .notice { background: #fef9c3; border-left: 3px solid #ca8a04; padding: 12px 16px; margin: 24px 36px 0; font-size: 13px; color: #713f12; line-height: 1.5; }
+    .card-body { padding: 24px 36px 32px; }
+    .field { margin-bottom: 18px; }
+    .field label { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #888; margin-bottom: 6px; }
+    .field input { width: 100%; padding: 10px 14px; border: 1px solid #e0e0e0; font-size: 14px; font-family: inherit; background: #f7f7f5; outline: none; transition: border 0.15s; }
+    .field input:focus { border-color: #0a0a0a; background: #fff; }
+    .btn { width: 100%; padding: 12px; background: #c9984a; border: none; color: #fff; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; font-family: inherit; cursor: pointer; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.85; }
+    .err { background: #fee2e2; border-left: 3px solid #ef4444; padding: 10px 14px; font-size: 13px; color: #991b1b; margin-bottom: 16px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="card-head">
+      <h1>${salon.name}</h1>
+      <p>Prvič: nastavite admin račun</p>
+    </div>
+    <div class="notice">To storite samo enkrat. Po nastavitvi bo ta stran zahtevala geslo.</div>
+    <div class="card-body">
+      <div class="err" id="err"></div>
+      <div class="field">
+        <label>Uporabniško ime</label>
+        <input type="text" id="username" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label>Geslo (min. 6 znakov)</label>
+        <input type="password" id="password" autocomplete="new-password" />
+      </div>
+      <div class="field">
+        <label>Potrdite geslo</label>
+        <input type="password" id="password2" autocomplete="new-password" />
+      </div>
+      <button class="btn" onclick="doSetup()">Ustvari račun in vstopi</button>
+    </div>
+  </div>
+  <script>
+    async function doSetup() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const password2 = document.getElementById('password2').value;
+      const err = document.getElementById('err');
+      err.style.display = 'none';
+      if (!username || !password) { err.textContent = 'Izpolnite vsa polja.'; err.style.display = 'block'; return; }
+      if (password !== password2) { err.textContent = 'Gesli se ne ujemata.'; err.style.display = 'block'; return; }
+      if (password.length < 6) { err.textContent = 'Geslo mora biti vsaj 6 znakov.'; err.style.display = 'block'; return; }
+      const res = await fetch('/admin-setup/${salon.id}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (data.success) { window.location.href = data.redirect; }
+      else { err.textContent = data.error || 'Napaka.'; err.style.display = 'block'; }
+    }
+  </script>
+</body>
+</html>`;
+}
+
 function buildChatPage(salon) {
   const apiUrl = process.env.API_URL || 'https://bookwell.si';
   return `<!DOCTYPE html>
