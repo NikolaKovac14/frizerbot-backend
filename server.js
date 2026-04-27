@@ -824,628 +824,885 @@ function buildAdminPage(salon) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin · ${salon.name}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg:       #f5f5f5;
-      --surface:  #ffffff;
-      --border:   #e4e4e7;
-      --border-2: #d1d1d6;
-      --text:     #18181b;
-      --text-2:   #52525b;
-      --text-3:   #a1a1aa;
-      --purple:   #7c3aed;
-      --purple-bg:#ede9fe;
-      --purple-lt:#f5f3ff;
-      --green:    #16a34a;
-      --green-bg: #dcfce7;
-      --red:      #dc2626;
-      --red-bg:   #fee2e2;
-      --blue:     #2563eb;
-      --blue-bg:  #dbeafe;
-      --amber:    #d97706;
-      --amber-bg: #fef3c7;
-      --r:        8px;
-      --shadow:   0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
-      --shadow-md:0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+      --bg-main: #f9f7ff;
+      --bg-soft: #fdfbff;
+      --bg-card: #fff;
+      --mint: #a8edce;
+      --mint-bg: #e8f9f5;
+      --coral: #ffb5a7;
+      --coral-bg: #ffe8e3;
+      --periwinkle: #b5c8ff;
+      --periwinkle-bg: #e8edff;
+      --text-dark: #3d3550;
+      --text-muted: #8a7d99;
+      --text-light: #b8acbe;
+      --border: rgba(61, 53, 80, 0.08);
+      --border-soft: rgba(61, 53, 80, 0.04);
+      --accent: #d78cb8;
+      --success: #5fc574;
+      --shadow-sm: 0 2px 8px rgba(61, 53, 80, 0.06);
+      --shadow-md: 0 6px 16px rgba(61, 53, 80, 0.1);
+      --radius: 16px;
+      --radius-lg: 20px;
     }
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    html, body { height:100%; background:var(--bg); }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
-      font-family:'Inter',sans-serif;
-      color:var(--text);
-      font-size:13px;
-      line-height:1.5;
-      -webkit-font-smoothing:antialiased;
+      font-family: 'Nunito', system-ui, -apple-system, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-dark);
+      font-size: 14px;
+      line-height: 1.6;
+      font-weight: 400;
     }
 
-    /* ── TOPBAR ── */
-    .topbar {
-      height:52px;
-      background:var(--surface);
-      border-bottom:1px solid var(--border);
-      display:flex;
-      align-items:center;
-      padding:0 20px;
-      gap:12px;
-      position:sticky;
-      top:0;
-      z-index:100;
+    /* ── HEADER ── */
+    .header {
+      background: linear-gradient(135deg, #fff 0%, var(--bg-soft) 100%);
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(8px);
+      background-color: rgba(255, 251, 255, 0.95);
     }
-    .topbar-logo {
-      font-size:14px;
-      font-weight:600;
-      color:var(--text);
-      display:flex;
-      align-items:center;
-      gap:7px;
-      letter-spacing:-0.01em;
+    
+    .header-logo {
+      font-family: 'Nunito', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-dark);
+      letter-spacing: -0.5px;
     }
-    .topbar-logo-icon {
-      width:26px;height:26px;
-      background:var(--purple);
-      border-radius:6px;
-      display:flex;align-items:center;justify-content:center;
-      flex-shrink:0;
+    
+    .header-logo span {
+      color: var(--accent);
+      font-weight: 700;
     }
-    .topbar-logo-icon svg { width:14px;height:14px;fill:#fff; }
-    .topbar-sep { flex:1; }
-    .topbar-salon {
-      font-size:12px;
-      color:var(--text-2);
-      background:var(--bg);
-      border:1px solid var(--border);
-      border-radius:var(--r);
-      padding:4px 10px;
-      font-weight:500;
+    
+    .header-sep { flex: 1; }
+    
+    .header-badge {
+      background: linear-gradient(135deg, var(--periwinkle-bg) 0%, rgba(168, 237, 206, 0.1) 100%);
+      border: 1px solid var(--periwinkle);
+      color: var(--text-dark);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      border-radius: 100px;
     }
-    .topbar-link {
-      display:flex;align-items:center;gap:5px;
-      font-size:12px;color:var(--text-3);
-      text-decoration:none;
-      padding:5px 9px;
-      border-radius:var(--r);
-      transition:background 0.12s,color 0.12s;
-      font-weight:500;
+    
+    .header-link {
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.2s ease;
+      padding: 6px 12px;
+      border-radius: 8px;
     }
-    .topbar-link:hover { background:var(--bg);color:var(--text); }
-    .topbar-link svg { width:12px;height:12px;flex-shrink:0; }
+    
+    .header-link:hover {
+      color: var(--accent);
+      background: rgba(215, 140, 184, 0.06);
+    }
+    
+    .header-link svg { width: 13px; height: 13px; }
 
-    /* ── TABS ── */
-    .tabs {
-      background:var(--surface);
-      border-bottom:1px solid var(--border);
-      padding:0 20px;
-      display:flex;
-      gap:2px;
+    /* ── NAVIGATION TABS ── */
+    .nav {
+      background: var(--bg-soft);
+      border-bottom: 1px solid var(--border-soft);
+      padding: 0 32px;
+      display: flex;
+      gap: 0;
+      backdrop-filter: blur(4px);
     }
-    .tab {
-      display:flex;align-items:center;gap:6px;
-      padding:10px 12px;
-      font-size:12px;font-weight:500;
-      color:var(--text-3);
-      cursor:pointer;
-      border-bottom:2px solid transparent;
-      transition:color 0.12s,border-color 0.12s;
-      user-select:none;
-      letter-spacing:0.005em;
+    
+    .nav-tab {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 16px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s ease;
+      user-select: none;
+      letter-spacing: 0.01em;
     }
-    .tab:hover { color:var(--text-2); }
-    .tab.active { color:var(--purple);border-bottom-color:var(--purple); }
-    .tab svg { width:13px;height:13px;flex-shrink:0; }
+    
+    .nav-tab:hover {
+      color: var(--text-dark);
+    }
+    
+    .nav-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    
+    .nav-tab svg { width: 15px; height: 15px; opacity: 0.6; }
+    .nav-tab.active svg { opacity: 1; }
 
-    /* ── LAYOUT ── */
-    .tab-panel { display:none; }
-    .tab-panel.active { display:block; }
-    .page { max-width:820px;margin:0 auto;padding:24px 20px; }
+    /* ── PAGE LAYOUT ── */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      animation: fadeIn 0.4s ease;
+    }
 
-    /* ── STATS PILLS ── */
-    .stats-pills {
-      display:flex;
-      gap:6px;
-      flex-wrap:wrap;
-      margin-bottom:20px;
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-    .stat-pill {
-      display:flex;align-items:center;gap:8px;
-      background:var(--surface);
-      border:1px solid var(--border);
-      border-radius:100px;
-      padding:5px 12px 5px 8px;
-      transition:box-shadow 0.12s;
-    }
-    .stat-pill:hover { box-shadow:var(--shadow); }
-    .stat-pill-icon {
-      width:22px;height:22px;border-radius:50%;
-      display:flex;align-items:center;justify-content:center;
-      flex-shrink:0;
-    }
-    .stat-pill-icon svg { width:11px;height:11px; }
-    .stat-pill-num {
-      font-size:13px;font-weight:600;color:var(--text);
-      letter-spacing:-0.01em;
-    }
-    .stat-pill-label { font-size:11px;color:var(--text-3);font-weight:400; }
 
-    /* ── DATE NAV ── */
+    /* ── DATE NAVIGATION ── */
     .date-nav {
-      display:flex;align-items:center;gap:8px;
-      margin-bottom:16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
     }
-    .datenav-btn {
-      width:30px;height:30px;
-      background:var(--surface);
-      border:1px solid var(--border);
-      border-radius:var(--r);
-      display:flex;align-items:center;justify-content:center;
-      cursor:pointer;
-      color:var(--text-3);
-      transition:background 0.12s,color 0.12s,border-color 0.12s;
-      flex-shrink:0;
+    
+    .date-nav-btn {
+      width: 40px;
+      height: 40px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.2s ease;
+      flex-shrink: 0;
     }
-    .datenav-btn:hover { background:var(--bg);color:var(--text);border-color:var(--border-2); }
-    .datenav-btn svg { width:14px;height:14px; }
-    .date-title {
-      flex:1;
-      font-size:14px;font-weight:600;color:var(--text);
-      letter-spacing:-0.01em;
+    
+    .date-nav-btn:hover {
+      background: var(--mint-bg);
+      border-color: var(--mint);
+      color: var(--text-dark);
     }
-    .today-btn {
-      font-size:11px;font-weight:500;
-      color:var(--text-2);
-      background:var(--surface);
-      border:1px solid var(--border);
-      border-radius:var(--r);
-      padding:4px 10px;
-      cursor:pointer;
-      transition:background 0.12s,color 0.12s,border-color 0.12s;
+    
+    .date-nav-btn svg { width: 18px; height: 18px; }
+    
+    .date-label {
+      flex: 1;
+      min-width: 200px;
+      text-align: center;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text-dark);
+      letter-spacing: -0.5px;
     }
-    .today-btn:hover { background:var(--purple-bg);color:var(--purple);border-color:var(--purple); }
+    
+    .date-today-btn {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(215, 140, 184, 0.08);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 7px 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .date-today-btn:hover {
+      background: var(--accent);
+      color: #fff;
+    }
 
     /* ── LEGEND ── */
     .legend {
-      display:flex;gap:16px;flex-wrap:wrap;
-      margin-bottom:16px;
+      display: flex;
+      gap: 24px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
     }
+    
     .legend-item {
-      display:flex;align-items:center;gap:5px;
-      font-size:11px;color:var(--text-3);font-weight:500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
     }
-    .legend-bar {
-      width:3px;height:14px;border-radius:2px;
-      flex-shrink:0;
+    
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
     }
+    
+    .legend-dot.free { background: var(--mint); }
+    .legend-dot.busy { background: var(--coral); }
+    .legend-dot.bot { background: var(--periwinkle); }
 
     /* ── CLOSED BANNER ── */
     .closed-banner {
-      background:var(--surface);
-      border:1px solid var(--border);
-      border-radius:var(--r);
-      padding:48px;
-      text-align:center;
-      box-shadow:var(--shadow);
+      background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-soft) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 60px 32px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
     }
-    .closed-banner-icon {
-      width:40px;height:40px;
-      background:var(--bg);
-      border-radius:10px;
-      display:flex;align-items:center;justify-content:center;
-      margin:0 auto 12px;
+    
+    .closed-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      display: block;
+      animation: float 3s ease-in-out infinite;
     }
-    .closed-banner-icon svg { width:18px;height:18px;color:var(--text-3); }
-    .closed-banner h3 { font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px; }
-    .closed-banner p { font-size:12px;color:var(--text-3); }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    
+    .closed-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-dark);
+      margin-bottom: 8px;
+    }
+    
+    .closed-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* ── STAT CHIPS ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    
+    .stat-chip {
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius);
+      padding: 16px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+    }
+    
+    .stat-chip:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--border);
+    }
+    
+    .stat-emoji {
+      font-size: 28px;
+      margin-bottom: 8px;
+      display: block;
+    }
+    
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-dark);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
 
     /* ── SLOTS GRID ── */
     .slots-grid {
-      display:grid;
-      grid-template-columns:repeat(auto-fill, minmax(150px,1fr));
-      gap:8px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 12px;
     }
-
-    /* ── SLOT CARD ── */
+    
     .slot-card {
-      background:var(--surface);
-      border:1px solid var(--border);
-      border-left:4px solid #e4e4e7;
-      border-radius:var(--r);
-      padding:11px 13px;
-      cursor:pointer;
-      transition:box-shadow 0.12s, border-color 0.12s, transform 0.12s;
-      position:relative;
-      overflow:hidden;
+      background: var(--bg-card);
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      padding: 16px 14px 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
     }
+    
+    .slot-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--mint);
+      transition: all 0.2s ease;
+    }
+    
+    .slot-card.busy::before { background: var(--coral); }
+    .slot-card.bot::before { background: var(--periwinkle); }
+    
     .slot-card:hover {
-      box-shadow:var(--shadow-md);
-      transform:translateY(-1px);
-      border-color:var(--border-2);
-      border-left-color:inherit;
+      border-color: var(--accent);
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
     }
-    .slot-card:active { transform:translateY(0); }
-    .slot-card.free  { border-left-color:#22c55e; }
-    .slot-card.busy  { border-left-color:#f87171; }
-    .slot-card.bot   { border-left-color:#818cf8; }
-
+    
+    .slot-card.busy {
+      background: var(--coral-bg);
+      border-color: rgba(255, 181, 167, 0.3);
+    }
+    
+    .slot-card.bot {
+      background: var(--periwinkle-bg);
+      border-color: rgba(181, 200, 255, 0.3);
+    }
+    
+    .slot-card:not(.busy):not(.bot) {
+      background: var(--mint-bg);
+      border-color: rgba(168, 237, 206, 0.3);
+    }
+    
     .slot-time {
-      font-size:15px;font-weight:600;color:var(--text);
-      letter-spacing:-0.02em;margin-bottom:2px;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-dark);
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+      line-height: 1;
     }
-    .slot-badge {
-      display:inline-flex;align-items:center;gap:4px;
-      font-size:10px;font-weight:600;
-      letter-spacing:0.04em;text-transform:uppercase;
-      padding:2px 6px;border-radius:4px;
-      margin-bottom:6px;
+    
+    .slot-status {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-dark);
+      opacity: 0.7;
     }
-    .slot-badge.free  { background:#dcfce7;color:#15803d; }
-    .slot-badge.busy  { background:#fee2e2;color:#b91c1c; }
-    .slot-badge.bot   { background:#e0e7ff;color:#4338ca; }
-    .slot-badge svg { width:8px;height:8px; }
-
+    
     .slot-name {
-      font-size:11px;color:var(--text-2);font-weight:500;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+      font-size: 11px;
+      color: var(--text-dark);
+      margin-top: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 500;
     }
+    
     .slot-service {
-      font-size:11px;color:var(--text-3);
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-      margin-top:1px;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* ── MODAL ── */
-    .overlay {
-      display:none;
-      position:fixed;inset:0;
-      background:rgba(0,0,0,0.35);
-      z-index:500;
-      align-items:center;justify-content:center;
-      padding:24px;
-      backdrop-filter:blur(4px);
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(61, 53, 80, 0.35);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      backdrop-filter: blur(6px);
     }
-    .overlay.open { display:flex; }
+    
+    .modal-overlay.open { display: flex; }
+    
     .modal {
-      background:var(--surface);
-      border-radius:12px;
-      border:1px solid var(--border);
-      width:100%;max-width:360px;
-      box-shadow:0 20px 60px rgba(0,0,0,0.14), 0 4px 16px rgba(0,0,0,0.06);
-      overflow:hidden;
-      animation:modalIn 0.14s ease;
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 24px 64px rgba(61, 53, 80, 0.16);
+      overflow: hidden;
+      animation: slideUp 0.3s ease;
     }
-    @keyframes modalIn {
-      from { opacity:0;transform:scale(0.97) translateY(6px); }
-      to   { opacity:1;transform:none; }
-    }
-    .modal-top {
-      padding:16px 18px;
-      border-bottom:1px solid var(--border);
-      display:flex;align-items:center;gap:10px;
-    }
-    .modal-top-time {
-      font-size:20px;font-weight:700;color:var(--text);letter-spacing:-0.03em;
-    }
-    .modal-top-date { font-size:11px;color:var(--text-3);font-weight:400;margin-top:1px; }
-    .modal-body { padding:16px 18px;display:flex;flex-direction:column;gap:12px; }
 
-    .modal-contact-card {
-      display:none;
-      background:var(--bg);
-      border:1px solid var(--border);
-      border-radius:var(--r);
-      padding:10px 12px;
-      gap:6px;
-      flex-direction:column;
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-    .modal-contact-card.visible { display:flex; }
-    .contact-row {
-      display:flex;align-items:center;gap:8px;
-      font-size:12px;color:var(--text-2);
+    
+    .modal-header {
+      background: linear-gradient(135deg, var(--accent) 0%, #e09ac5 100%);
+      padding: 28px 24px;
+      color: #fff;
     }
-    .contact-row svg { width:12px;height:12px;color:var(--text-3);flex-shrink:0; }
-
-    .field { display:flex;flex-direction:column;gap:4px; }
-    .field-label {
-      display:flex;align-items:center;gap:5px;
-      font-size:11px;font-weight:500;color:var(--text-3);
-      text-transform:uppercase;letter-spacing:0.06em;
+    
+    .modal-time {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      line-height: 1;
     }
-    .field-label svg { width:11px;height:11px; }
-    .field-input {
-      width:100%;
-      padding:7px 10px;
-      border:1px solid var(--border-2);
-      border-radius:var(--r);
-      font-size:13px;font-family:'Inter',sans-serif;
-      color:var(--text);background:#fff;
-      outline:none;
-      transition:border-color 0.12s,box-shadow 0.12s;
+    
+    .modal-date-label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-top: 6px;
+      font-weight: 500;
     }
-    .field-input:focus {
-      border-color:var(--purple);
-      box-shadow:0 0 0 3px rgba(124,58,237,0.08);
+    
+    .modal-body { padding: 24px; }
+    
+    .modal-info-card {
+      background: var(--mint-bg);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 12px;
+      color: var(--text-dark);
+      line-height: 1.8;
+      display: none;
+      border: 1px solid var(--mint);
     }
+    
+    .modal-info-card.visible { display: block; }
+    
+    .modal-info-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    
+    .modal-info-row span:first-child { font-size: 14px; }
+    
+    .modal-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      margin-top: 14px;
+    }
+    
+    .modal-label:first-of-type { margin-top: 0; }
+    
+    .modal-input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 13px;
+      font-family: 'Nunito', sans-serif;
+      color: var(--text-dark);
+      background: var(--bg-soft);
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    
+    .modal-input:focus {
+      border-color: var(--accent);
+      background: var(--bg-card);
+      box-shadow: 0 0 0 3px rgba(215, 140, 184, 0.1);
+    }
+    
     .modal-actions {
-      display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;
-      padding:14px 18px;
-      border-top:1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 22px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-soft);
     }
+    
     .modal-btn {
-      display:flex;align-items:center;justify-content:center;gap:5px;
-      padding:7px 10px;
-      border:none;border-radius:var(--r);
-      font-size:12px;font-weight:500;font-family:'Inter',sans-serif;
-      cursor:pointer;
-      transition:opacity 0.12s,transform 0.12s;
-      letter-spacing:0.01em;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: none;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Nunito', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
     }
-    .modal-btn:hover { opacity:0.82; }
-    .modal-btn:active { transform:scale(0.97); }
-    .modal-btn svg { width:12px;height:12px;flex-shrink:0; }
-    .btn-cancel { background:var(--bg);color:var(--text-2); }
-    .btn-free   { background:var(--green-bg);color:var(--green); }
-    .btn-busy   { background:var(--red-bg);color:var(--red); }
+    
+    .modal-btn:hover { transform: translateY(-1px); }
+    
+    .btn-cancel {
+      background: var(--bg-soft);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    
+    .btn-cancel:hover {
+      background: var(--bg-main);
+      color: var(--text-dark);
+    }
+    
+    .btn-free {
+      background: var(--mint);
+      color: #fff;
+    }
+    
+    .btn-free:hover { opacity: 0.9; }
+    
+    .btn-busy {
+      background: var(--coral);
+      color: #fff;
+    }
+    
+    .btn-busy:hover { opacity: 0.9; }
 
     /* ── SCHEDULE ── */
     .schedule-card {
-      background:var(--surface);
-      border:1px solid var(--border);
-      border-radius:var(--r);
-      overflow:hidden;
-      box-shadow:var(--shadow);
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
     }
+    
     .schedule-header {
-      padding:14px 18px;
-      border-bottom:1px solid var(--border);
-      display:flex;align-items:center;gap:8px;
+      padding: 24px;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(135deg, var(--bg-soft) 0%, var(--bg-card) 100%);
     }
-    .schedule-header-icon {
-      width:28px;height:28px;
-      background:var(--purple-bg);
-      border-radius:var(--r);
-      display:flex;align-items:center;justify-content:center;
+    
+    .schedule-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-dark);
     }
-    .schedule-header-icon svg { width:14px;height:14px;color:var(--purple); }
-    .schedule-header-text h2 { font-size:13px;font-weight:600;color:var(--text); }
-    .schedule-header-text p  { font-size:11px;color:var(--text-3);margin-top:1px; }
-
+    
+    .schedule-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 3px;
+      font-weight: 500;
+    }
+    
     .day-row {
-      display:flex;align-items:center;gap:14px;
-      padding:11px 18px;
-      border-bottom:1px solid var(--border);
-      transition:background 0.12s;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-soft);
+      transition: background 0.15s ease;
     }
-    .day-row:last-child { border-bottom:none; }
-    .day-row:hover { background:var(--bg); }
+    
+    .day-row:last-child { border-bottom: none; }
+    .day-row:hover { background: var(--bg-soft); }
+    
     .day-name {
-      width:90px;font-size:12px;font-weight:500;color:var(--text-2);
-      flex-shrink:0;
+      width: 110px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dark);
     }
+    
     .toggle-wrap {
-      position:relative;width:34px;height:18px;flex-shrink:0;
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
     }
-    .toggle-wrap input { opacity:0;width:0;height:0; }
+    
+    .toggle-wrap input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
     .toggle-slider {
-      position:absolute;inset:0;
-      background:var(--border-2);border-radius:18px;
-      cursor:pointer;transition:background 0.12s;
+      position: absolute;
+      inset: 0;
+      background: var(--text-light);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.3s ease;
     }
-    .toggle-wrap input:checked + .toggle-slider { background:var(--purple); }
+    
+    .toggle-wrap input:checked + .toggle-slider {
+      background: linear-gradient(135deg, var(--mint) 0%, #7ee0c2 100%);
+    }
+    
     .toggle-slider::before {
-      content:'';position:absolute;
-      width:12px;height:12px;
-      left:3px;bottom:3px;
-      background:#fff;border-radius:50%;
-      box-shadow:0 1px 2px rgba(0,0,0,0.18);
-      transition:transform 0.12s;
+      content: '';
+      position: absolute;
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
-    .toggle-wrap input:checked + .toggle-slider::before { transform:translateX(16px); }
+    
+    .toggle-wrap input:checked + .toggle-slider::before {
+      transform: translateX(20px);
+    }
+    
     .day-times {
-      display:flex;align-items:center;gap:7px;
-      font-size:12px;color:var(--text-3);
-      transition:opacity 0.12s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text-muted);
     }
-    .day-times.disabled { opacity:0.3;pointer-events:none; }
-    .time-input {
-      padding:4px 8px;
-      border:1px solid var(--border-2);
-      border-radius:6px;
-      font-size:12px;font-family:'Inter',sans-serif;
-      color:var(--text);background:#fff;
-      outline:none;
-      transition:border-color 0.12s;
+    
+    .day-times.disabled {
+      opacity: 0.35;
+      pointer-events: none;
     }
-    .time-input:focus { border-color:var(--purple); }
-    .time-sep { color:var(--text-3); }
-    .closed-tag {
-      display:none;
-      font-size:11px;color:var(--text-3);
-      background:var(--bg);
-      border:1px solid var(--border);
-      border-radius:5px;
-      padding:3px 8px;
+    
+    .day-times input[type=time] {
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: 'Nunito', sans-serif;
+      color: var(--text-dark);
+      background: var(--bg-soft);
+      outline: none;
+      transition: all 0.2s ease;
     }
-    .day-times.disabled + .closed-tag { display:inline-block; }
-
+    
+    .day-times input[type=time]:focus {
+      border-color: var(--accent);
+      background: var(--bg-card);
+      box-shadow: 0 0 0 3px rgba(215, 140, 184, 0.1);
+    }
+    
+    .day-sep {
+      color: var(--text-light);
+      font-weight: 600;
+    }
+    
     .schedule-footer {
-      padding:12px 18px;border-top:1px solid var(--border);
-      display:flex;align-items:center;justify-content:space-between;
+      padding: 16px 24px;
+      border-top: 1px solid var(--border-soft);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-soft);
     }
-    .save-msg {
-      display:none;align-items:center;gap:5px;
-      font-size:12px;font-weight:500;color:var(--green);
-    }
-    .save-msg.visible { display:flex; }
-    .save-msg svg { width:13px;height:13px; }
+    
     .save-btn {
-      display:flex;align-items:center;gap:6px;
-      background:var(--purple);color:#fff;
-      border:none;border-radius:var(--r);
-      padding:7px 16px;
-      font-size:12px;font-weight:500;font-family:'Inter',sans-serif;
-      cursor:pointer;
-      transition:opacity 0.12s,transform 0.12s;
-      letter-spacing:0.01em;
+      background: linear-gradient(135deg, var(--accent) 0%, #e09ac5 100%);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 24px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Nunito', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
     }
-    .save-btn:hover { opacity:0.88; }
-    .save-btn:active { transform:scale(0.97); }
-    .save-btn svg { width:12px;height:12px; }
+    
+    .save-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(215, 140, 184, 0.25);
+    }
+    
+    .save-msg {
+      display: none;
+      font-size: 12px;
+      color: var(--success);
+      font-weight: 600;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .save-msg.visible { display: flex; }
 
     /* ── SCROLLBAR ── */
-    ::-webkit-scrollbar { width:4px; }
-    ::-webkit-scrollbar-track { background:transparent; }
-    ::-webkit-scrollbar-thumb { background:var(--border-2);border-radius:4px; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(61, 53, 80, 0.12);
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(61, 53, 80, 0.2); }
 
-    @media(max-width:580px) {
-      .slots-grid { grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); }
-      .day-name { width:72px; }
-      .page { padding:16px 14px; }
+    /* ── RESPONSIVE ── */
+    @media (max-width: 700px) {
+      .header { padding: 16px 16px; }
+      .nav { padding: 0 16px; }
+      .page { padding: 28px 16px; }
+      .date-label { font-size: 18px; min-width: auto; }
+      .date-nav { gap: 12px; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .slots-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+      .slot-time { font-size: 18px; }
+      .day-row { padding: 14px 16px; }
+      .day-name { width: 90px; }
+      .day-times { flex-wrap: wrap; }
+      .schedule-header, .schedule-footer { padding: 14px 16px; }
+      .modal { max-width: 90%; }
     }
   </style>
 </head>
 <body>
 
-  <!-- TOPBAR -->
-  <div class="topbar">
-    <div class="topbar-logo">
-      <div class="topbar-logo-icon">
-        <svg viewBox="0 0 16 16"><rect x="1" y="3" width="14" height="11" rx="2"/><path d="M5 1v3M11 1v3M1 7h14" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
-      </div>
-      BookWell
-    </div>
-    <div class="topbar-salon">${salon.name}</div>
-    <div class="topbar-sep"></div>
-    <a href="/${salon.type || 'salon'}/${salon.slug || salon.id}" class="topbar-link">
-      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 2H2.5A1 1 0 0 0 1.5 3v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V8.5M7 1.5h3.5m0 0v3.5m0-3.5L5.5 7"/></svg>
-      Ogled strani
+  <div class="header">
+    <div class="header-logo">${salon.name.split(' ')[0]}<span>${salon.name.split(' ').slice(1).join(' ')}</span></div>
+    <div class="header-sep"></div>
+    <div class="header-badge">Admin</div>
+    <a href="/${salon.type || 'salon'}/${salon.slug || salon.id}" class="header-link">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9M9 2h5m0 0v5m0-5L7 10"/>
+      </svg>
+      Oglej stran
     </a>
   </div>
 
-  <!-- TABS -->
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('termini', this)">
-      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="1" y="2" width="12" height="10" rx="1.5"/><path d="M4 1v2M10 1v2M1 6h12"/></svg>
+  <nav class="nav">
+    <div class="nav-tab active" onclick="switchTab('termini')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1v3M11 1v3M2 7h12"/>
+      </svg>
       Termini
     </div>
-    <div class="tab" onclick="switchTab('urnik', this)">
-      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><path d="M7 4.5V7l1.5 1.5"/></svg>
+    <div class="nav-tab" onclick="switchTab('urnik')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2 1.5"/>
+      </svg>
       Delovni čas
     </div>
-  </div>
+  </nav>
 
-  <!-- TAB: TERMINI -->
-  <div class="tab-panel active" id="panel-termini">
+  <!-- TERMINI -->
+  <div class="tab-content active" id="tab-termini">
     <div class="page">
 
       <div class="date-nav">
-        <button class="datenav-btn" id="prev" title="Prejšnji dan">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 3L5 7l4 4"/></svg>
+        <button class="date-nav-btn" id="prev" title="Prejšnji dan">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 4L6 8l4 4"/>
+          </svg>
         </button>
-        <div class="date-title" id="dateTitle"></div>
-        <button class="today-btn" id="today">Danes</button>
-        <button class="datenav-btn" id="next" title="Naslednji dan">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 3l4 4-4 4"/></svg>
+        <div class="date-label" id="dateTitle"></div>
+        <button class="date-today-btn" id="today">Danes</button>
+        <button class="date-nav-btn" id="next" title="Naslednji dan">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 4l4 4-4 4"/>
+          </svg>
         </button>
       </div>
 
-      <div class="stats-pills" id="stats-pills"></div>
+      <div class="stats-row" id="stats-row"></div>
 
       <div class="legend">
-        <div class="legend-item">
-          <div class="legend-bar" style="background:#22c55e"></div>Prost
-        </div>
-        <div class="legend-item">
-          <div class="legend-bar" style="background:#f87171"></div>Zaseden (ročno)
-        </div>
-        <div class="legend-item">
-          <div class="legend-bar" style="background:#818cf8"></div>Bot rezervacija
-        </div>
+        <div class="legend-item"><div class="legend-dot free"></div> Prost termin</div>
+        <div class="legend-item"><div class="legend-dot busy"></div> Zaseden (ročno)</div>
+        <div class="legend-item"><div class="legend-dot bot"></div> Rezerviral asistent</div>
       </div>
 
       <div id="slots-container"></div>
+
     </div>
   </div>
 
-  <!-- TAB: URNIK -->
-  <div class="tab-panel" id="panel-urnik">
+  <!-- URNIK -->
+  <div class="tab-content" id="tab-urnik">
     <div class="page">
       <div class="schedule-card">
         <div class="schedule-header">
-          <div class="schedule-header-icon">
-            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><path d="M7 4.5V7l1.5 1.5"/></svg>
-          </div>
-          <div class="schedule-header-text">
-            <h2>Delovni čas</h2>
-            <p>Nastavi razpoložljive termine za vsak dan</p>
+          <div>
+            <div class="schedule-title">✨ Delovni čas</div>
+            <div class="schedule-subtitle">Nastavljeni urniki določajo razpoložljive termine</div>
           </div>
         </div>
         <div id="schedule-rows"></div>
         <div class="schedule-footer">
           <div class="save-msg" id="save-msg">
-            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2.5 7l3 3 6-6"/></svg>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 8l3.5 3.5L13 4"/>
+            </svg>
             Shranjeno
           </div>
-          <button class="save-btn" onclick="saveSchedule()">
-            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 6.5l2.5 2.5L10 3"/></svg>
-            Shrani spremembe
-          </button>
+          <button class="save-btn" onclick="saveSchedule()">Shrani spremembe</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- MODAL -->
-  <div class="overlay" id="overlay">
+  <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
-      <div class="modal-top">
-        <div>
-          <div class="modal-top-time" id="modal-time-display"></div>
-          <div class="modal-top-date" id="modal-date-label"></div>
-        </div>
+      <div class="modal-header">
+        <div class="modal-time" id="modal-time-display"></div>
+        <div class="modal-date-label" id="modal-date-label"></div>
       </div>
       <div class="modal-body">
-        <div class="modal-contact-card" id="modal-contact-card"></div>
-        <div class="field">
-          <div class="field-label">
-            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="4" r="2.5"/><path d="M1.5 10.5c0-2.21 2.015-4 4.5-4s4.5 1.79 4.5 4"/></svg>
-            Ime stranke
-          </div>
-          <input class="field-input" type="text" id="modal-customer" placeholder="Ime Priimek" />
+        <div class="modal-info-card" id="modal-info-card"></div>
+        <div class="modal-label">Ime stranke</div>
+        <input class="modal-input" type="text" id="modal-customer" placeholder="Ime Priimek" />
+        <div class="modal-label">Storitev</div>
+        <input class="modal-input" type="text" id="modal-service" placeholder="npr. Ženski haircut" />
+        <div class="modal-actions">
+          <button class="modal-btn btn-cancel" id="modal-cancel">Preklic</button>
+          <button class="modal-btn btn-free" id="modal-set-free">Prost</button>
+          <button class="modal-btn btn-busy" id="modal-set-busy">Zaseden</button>
         </div>
-        <div class="field">
-          <div class="field-label">
-            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 2h8a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm0 1l4 3 4-3"/></svg>
-            Storitev
-          </div>
-          <input class="field-input" type="text" id="modal-service" placeholder="npr. Ženski haircut" />
-        </div>
-      </div>
-      <div class="modal-actions">
-        <button class="modal-btn btn-cancel" id="modal-cancel">
-          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 3L3 9M3 3l6 6"/></svg>
-          Preklic
-        </button>
-        <button class="modal-btn btn-free" id="modal-set-free">
-          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M4 6l1.5 1.5L8 4"/></svg>
-          Prost
-        </button>
-        <button class="modal-btn btn-busy" id="modal-set-busy">
-          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M4 4l4 4M8 4l-4 4"/></svg>
-          Zaseden
-        </button>
       </div>
     </div>
   </div>
 
   <script>
-    const API_URL  = '${apiUrl}';
+    const API_URL = '${apiUrl}';
     const SALON_ID = '${salon.id}';
     let currentDate = new Date();
     let currentSlot = null;
-    let slotsData   = {};
-    let schedule    = ${scheduleJson};
+    let slotsData = {};
+    let schedule = ${scheduleJson};
 
-    const DAY_KEYS     = ['mon','tue','wed','thu','fri','sat','sun'];
+    const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
     const DAY_NAMES_SL = { mon:'Ponedeljek', tue:'Torek', wed:'Sreda', thu:'Četrtek', fri:'Petek', sat:'Sobota', sun:'Nedelja' };
+    const STAT_EMOJIS = { total: '📅', free: '✨', busy: '💅', bot: '🤖' };
 
     function generateSlots(from, to) {
       const slots = [];
@@ -1462,105 +1719,98 @@ function buildAdminPage(salon) {
       return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()];
     }
 
-    function switchTab(name, el) {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      el.classList.add('active');
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      document.getElementById('panel-' + name).classList.add('active');
+    function switchTab(name) {
+      document.querySelectorAll('.nav-tab').forEach((t, i) =>
+        t.classList.toggle('active', ['termini','urnik'][i] === name));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
     }
 
-    function fmtDate(d)   { return d.toISOString().split('T')[0]; }
-    function isToday(d)   { return d.toDateString() === new Date().toDateString(); }
+    function formatDate(d) { return d.toISOString().split('T')[0]; }
 
-    function fmtDateSl(d) {
-      return d.toLocaleDateString('sl-SI', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    function formatDateSl(d) {
+      return d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function isToday(d) {
+      const now = new Date();
+      return d.toDateString() === now.toDateString();
     }
 
     async function loadSlots() {
-      const dateStr  = fmtDate(currentDate);
-      const dayKey   = getDayKey(currentDate);
-      const daySched = schedule[dayKey];
+      const dateStr = formatDate(currentDate);
+      const label = document.getElementById('dateTitle');
+      label.textContent = formatDateSl(currentDate) + (isToday(currentDate) ? ' · danes' : '');
+
+      const dayKey = getDayKey(currentDate);
+      const daySchedule = schedule[dayKey];
       const container = document.getElementById('slots-container');
 
-      document.getElementById('dateTitle').textContent =
-        fmtDateSl(currentDate) + (isToday(currentDate) ? ' — hoje' : '');
-
-      if (!daySched || !daySched.open) {
-        document.getElementById('stats-pills').innerHTML = '';
+      if (!daySchedule || !daySchedule.open) {
         container.innerHTML = \`
           <div class="closed-banner">
-            <div class="closed-banner-icon">
-              <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                <circle cx="9" cy="9" r="7.5"/><path d="M6 6l6 6M12 6l-6 6"/>
-              </svg>
-            </div>
-            <h3>Salon je zaprt</h3>
-            <p>Za ta dan ni nastavljenega delovnega časa</p>
+            <span class="closed-icon">😴</span>
+            <div class="closed-title">Salon je zaprt</div>
+            <div class="closed-sub">Ta dan ni delovnega časa</div>
           </div>\`;
+        document.getElementById('stats-row').innerHTML = '';
         return;
       }
 
-      const res  = await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots?date=' + dateStr);
+      const res = await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots?date=' + dateStr);
       const data = await res.json();
-      slotsData  = {};
+      slotsData = {};
       data.forEach(s => { slotsData[s.time] = s; });
 
-      const hours    = generateSlots(daySched.from, daySched.to);
-      const busyRows = hours.filter(h => slotsData[h]?.status === 'busy');
-      const botCount = busyRows.filter(h => slotsData[h]?.customer_email).length;
-      const freeCount = hours.length - busyRows.length;
+      const hours = generateSlots(daySchedule.from, daySchedule.to);
+      const busyCount = hours.filter(h => slotsData[h] && slotsData[h].status === 'busy').length;
+      const botCount = hours.filter(h => slotsData[h] && slotsData[h].status === 'busy' && slotsData[h].customer_email).length;
+      const freeCount = hours.length - busyCount;
 
-      document.getElementById('stats-pills').innerHTML = \`
-        <div class="stat-pill">
-          <div class="stat-pill-icon" style="background:#f4f4f5;">
-            <svg viewBox="0 0 12 12" fill="none" stroke="#71717a" stroke-width="1.5" stroke-linecap="round"><rect x="1" y="1.5" width="10" height="9" rx="1.5"/><path d="M1 5h10"/></svg>
-          </div>
-          <div class="stat-pill-num">\${hours.length}</div>
-          <div class="stat-pill-label">Skupaj</div>
+      document.getElementById('stats-row').innerHTML = \`
+        <div class="stat-chip">
+          <span class="stat-emoji">\${STAT_EMOJIS.total}</span>
+          <div class="stat-value">\${hours.length}</div>
+          <div class="stat-label">Skupaj</div>
         </div>
-        <div class="stat-pill">
-          <div class="stat-pill-icon" style="background:#dcfce7;">
-            <svg viewBox="0 0 12 12" fill="none" stroke="#16a34a" stroke-width="1.6" stroke-linecap="round"><path d="M2 6l2.5 2.5L10 3"/></svg>
-          </div>
-          <div class="stat-pill-num" style="color:#16a34a">\${freeCount}</div>
-          <div class="stat-pill-label">Prostih</div>
+        <div class="stat-chip">
+          <span class="stat-emoji">\${STAT_EMOJIS.free}</span>
+          <div class="stat-value" style="color:var(--mint)">\${freeCount}</div>
+          <div class="stat-label">Prostih</div>
         </div>
-        <div class="stat-pill">
-          <div class="stat-pill-icon" style="background:#fee2e2;">
-            <svg viewBox="0 0 12 12" fill="none" stroke="#dc2626" stroke-width="1.6" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"/></svg>
-          </div>
-          <div class="stat-pill-num" style="color:#dc2626">\${busyRows.length}</div>
-          <div class="stat-pill-label">Zasedenih</div>
+        <div class="stat-chip">
+          <span class="stat-emoji">\${STAT_EMOJIS.busy}</span>
+          <div class="stat-value" style="color:var(--coral)">\${busyCount}</div>
+          <div class="stat-label">Zasedenih</div>
         </div>
-        <div class="stat-pill">
-          <div class="stat-pill-icon" style="background:#e0e7ff;">
-            <svg viewBox="0 0 12 12" fill="none" stroke="#4338ca" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="4.5" r="2"/><path d="M2 10.5c0-1.93 1.79-3.5 4-3.5s4 1.57 4 3.5"/></svg>
-          </div>
-          <div class="stat-pill-num" style="color:#4338ca">\${botCount}</div>
-          <div class="stat-pill-label">Bot</div>
+        <div class="stat-chip">
+          <span class="stat-emoji">\${STAT_EMOJIS.bot}</span>
+          <div class="stat-value" style="color:var(--periwinkle)">\${botCount}</div>
+          <div class="stat-label">Bot</div>
         </div>
       \`;
 
       container.innerHTML = '<div class="slots-grid" id="slots"></div>';
+      renderSlots(hours);
+    }
+
+    function renderSlots(hours) {
       const grid = document.getElementById('slots');
+      if (!grid) return;
+      grid.innerHTML = '';
       hours.forEach(hour => {
-        const slot   = slotsData[hour];
-        const isBusy = slot?.status === 'busy';
-        const isBot  = isBusy && slot?.customer_email;
-        const cls    = isBusy ? (isBot ? 'bot' : 'busy') : 'free';
-        const badgeLabels = { free:'Prost', busy:'Zaseden', bot:'Bot' };
-        const badgeSvg = {
-          free: '<svg viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 4l1.5 1.5L6.5 2"/></svg>',
-          busy: '<svg viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l4 4M6 2l-4 4"/></svg>',
-          bot:  '<svg viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="4" cy="3" r="1.5"/><path d="M1 7.5c0-1.38 1.34-2.5 3-2.5s3 1.12 3 2.5"/></svg>'
-        };
+        const slot = slotsData[hour];
+        const isBusy = slot && slot.status === 'busy';
+        const isBot = isBusy && slot.customer_email;
+        const cls = isBusy ? (isBot ? 'bot' : 'busy') : '';
+
         const card = document.createElement('div');
         card.className = 'slot-card ' + cls;
         card.innerHTML = \`
           <div class="slot-time">\${hour}</div>
-          <div class="slot-badge \${cls}">\${badgeSvg[cls]}\${badgeLabels[cls]}</div>
-          \${slot?.customer_name ? \`<div class="slot-name">\${slot.customer_name}</div>\` : ''}
-          \${slot?.service       ? \`<div class="slot-service">\${slot.service}</div>\` : ''}
+          <div class="slot-status">\${isBusy ? (isBot ? 'Bot' : 'Zaseden') : 'Prost'}</div>
+          \${slot && slot.customer_name ? \`<div class="slot-name">\${slot.customer_name}</div>\` : ''}
+          \${slot && slot.service ? \`<div class="slot-service">\${slot.service}</div>\` : ''}
         \`;
         card.addEventListener('click', () => openModal(hour, slot));
         grid.appendChild(card);
@@ -1570,39 +1820,33 @@ function buildAdminPage(salon) {
     function openModal(time, slot) {
       currentSlot = time;
       document.getElementById('modal-time-display').textContent = time;
-      document.getElementById('modal-date-label').textContent   = fmtDateSl(currentDate);
-      document.getElementById('modal-customer').value           = slot?.customer_name || '';
-      document.getElementById('modal-service').value            = slot?.service       || '';
+      document.getElementById('modal-date-label').textContent = formatDateSl(currentDate);
+      document.getElementById('modal-customer').value = slot?.customer_name || '';
+      document.getElementById('modal-service').value = slot?.service || '';
 
-      const card = document.getElementById('modal-contact-card');
-      if (slot?.customer_email) {
-        card.className = 'modal-contact-card visible';
-        card.innerHTML = \`
-          <div class="contact-row">
-            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M1 2.5h10a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5H1a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5zm0 .5l5 3 5-3"/></svg>
-            \${slot.customer_email}
-          </div>
-          \${slot.customer_phone ? \`<div class="contact-row">
-            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2 2a1 1 0 0 1 1-1h1.5l1 2.5-1.5 1a7 7 0 0 0 3 3l1-1.5L11 7v1.5a1 1 0 0 1-1 1 9 9 0 0 1-9-9z"/></svg>
-            \${slot.customer_phone}
-          </div>\` : ''}
+      const infoCard = document.getElementById('modal-info-card');
+      if (slot && slot.customer_email) {
+        infoCard.className = 'modal-info-card visible';
+        infoCard.innerHTML = \`
+          <div class="modal-info-row"><span>✉️</span><span>\${slot.customer_email}</span></div>
+          <div class="modal-info-row"><span>📞</span><span>\${slot.customer_phone || '–'}</span></div>
         \`;
       } else {
-        card.className = 'modal-contact-card';
-        card.innerHTML = '';
+        infoCard.className = 'modal-info-card';
+        infoCard.innerHTML = '';
       }
-      document.getElementById('overlay').classList.add('open');
+      document.getElementById('modal-overlay').classList.add('open');
     }
 
     async function saveSlot(status) {
       const customerName = document.getElementById('modal-customer').value;
-      const service      = document.getElementById('modal-service').value;
+      const service = document.getElementById('modal-service').value;
       await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ date: fmtDate(currentDate), time: currentSlot, status, customerName, service })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: formatDate(currentDate), time: currentSlot, status, customerName, service })
       });
-      document.getElementById('overlay').classList.remove('open');
+      document.getElementById('modal-overlay').classList.remove('open');
       loadSlots();
     }
 
@@ -1610,7 +1854,7 @@ function buildAdminPage(salon) {
       const container = document.getElementById('schedule-rows');
       container.innerHTML = '';
       DAY_KEYS.forEach(key => {
-        const d   = schedule[key] || { open:false, from:'08:00', to:'20:00' };
+        const d = schedule[key] || { open: false, from: '08:00', to: '20:00' };
         const row = document.createElement('div');
         row.className = 'day-row';
         row.innerHTML = \`
@@ -1620,9 +1864,9 @@ function buildAdminPage(salon) {
             <span class="toggle-slider"></span>
           </label>
           <div class="day-times \${d.open ? '' : 'disabled'}" id="times-\${key}">
-            <input type="time" class="time-input" id="from-\${key}" value="\${d.from}" step="1800">
-            <span class="time-sep">–</span>
-            <input type="time" class="time-input" id="to-\${key}" value="\${d.to}" step="1800">
+            <input type="time" id="from-\${key}" value="\${d.from}" step="1800">
+            <span class="day-sep">–</span>
+            <input type="time" id="to-\${key}" value="\${d.to}" step="1800">
           </div>
         \`;
         container.appendChild(row);
@@ -1631,7 +1875,8 @@ function buildAdminPage(salon) {
 
     function toggleDay(key) {
       const isOpen = document.getElementById('open-' + key).checked;
-      document.getElementById('times-' + key).className = 'day-times' + (isOpen ? '' : ' disabled');
+      const timesEl = document.getElementById('times-' + key);
+      timesEl.className = 'day-times' + (isOpen ? '' : ' disabled');
     }
 
     async function saveSchedule() {
@@ -1640,12 +1885,12 @@ function buildAdminPage(salon) {
         newSchedule[key] = {
           open: document.getElementById('open-' + key).checked,
           from: document.getElementById('from-' + key).value || '08:00',
-          to:   document.getElementById('to-' + key).value   || '20:00'
+          to: document.getElementById('to-' + key).value || '20:00'
         };
       });
       await fetch(API_URL + '/admin/' + SALON_ID + '/schedule', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSchedule)
       });
       schedule = newSchedule;
@@ -1656,13 +1901,26 @@ function buildAdminPage(salon) {
     }
 
     // ── Events ──
-    document.getElementById('modal-cancel').addEventListener('click',   () => document.getElementById('overlay').classList.remove('open'));
-    document.getElementById('overlay').addEventListener('click', e => { if (e.target === document.getElementById('overlay')) document.getElementById('overlay').classList.remove('open'); });
+    document.getElementById('modal-cancel').addEventListener('click', () =>
+      document.getElementById('modal-overlay').classList.remove('open'));
+    document.getElementById('modal-overlay').addEventListener('click', e => {
+      if (e.target === document.getElementById('modal-overlay'))
+        document.getElementById('modal-overlay').classList.remove('open');
+    });
     document.getElementById('modal-set-busy').addEventListener('click', () => saveSlot('busy'));
     document.getElementById('modal-set-free').addEventListener('click', () => saveSlot('free'));
-    document.getElementById('prev').addEventListener('click',  () => { currentDate.setDate(currentDate.getDate() - 1); loadSlots(); });
-    document.getElementById('next').addEventListener('click',  () => { currentDate.setDate(currentDate.getDate() + 1); loadSlots(); });
-    document.getElementById('today').addEventListener('click', () => { currentDate = new Date(); loadSlots(); });
+    document.getElementById('prev').addEventListener('click', () => {
+      currentDate.setDate(currentDate.getDate() - 1);
+      loadSlots();
+    });
+    document.getElementById('next').addEventListener('click', () => {
+      currentDate.setDate(currentDate.getDate() + 1);
+      loadSlots();
+    });
+    document.getElementById('today').addEventListener('click', () => {
+      currentDate = new Date();
+      loadSlots();
+    });
 
     // ── Init ──
     loadSlots();
