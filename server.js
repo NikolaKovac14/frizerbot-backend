@@ -826,792 +826,576 @@ function buildAdminPage(salon) {
   <title>Admin · ${salon.name}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-main: #f9f7ff;
-      --bg-soft: #fdfbff;
-      --bg-card: #fff;
-      --mint: #a8edce;
-      --mint-bg: #e8f9f5;
-      --coral: #ffb5a7;
-      --coral-bg: #ffe8e3;
-      --periwinkle: #b5c8ff;
-      --periwinkle-bg: #e8edff;
-      --text-dark: #3d3550;
-      --text-muted: #8a7d99;
-      --text-light: #b8acbe;
-      --border: rgba(61, 53, 80, 0.08);
-      --border-soft: rgba(61, 53, 80, 0.04);
-      --accent: #d78cb8;
-      --success: #5fc574;
-      --shadow-sm: 0 2px 8px rgba(61, 53, 80, 0.06);
-      --shadow-md: 0 6px 16px rgba(61, 53, 80, 0.1);
-      --radius: 16px;
-      --radius-lg: 20px;
+      --black: #0a0a0a;
+      --white: #ffffff;
+      --off-white: #f7f7f5;
+      --rule: #e0e0e0;
+      --muted: #888888;
+      --ink-light: #444444;
+      --gold: #c9984a;
+      --gold-hover: #b8863a;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; }
+
     body {
-      font-family: 'Nunito', system-ui, -apple-system, sans-serif;
-      background: var(--bg-main);
-      color: var(--text-dark);
-      font-size: 14px;
-      line-height: 1.6;
-      font-weight: 400;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--off-white);
+      color: var(--black);
+      font-size: 13px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* ── HEADER ── */
-    .header {
-      background: linear-gradient(135deg, #fff 0%, var(--bg-soft) 100%);
-      padding: 20px 32px;
-      border-bottom: 1px solid var(--border-soft);
+    /* ─── MASTHEAD ─── */
+    .masthead {
+      background: var(--white);
+      border-bottom: 2px solid var(--black);
+      padding: 0 40px;
       display: flex;
-      align-items: center;
-      gap: 20px;
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      backdrop-filter: blur(8px);
-      background-color: rgba(255, 251, 255, 0.95);
+      align-items: stretch;
+      height: 60px;
     }
-    
-    .header-logo {
-      font-family: 'Nunito', sans-serif;
+    .masthead-title {
+      font-family: 'Playfair Display', serif;
       font-size: 20px;
       font-weight: 700;
-      color: var(--text-dark);
-      letter-spacing: -0.5px;
+      letter-spacing: -0.01em;
+      color: var(--black);
+      display: flex;
+      align-items: center;
+      padding-right: 32px;
+      border-right: 1px solid var(--rule);
+      white-space: nowrap;
     }
-    
-    .header-logo span {
-      color: var(--accent);
-      font-weight: 700;
-    }
-    
-    .header-sep { flex: 1; }
-    
-    .header-badge {
-      background: linear-gradient(135deg, var(--periwinkle-bg) 0%, rgba(168, 237, 206, 0.1) 100%);
-      border: 1px solid var(--periwinkle);
-      color: var(--text-dark);
-      font-size: 11px;
+    .masthead-label {
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      font-size: 10px;
       font-weight: 600;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.15em;
       text-transform: uppercase;
-      padding: 6px 14px;
-      border-radius: 100px;
+      color: var(--muted);
+      border-right: 1px solid var(--rule);
     }
-    
-    .header-link {
-      color: var(--text-muted);
-      font-size: 12px;
-      font-weight: 500;
-      text-decoration: none;
+    .masthead-spacer { flex: 1; }
+    .masthead-link {
       display: flex;
       align-items: center;
       gap: 6px;
-      transition: color 0.2s ease;
-      padding: 6px 12px;
-      border-radius: 8px;
+      padding: 0 20px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-decoration: none;
+      border-left: 1px solid var(--rule);
+      transition: color 0.15s;
     }
-    
-    .header-link:hover {
-      color: var(--accent);
-      background: rgba(215, 140, 184, 0.06);
-    }
-    
-    .header-link svg { width: 13px; height: 13px; }
+    .masthead-link:hover { color: var(--black); }
+    .masthead-link svg { width: 10px; height: 10px; }
 
-    /* ── NAVIGATION TABS ── */
+    /* ─── NAV ─── */
     .nav {
-      background: var(--bg-soft);
-      border-bottom: 1px solid var(--border-soft);
-      padding: 0 32px;
+      background: var(--white);
+      border-bottom: 1px solid var(--rule);
+      padding: 0 40px;
       display: flex;
       gap: 0;
-      backdrop-filter: blur(4px);
     }
-    
     .nav-tab {
       display: flex;
       align-items: center;
-      gap: 7px;
-      padding: 16px 20px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-muted);
+      gap: 8px;
+      padding: 14px 24px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
       cursor: pointer;
-      border-bottom: 3px solid transparent;
-      transition: all 0.2s ease;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.15s;
       user-select: none;
-      letter-spacing: 0.01em;
     }
-    
-    .nav-tab:hover {
-      color: var(--text-dark);
-    }
-    
+    .nav-tab:hover { color: var(--black); }
     .nav-tab.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
+      color: var(--black);
+      border-bottom-color: var(--gold);
     }
-    
-    .nav-tab svg { width: 15px; height: 15px; opacity: 0.6; }
-    .nav-tab.active svg { opacity: 1; }
 
-    /* ── PAGE LAYOUT ── */
+    /* ─── LAYOUT ─── */
     .tab-content { display: none; }
     .tab-content.active { display: block; }
-    .page {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 40px 24px;
-      animation: fadeIn 0.4s ease;
-    }
+    .page { max-width: 880px; margin: 0 auto; padding: 40px 32px; }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ── DATE NAVIGATION ── */
+    /* ─── DATE NAVIGATION ─── */
     .date-nav {
       display: flex;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 32px;
-      flex-wrap: wrap;
-    }
-    
-    .date-nav-btn {
-      width: 40px;
-      height: 40px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      color: var(--text-muted);
-      transition: all 0.2s ease;
-      flex-shrink: 0;
-    }
-    
-    .date-nav-btn:hover {
-      background: var(--mint-bg);
-      border-color: var(--mint);
-      color: var(--text-dark);
-    }
-    
-    .date-nav-btn svg { width: 18px; height: 18px; }
-    
-    .date-label {
-      flex: 1;
-      min-width: 200px;
-      text-align: center;
-      font-size: 22px;
-      font-weight: 600;
-      color: var(--text-dark);
-      letter-spacing: -0.5px;
-    }
-    
-    .date-today-btn {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--accent);
-      background: rgba(215, 140, 184, 0.08);
-      border: 1px solid var(--accent);
-      border-radius: 8px;
-      padding: 7px 14px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    
-    .date-today-btn:hover {
-      background: var(--accent);
-      color: #fff;
-    }
-
-    /* ── LEGEND ── */
-    .legend {
-      display: flex;
-      gap: 24px;
-      margin-bottom: 28px;
-      flex-wrap: wrap;
-    }
-    
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-    
-    .legend-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
-    
-    .legend-dot.free { background: var(--mint); }
-    .legend-dot.busy { background: var(--coral); }
-    .legend-dot.bot { background: var(--periwinkle); }
-
-    /* ── CLOSED BANNER ── */
-    .closed-banner {
-      background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-soft) 100%);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 60px 32px;
-      text-align: center;
-      box-shadow: var(--shadow-sm);
-    }
-    
-    .closed-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-      display: block;
-      animation: float 3s ease-in-out infinite;
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-8px); }
-    }
-    
-    .closed-title {
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--text-dark);
+      align-items: baseline;
+      gap: 20px;
       margin-bottom: 8px;
     }
-    
-    .closed-sub {
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-
-    /* ── STAT CHIPS ── */
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 14px;
-      margin-bottom: 28px;
-    }
-    
-    .stat-chip {
-      background: var(--bg-card);
-      border: 1px solid var(--border-soft);
-      border-radius: var(--radius);
-      padding: 16px;
-      text-align: center;
-      box-shadow: var(--shadow-sm);
-      transition: all 0.2s ease;
-    }
-    
-    .stat-chip:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
-      border-color: var(--border);
-    }
-    
-    .stat-emoji {
-      font-size: 28px;
-      margin-bottom: 8px;
-      display: block;
-    }
-    
-    .stat-value {
-      font-size: 28px;
+    .date-heading {
+      font-family: 'Playfair Display', serif;
+      font-size: 32px;
       font-weight: 700;
-      color: var(--text-dark);
+      letter-spacing: -0.02em;
       line-height: 1;
-      margin-bottom: 4px;
+      color: var(--black);
+      flex: 1;
     }
-    
-    .stat-label {
-      font-size: 11px;
-      color: var(--text-muted);
+    .date-heading em {
+      font-style: italic;
+      font-weight: 400;
+      color: var(--muted);
+    }
+    .nav-arrow {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      padding: 4px 2px;
+      font-size: 20px;
+      line-height: 1;
+      transition: color 0.12s;
+      font-family: 'Playfair Display', serif;
+    }
+    .nav-arrow:hover { color: var(--black); }
+    .today-btn {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--rule);
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .today-btn:hover { border-color: var(--black); color: var(--black); }
+
+    /* ─── RULE ─── */
+    .section-rule {
+      border: none;
+      border-top: 1px solid var(--rule);
+      margin: 16px 0 28px;
+    }
+    .section-rule.thick {
+      border-top: 2px solid var(--black);
+      margin: 0 0 28px;
+    }
+
+    /* ─── STATS ROW ─── */
+    .stats-row {
+      font-size: 12px;
       font-weight: 500;
       letter-spacing: 0.04em;
-      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 32px;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      flex-wrap: wrap;
+    }
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stat-item .num {
+      font-family: 'Playfair Display', serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--black);
+      letter-spacing: -0.01em;
+    }
+    .stat-item .num.green { color: #2a7a2a; }
+    .stat-item .num.red { color: #8a1a1a; }
+    .stat-item .num.blue { color: #1a3a7a; }
+    .stat-sep {
+      margin: 0 14px;
+      color: var(--rule);
+      font-size: 16px;
+      font-weight: 300;
     }
 
-    /* ── SLOTS GRID ── */
+    /* ─── CLOSED BANNER ─── */
+    .closed-banner {
+      border: 1px solid var(--rule);
+      background: var(--white);
+      padding: 56px 40px;
+      text-align: center;
+    }
+    .closed-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      font-weight: 400;
+      font-style: italic;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .closed-sub {
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--rule);
+      font-weight: 600;
+    }
+
+    /* ─── SLOTS GRID ─── */
     .slots-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-      gap: 12px;
+      gap: 1px;
+      background: var(--rule);
+      border: 1px solid var(--rule);
     }
-    
     .slot-card {
-      background: var(--bg-card);
-      border: 1.5px solid var(--border);
-      border-radius: 20px;
-      padding: 16px 14px 14px;
+      background: var(--white);
+      padding: 16px 18px 14px;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: background 0.1s;
       position: relative;
-      overflow: hidden;
-      box-shadow: var(--shadow-sm);
     }
-    
-    .slot-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background: var(--mint);
-      transition: all 0.2s ease;
+    .slot-card:hover { background: var(--off-white); }
+    .slot-card.busy { background: var(--black); }
+    .slot-card.busy:hover { background: #1a1a1a; }
+    .slot-card.bot { background: var(--black); }
+    .slot-card.bot:hover { background: #1a1a1a; }
+
+    .slot-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
     }
-    
-    .slot-card.busy::before { background: var(--coral); }
-    .slot-card.bot::before { background: var(--periwinkle); }
-    
-    .slot-card:hover {
-      border-color: var(--accent);
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-md);
-    }
-    
-    .slot-card.busy {
-      background: var(--coral-bg);
-      border-color: rgba(255, 181, 167, 0.3);
-    }
-    
-    .slot-card.bot {
-      background: var(--periwinkle-bg);
-      border-color: rgba(181, 200, 255, 0.3);
-    }
-    
-    .slot-card:not(.busy):not(.bot) {
-      background: var(--mint-bg);
-      border-color: rgba(168, 237, 206, 0.3);
-    }
-    
     .slot-time {
-      font-size: 22px;
+      font-family: 'Playfair Display', serif;
+      font-size: 19px;
       font-weight: 700;
-      color: var(--text-dark);
-      letter-spacing: -0.5px;
-      margin-bottom: 4px;
+      letter-spacing: -0.01em;
+      color: var(--black);
       line-height: 1;
     }
-    
-    .slot-status {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--text-dark);
-      opacity: 0.7;
+    .slot-card.busy .slot-time,
+    .slot-card.bot .slot-time {
+      color: var(--white);
     }
-    
+    .slot-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #ccc;
+      flex-shrink: 0;
+    }
+    .slot-card:not(.busy):not(.bot) .slot-dot { background: #b0b0b0; }
+    .slot-card.busy .slot-dot { background: var(--white); }
+    .slot-card.bot .slot-dot { background: var(--gold); }
+
     .slot-name {
       font-size: 11px;
-      color: var(--text-dark);
-      margin-top: 8px;
+      font-weight: 400;
+      color: var(--ink-light);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      font-weight: 500;
+      line-height: 1.3;
     }
-    
-    .slot-service {
-      font-size: 10px;
-      color: var(--text-muted);
+    .slot-card.busy .slot-name,
+    .slot-card.bot .slot-name {
+      color: rgba(255,255,255,0.55);
+    }
+    .slot-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
       margin-top: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
+    .slot-card.busy .slot-label { color: rgba(255,255,255,0.3); }
+    .slot-card.bot .slot-label { color: var(--gold); }
 
-    /* ── MODAL ── */
+    /* ─── MODAL ─── */
     .modal-overlay {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(61, 53, 80, 0.35);
+      background: rgba(0,0,0,0.6);
       z-index: 200;
       align-items: center;
       justify-content: center;
       padding: 24px;
-      backdrop-filter: blur(6px);
     }
-    
     .modal-overlay.open { display: flex; }
-    
     .modal {
-      background: var(--bg-card);
-      border-radius: var(--radius-lg);
+      background: var(--white);
       width: 100%;
-      max-width: 400px;
-      box-shadow: 0 24px 64px rgba(61, 53, 80, 0.16);
+      max-width: 360px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.3);
       overflow: hidden;
-      animation: slideUp 0.3s ease;
     }
-
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
     .modal-header {
-      background: linear-gradient(135deg, var(--accent) 0%, #e09ac5 100%);
-      padding: 28px 24px;
-      color: #fff;
+      background: var(--black);
+      padding: 24px 28px 20px;
+      border-bottom: 1px solid #222;
     }
-    
-    .modal-time {
-      font-size: 32px;
+    .modal-time-display {
+      font-family: 'Playfair Display', serif;
+      font-size: 36px;
       font-weight: 700;
-      letter-spacing: -0.5px;
+      color: var(--white);
+      letter-spacing: -0.02em;
       line-height: 1;
     }
-    
     .modal-date-label {
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.7);
-      margin-top: 6px;
-      font-weight: 500;
-    }
-    
-    .modal-body { padding: 24px; }
-    
-    .modal-info-card {
-      background: var(--mint-bg);
-      border-radius: 12px;
-      padding: 12px 14px;
-      margin-bottom: 16px;
-      font-size: 12px;
-      color: var(--text-dark);
-      line-height: 1.8;
-      display: none;
-      border: 1px solid var(--mint);
-    }
-    
-    .modal-info-card.visible { display: block; }
-    
-    .modal-info-row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    
-    .modal-info-row span:first-child { font-size: 14px; }
-    
-    .modal-label {
       font-size: 11px;
-      font-weight: 600;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: 6px;
+      color: rgba(255,255,255,0.3);
+      margin-top: 6px;
+    }
+    .modal-body { padding: 22px 28px; }
+    .modal-info-card {
+      background: var(--off-white);
+      border-left: 2px solid var(--gold);
+      padding: 10px 14px;
+      margin-bottom: 18px;
+      font-size: 12px;
+      color: var(--ink-light);
+      line-height: 1.8;
+      display: none;
+    }
+    .modal-info-card.visible { display: block; }
+    .modal-info-row { display: flex; align-items: center; gap: 8px; }
+    .modal-field-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 5px;
       margin-top: 14px;
     }
-    
-    .modal-label:first-of-type { margin-top: 0; }
-    
+    .modal-field-label:first-child { margin-top: 0; }
     .modal-input {
       width: 100%;
-      padding: 10px 14px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
+      padding: 9px 12px;
+      border: 1px solid var(--rule);
+      background: var(--off-white);
       font-size: 13px;
-      font-family: 'Nunito', sans-serif;
-      color: var(--text-dark);
-      background: var(--bg-soft);
+      font-family: system-ui, sans-serif;
+      color: var(--black);
       outline: none;
-      transition: all 0.2s ease;
+      transition: border-color 0.12s;
+      border-radius: 0;
     }
-    
-    .modal-input:focus {
-      border-color: var(--accent);
-      background: var(--bg-card);
-      box-shadow: 0 0 0 3px rgba(215, 140, 184, 0.1);
-    }
-    
+    .modal-input:focus { border-color: var(--black); background: var(--white); }
     .modal-actions {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-      margin-top: 22px;
-      padding-top: 16px;
-      border-top: 1px solid var(--border-soft);
+      gap: 8px;
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid var(--rule);
     }
-    
     .modal-btn {
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: none;
-      font-size: 12px;
-      font-weight: 600;
-      font-family: 'Nunito', sans-serif;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      letter-spacing: 0.02em;
-      text-transform: uppercase;
-    }
-    
-    .modal-btn:hover { transform: translateY(-1px); }
-    
-    .btn-cancel {
-      background: var(--bg-soft);
-      color: var(--text-muted);
-      border: 1px solid var(--border);
-    }
-    
-    .btn-cancel:hover {
-      background: var(--bg-main);
-      color: var(--text-dark);
-    }
-    
-    .btn-free {
-      background: var(--mint);
-      color: #fff;
-    }
-    
-    .btn-free:hover { opacity: 0.9; }
-    
-    .btn-busy {
-      background: var(--coral);
-      color: #fff;
-    }
-    
-    .btn-busy:hover { opacity: 0.9; }
-
-    /* ── SCHEDULE ── */
-    .schedule-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-soft);
-      border-radius: var(--radius-lg);
-      overflow: hidden;
-      box-shadow: var(--shadow-sm);
-    }
-    
-    .schedule-header {
-      padding: 24px;
-      border-bottom: 1px solid var(--border-soft);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: linear-gradient(135deg, var(--bg-soft) 0%, var(--bg-card) 100%);
-    }
-    
-    .schedule-title {
-      font-size: 18px;
+      padding: 9px 10px;
+      border: 1px solid var(--rule);
+      font-size: 10px;
       font-weight: 700;
-      color: var(--text-dark);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-family: system-ui, sans-serif;
+      cursor: pointer;
+      background: var(--white);
+      color: var(--black);
+      transition: all 0.12s;
+      border-radius: 0;
     }
-    
-    .schedule-subtitle {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 3px;
+    .modal-btn:hover { background: var(--off-white); }
+    .modal-btn.btn-busy {
+      background: var(--black);
+      color: var(--white);
+      border-color: var(--black);
+    }
+    .modal-btn.btn-busy:hover { background: #222; }
+    .modal-btn.btn-primary-action {
+      background: var(--gold);
+      color: var(--white);
+      border-color: var(--gold);
+    }
+    .modal-btn.btn-primary-action:hover { background: var(--gold-hover); border-color: var(--gold-hover); }
+
+    /* ─── SCHEDULE ─── */
+    .schedule-card {
+      background: var(--white);
+      border: 1px solid var(--rule);
+    }
+    .schedule-head {
+      padding: 22px 28px;
+      border-bottom: 2px solid var(--black);
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .schedule-head-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--black);
+    }
+    .schedule-head-sub {
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
       font-weight: 500;
     }
-    
     .day-row {
       display: flex;
       align-items: center;
-      gap: 16px;
-      padding: 16px 24px;
-      border-bottom: 1px solid var(--border-soft);
-      transition: background 0.15s ease;
+      gap: 20px;
+      padding: 15px 28px;
+      border-bottom: 1px solid var(--rule);
+      transition: background 0.1s;
     }
-    
     .day-row:last-child { border-bottom: none; }
-    .day-row:hover { background: var(--bg-soft); }
-    
+    .day-row:hover { background: var(--off-white); }
     .day-name {
       width: 110px;
       font-size: 13px;
-      font-weight: 600;
-      color: var(--text-dark);
-    }
-    
-    .toggle-wrap {
-      position: relative;
-      width: 44px;
-      height: 24px;
+      font-weight: 500;
+      color: var(--black);
       flex-shrink: 0;
     }
-    
-    .toggle-wrap input {
-      opacity: 0;
-      width: 0;
-      height: 0;
+    .toggle-wrap {
+      position: relative;
+      width: 36px;
+      height: 18px;
+      flex-shrink: 0;
     }
-    
+    .toggle-wrap input { opacity: 0; width: 0; height: 0; }
     .toggle-slider {
       position: absolute;
       inset: 0;
-      background: var(--text-light);
-      border-radius: 20px;
+      background: var(--rule);
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: 0.2s;
+      border-radius: 0;
     }
-    
-    .toggle-wrap input:checked + .toggle-slider {
-      background: linear-gradient(135deg, var(--mint) 0%, #7ee0c2 100%);
-    }
-    
+    .toggle-wrap input:checked + .toggle-slider { background: var(--gold); }
     .toggle-slider::before {
       content: '';
       position: absolute;
-      height: 18px;
-      width: 18px;
+      height: 12px;
+      width: 12px;
       left: 3px;
-      bottom: 3px;
-      background: #fff;
-      border-radius: 50%;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      top: 3px;
+      background: var(--white);
+      transition: 0.2s;
     }
-    
-    .toggle-wrap input:checked + .toggle-slider::before {
-      transform: translateX(20px);
-    }
-    
+    .toggle-wrap input:checked + .toggle-slider::before { transform: translateX(18px); }
     .day-times {
       display: flex;
       align-items: center;
       gap: 10px;
       font-size: 13px;
-      color: var(--text-muted);
+      color: var(--muted);
     }
-    
-    .day-times.disabled {
-      opacity: 0.35;
-      pointer-events: none;
-    }
-    
+    .day-times.disabled { opacity: 0.25; pointer-events: none; }
     .day-times input[type=time] {
-      padding: 7px 10px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
+      padding: 5px 10px;
+      border: 1px solid var(--rule);
       font-size: 13px;
-      font-family: 'Nunito', sans-serif;
-      color: var(--text-dark);
-      background: var(--bg-soft);
+      font-family: system-ui, sans-serif;
+      color: var(--black);
+      background: var(--off-white);
       outline: none;
-      transition: all 0.2s ease;
+      transition: border-color 0.12s;
+      border-radius: 0;
     }
-    
-    .day-times input[type=time]:focus {
-      border-color: var(--accent);
-      background: var(--bg-card);
-      box-shadow: 0 0 0 3px rgba(215, 140, 184, 0.1);
-    }
-    
-    .day-sep {
-      color: var(--text-light);
-      font-weight: 600;
-    }
-    
+    .day-times input[type=time]:focus { border-color: var(--black); background: var(--white); }
+    .day-sep { color: var(--rule); font-weight: 300; }
+
     .schedule-footer {
-      padding: 16px 24px;
-      border-top: 1px solid var(--border-soft);
+      padding: 18px 28px;
+      border-top: 2px solid var(--black);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: var(--bg-soft);
     }
-    
     .save-btn {
-      background: linear-gradient(135deg, var(--accent) 0%, #e09ac5 100%);
-      color: #fff;
+      background: var(--gold);
+      color: var(--white);
       border: none;
-      border-radius: 10px;
-      padding: 10px 24px;
-      font-size: 12px;
-      font-weight: 600;
-      font-family: 'Nunito', sans-serif;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      letter-spacing: 0.02em;
+      padding: 10px 28px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
+      font-family: system-ui, sans-serif;
+      cursor: pointer;
+      transition: background 0.15s;
+      border-radius: 0;
     }
-    
-    .save-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(215, 140, 184, 0.25);
-    }
-    
+    .save-btn:hover { background: var(--gold-hover); }
     .save-msg {
       display: none;
-      font-size: 12px;
-      color: var(--success);
+      font-size: 11px;
       font-weight: 600;
-      align-items: center;
-      gap: 6px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #2a7a2a;
     }
-    
-    .save-msg.visible { display: flex; }
+    .save-msg.visible { display: flex; align-items: center; gap: 6px; }
 
-    /* ── SCROLLBAR ── */
-    ::-webkit-scrollbar { width: 6px; }
+    /* ─── SCROLLBAR ─── */
+    ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(61, 53, 80, 0.12);
-      border-radius: 10px;
-    }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(61, 53, 80, 0.2); }
+    ::-webkit-scrollbar-thumb { background: var(--rule); }
 
-    /* ── RESPONSIVE ── */
-    @media (max-width: 700px) {
-      .header { padding: 16px 16px; }
-      .nav { padding: 0 16px; }
-      .page { padding: 28px 16px; }
-      .date-label { font-size: 18px; min-width: auto; }
-      .date-nav { gap: 12px; }
-      .stats-row { grid-template-columns: repeat(2, 1fr); }
-      .slots-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
-      .slot-time { font-size: 18px; }
-      .day-row { padding: 14px 16px; }
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 600px) {
+      .masthead { padding: 0 20px; }
+      .nav { padding: 0 20px; }
+      .page { padding: 24px 20px; }
+      .date-heading { font-size: 24px; }
+      .slots-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+      .day-row { padding: 12px 20px; gap: 12px; }
       .day-name { width: 90px; }
-      .day-times { flex-wrap: wrap; }
-      .schedule-header, .schedule-footer { padding: 14px 16px; }
-      .modal { max-width: 90%; }
+      .schedule-head, .schedule-footer { padding: 16px 20px; }
+      .modal-body { padding: 18px 22px; }
     }
   </style>
 </head>
 <body>
 
-  <div class="header">
-    <div class="header-logo">${salon.name.split(' ')[0]}<span>${salon.name.split(' ').slice(1).join(' ')}</span></div>
-    <div class="header-sep"></div>
-    <div class="header-badge">Admin</div>
-    <a href="/${salon.type || 'salon'}/${salon.slug || salon.id}" class="header-link">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9M9 2h5m0 0v5m0-5L7 10"/>
+  <div class="masthead">
+    <div class="masthead-title">${salon.name}</div>
+    <div class="masthead-label">Admin Panel</div>
+    <div class="masthead-spacer"></div>
+    <a href="/${salon.type || 'salon'}/${salon.slug || salon.id}" class="masthead-link">
+      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M4.5 1.5H2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h8a.5.5 0 0 0 .5-.5V7.5M7 1.5h3.5m0 0v3.5m0-3.5L5 7"/>
       </svg>
-      Oglej stran
+      Javna stran
     </a>
   </div>
 
   <nav class="nav">
-    <div class="nav-tab active" onclick="switchTab('termini')">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-        <rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1v3M11 1v3M2 7h12"/>
-      </svg>
-      Termini
-    </div>
-    <div class="nav-tab" onclick="switchTab('urnik')">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-        <circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2 1.5"/>
-      </svg>
-      Delovni čas
-    </div>
+    <div class="nav-tab active" onclick="switchTab('termini')">Termini</div>
+    <div class="nav-tab" onclick="switchTab('urnik')">Delovni čas</div>
   </nav>
 
   <!-- TERMINI -->
@@ -1619,27 +1403,15 @@ function buildAdminPage(salon) {
     <div class="page">
 
       <div class="date-nav">
-        <button class="date-nav-btn" id="prev" title="Prejšnji dan">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M10 4L6 8l4 4"/>
-          </svg>
-        </button>
-        <div class="date-label" id="dateTitle"></div>
-        <button class="date-today-btn" id="today">Danes</button>
-        <button class="date-nav-btn" id="next" title="Naslednji dan">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M6 4l4 4-4 4"/>
-          </svg>
-        </button>
+        <button class="nav-arrow" id="prev">&#8592;</button>
+        <div class="date-heading" id="dateTitle"></div>
+        <button class="today-btn" id="today">Danes</button>
+        <button class="nav-arrow" id="next">&#8594;</button>
       </div>
+
+      <hr class="section-rule thick">
 
       <div class="stats-row" id="stats-row"></div>
-
-      <div class="legend">
-        <div class="legend-item"><div class="legend-dot free"></div> Prost termin</div>
-        <div class="legend-item"><div class="legend-dot busy"></div> Zaseden (ročno)</div>
-        <div class="legend-item"><div class="legend-dot bot"></div> Rezerviral asistent</div>
-      </div>
 
       <div id="slots-container"></div>
 
@@ -1650,20 +1422,15 @@ function buildAdminPage(salon) {
   <div class="tab-content" id="tab-urnik">
     <div class="page">
       <div class="schedule-card">
-        <div class="schedule-header">
+        <div class="schedule-head">
           <div>
-            <div class="schedule-title">✨ Delovni čas</div>
-            <div class="schedule-subtitle">Nastavljeni urniki določajo razpoložljive termine</div>
+            <div class="schedule-head-title">Delovni čas</div>
           </div>
+          <div class="schedule-head-sub">Urnik terminov</div>
         </div>
         <div id="schedule-rows"></div>
         <div class="schedule-footer">
-          <div class="save-msg" id="save-msg">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 8l3.5 3.5L13 4"/>
-            </svg>
-            Shranjeno
-          </div>
+          <div class="save-msg" id="save-msg">&#10003; &nbsp;Shranjeno</div>
           <button class="save-btn" onclick="saveSchedule()">Shrani spremembe</button>
         </div>
       </div>
@@ -1674,18 +1441,18 @@ function buildAdminPage(salon) {
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
       <div class="modal-header">
-        <div class="modal-time" id="modal-time-display"></div>
+        <div class="modal-time-display" id="modal-time-display"></div>
         <div class="modal-date-label" id="modal-date-label"></div>
       </div>
       <div class="modal-body">
         <div class="modal-info-card" id="modal-info-card"></div>
-        <div class="modal-label">Ime stranke</div>
+        <div class="modal-field-label">Ime stranke</div>
         <input class="modal-input" type="text" id="modal-customer" placeholder="Ime Priimek" />
-        <div class="modal-label">Storitev</div>
+        <div class="modal-field-label">Storitev</div>
         <input class="modal-input" type="text" id="modal-service" placeholder="npr. Ženski haircut" />
         <div class="modal-actions">
-          <button class="modal-btn btn-cancel" id="modal-cancel">Preklic</button>
-          <button class="modal-btn btn-free" id="modal-set-free">Prost</button>
+          <button class="modal-btn" id="modal-cancel">Preklic</button>
+          <button class="modal-btn" id="modal-set-free">Prost</button>
           <button class="modal-btn btn-busy" id="modal-set-busy">Zaseden</button>
         </div>
       </div>
@@ -1702,7 +1469,6 @@ function buildAdminPage(salon) {
 
     const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
     const DAY_NAMES_SL = { mon:'Ponedeljek', tue:'Torek', wed:'Sreda', thu:'Četrtek', fri:'Petek', sat:'Sobota', sun:'Nedelja' };
-    const STAT_EMOJIS = { total: '📅', free: '✨', busy: '💅', bot: '🤖' };
 
     function generateSlots(from, to) {
       const slots = [];
@@ -1733,14 +1499,17 @@ function buildAdminPage(salon) {
     }
 
     function isToday(d) {
-      const now = new Date();
-      return d.toDateString() === now.toDateString();
+      return d.toDateString() === new Date().toDateString();
     }
 
     async function loadSlots() {
       const dateStr = formatDate(currentDate);
-      const label = document.getElementById('dateTitle');
-      label.textContent = formatDateSl(currentDate) + (isToday(currentDate) ? ' · danes' : '');
+      const isTodayFlag = isToday(currentDate);
+      const dateHeading = document.getElementById('dateTitle');
+
+      const dayName = currentDate.toLocaleDateString('sl-SI', { weekday: 'long' });
+      const dayNum = currentDate.toLocaleDateString('sl-SI', { day: 'numeric', month: 'long', year: 'numeric' });
+      dateHeading.innerHTML = dayName + ', <em>' + dayNum + (isTodayFlag ? ' — danes' : '') + '</em>';
 
       const dayKey = getDayKey(currentDate);
       const daySchedule = schedule[dayKey];
@@ -1749,7 +1518,6 @@ function buildAdminPage(salon) {
       if (!daySchedule || !daySchedule.open) {
         container.innerHTML = \`
           <div class="closed-banner">
-            <span class="closed-icon">😴</span>
             <div class="closed-title">Salon je zaprt</div>
             <div class="closed-sub">Ta dan ni delovnega časa</div>
           </div>\`;
@@ -1768,26 +1536,13 @@ function buildAdminPage(salon) {
       const freeCount = hours.length - busyCount;
 
       document.getElementById('stats-row').innerHTML = \`
-        <div class="stat-chip">
-          <span class="stat-emoji">\${STAT_EMOJIS.total}</span>
-          <div class="stat-value">\${hours.length}</div>
-          <div class="stat-label">Skupaj</div>
-        </div>
-        <div class="stat-chip">
-          <span class="stat-emoji">\${STAT_EMOJIS.free}</span>
-          <div class="stat-value" style="color:var(--mint)">\${freeCount}</div>
-          <div class="stat-label">Prostih</div>
-        </div>
-        <div class="stat-chip">
-          <span class="stat-emoji">\${STAT_EMOJIS.busy}</span>
-          <div class="stat-value" style="color:var(--coral)">\${busyCount}</div>
-          <div class="stat-label">Zasedenih</div>
-        </div>
-        <div class="stat-chip">
-          <span class="stat-emoji">\${STAT_EMOJIS.bot}</span>
-          <div class="stat-value" style="color:var(--periwinkle)">\${botCount}</div>
-          <div class="stat-label">Bot</div>
-        </div>
+        <div class="stat-item"><span class="num">\${hours.length}</span>&nbsp;terminov</div>
+        <span class="stat-sep">—</span>
+        <div class="stat-item"><span class="num green">\${freeCount}</span>&nbsp;prostih</div>
+        <span class="stat-sep">—</span>
+        <div class="stat-item"><span class="num red">\${busyCount}</span>&nbsp;zasedenih</div>
+        <span class="stat-sep">—</span>
+        <div class="stat-item"><span class="num blue">\${botCount}</span>&nbsp;bot rezervacij</div>
       \`;
 
       container.innerHTML = '<div class="slots-grid" id="slots"></div>';
@@ -1806,11 +1561,19 @@ function buildAdminPage(salon) {
 
         const card = document.createElement('div');
         card.className = 'slot-card ' + cls;
+
+        const statusLabel = isBusy ? (isBot ? 'Bot' : 'Zaseden') : 'Prost';
+        const nameHtml = slot && slot.customer_name
+          ? \`<div class="slot-name">\${slot.customer_name}</div>\`
+          : \`<div class="slot-name">&nbsp;</div>\`;
+
         card.innerHTML = \`
-          <div class="slot-time">\${hour}</div>
-          <div class="slot-status">\${isBusy ? (isBot ? 'Bot' : 'Zaseden') : 'Prost'}</div>
-          \${slot && slot.customer_name ? \`<div class="slot-name">\${slot.customer_name}</div>\` : ''}
-          \${slot && slot.service ? \`<div class="slot-service">\${slot.service}</div>\` : ''}
+          <div class="slot-top">
+            <div class="slot-time">\${hour}</div>
+            <div class="slot-dot"></div>
+          </div>
+          \${nameHtml}
+          <div class="slot-label">\${statusLabel}</div>
         \`;
         card.addEventListener('click', () => openModal(hour, slot));
         grid.appendChild(card);
@@ -1820,7 +1583,7 @@ function buildAdminPage(salon) {
     function openModal(time, slot) {
       currentSlot = time;
       document.getElementById('modal-time-display').textContent = time;
-      document.getElementById('modal-date-label').textContent = formatDateSl(currentDate);
+      document.getElementById('modal-date-label').textContent = formatDateSl(currentDate).toUpperCase();
       document.getElementById('modal-customer').value = slot?.customer_name || '';
       document.getElementById('modal-service').value = slot?.service || '';
 
@@ -1828,8 +1591,8 @@ function buildAdminPage(salon) {
       if (slot && slot.customer_email) {
         infoCard.className = 'modal-info-card visible';
         infoCard.innerHTML = \`
-          <div class="modal-info-row"><span>✉️</span><span>\${slot.customer_email}</span></div>
-          <div class="modal-info-row"><span>📞</span><span>\${slot.customer_phone || '–'}</span></div>
+          <div class="modal-info-row"><span>✉</span>&nbsp;\${slot.customer_email}</div>
+          <div class="modal-info-row"><span>☏</span>&nbsp;\${slot.customer_phone || '–'}</div>
         \`;
       } else {
         infoCard.className = 'modal-info-card';
@@ -1875,8 +1638,7 @@ function buildAdminPage(salon) {
 
     function toggleDay(key) {
       const isOpen = document.getElementById('open-' + key).checked;
-      const timesEl = document.getElementById('times-' + key);
-      timesEl.className = 'day-times' + (isOpen ? '' : ' disabled');
+      document.getElementById('times-' + key).className = 'day-times' + (isOpen ? '' : ' disabled');
     }
 
     async function saveSchedule() {
@@ -1910,23 +1672,20 @@ function buildAdminPage(salon) {
     document.getElementById('modal-set-busy').addEventListener('click', () => saveSlot('busy'));
     document.getElementById('modal-set-free').addEventListener('click', () => saveSlot('free'));
     document.getElementById('prev').addEventListener('click', () => {
-      currentDate.setDate(currentDate.getDate() - 1);
-      loadSlots();
+      currentDate.setDate(currentDate.getDate() - 1); loadSlots();
     });
     document.getElementById('next').addEventListener('click', () => {
-      currentDate.setDate(currentDate.getDate() + 1);
-      loadSlots();
+      currentDate.setDate(currentDate.getDate() + 1); loadSlots();
     });
     document.getElementById('today').addEventListener('click', () => {
-      currentDate = new Date();
-      loadSlots();
+      currentDate = new Date(); loadSlots();
     });
 
     // ── Init ──
     loadSlots();
     buildScheduleUI();
     setInterval(loadSlots, 30000);
-</script>
+  </script>
 </body>
 </html>`;
 }
