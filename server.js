@@ -343,17 +343,27 @@ app.get('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
   res.json(rows);
 });
 
+// ─── SPREMENJEN: admin timeslots POST - zdaj sprejme tudi email in ga shrani + pošlje obvestilo ───
 app.post('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
-  const { date, time, status, customerName, service } = req.body;
-  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
-  const salonId = salonRows[0]?.id || req.params.id;
+  const { date, time, status, customerName, customerEmail, service } = req.body;
+  const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salon = salonRows[0];
+  if (!salon) return res.status(404).json({ error: 'Not found' });
+  const salonId = salon.id;
+
   if (status === 'busy') {
+    const cleanEmail = (customerEmail || '').trim();
     await pool.query(`
-      INSERT INTO timeslots (salon_id, date, time, status, customer_name, service)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, service)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       ON CONFLICT (salon_id, date, time) DO UPDATE
-      SET status = $4, customer_name = $5, service = $6
-    `, [salonId, date, time, status, customerName, service]);
+      SET status = $4, customer_name = $5, customer_email = $6, service = $7
+    `, [salonId, date, time, status, customerName, cleanEmail, service]);
+
+    // Pošlji email stranki če je vpisan
+    if (cleanEmail) {
+      await sendConfirmationEmail(cleanEmail, customerName || 'Stranka', salon, date, time, service || '');
+    }
   } else {
     await pool.query('DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3', [salonId, date, time]);
   }
@@ -1396,6 +1406,14 @@ function buildAdminPage(salon) {
       margin-top: 14px;
     }
     .modal-field-label:first-child { margin-top: 0; }
+    .modal-field-label .optional {
+      font-weight: 400;
+      letter-spacing: 0;
+      text-transform: none;
+      font-size: 9px;
+      color: #bbb;
+      margin-left: 4px;
+    }
     .modal-input {
       width: 100%;
       padding: 9px 12px;
@@ -1409,6 +1427,11 @@ function buildAdminPage(salon) {
       border-radius: 0;
     }
     .modal-input:focus { border-color: var(--black); background: var(--white); }
+    .modal-email-hint {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
     .modal-actions {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -1659,6 +1682,9 @@ function buildAdminPage(salon) {
         <input class="modal-input" type="text" id="modal-customer" placeholder="Ime Priimek" />
         <div class="modal-field-label">Storitev</div>
         <input class="modal-input" type="text" id="modal-service" placeholder="npr. Ženski haircut" />
+        <div class="modal-field-label">E-pošta stranke <span class="optional">(neobvezno — za potrditveni e-mail)</span></div>
+        <input class="modal-input" type="email" id="modal-email" placeholder="stranka@email.com" />
+        <div class="modal-email-hint" id="modal-email-hint"></div>
         <div class="modal-actions">
           <button class="modal-btn" id="modal-cancel">Preklic</button>
           <button class="modal-btn" id="modal-set-free">Prost</button>
@@ -1795,6 +1821,8 @@ function buildAdminPage(salon) {
       document.getElementById('modal-date-label').textContent = formatDateSl(currentDate).toUpperCase();
       document.getElementById('modal-customer').value = slot?.customer_name || '';
       document.getElementById('modal-service').value = slot?.service || '';
+      document.getElementById('modal-email').value = slot?.customer_email || '';
+      document.getElementById('modal-email-hint').textContent = '';
 
       const infoCard = document.getElementById('modal-info-card');
       if (slot && slot.customer_email) {
@@ -1811,14 +1839,37 @@ function buildAdminPage(salon) {
     }
 
     async function saveSlot(status) {
-      const customerName = document.getElementById('modal-customer').value;
-      const service = document.getElementById('modal-service').value;
-      await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots', {
+      const customerName = document.getElementById('modal-customer').value.trim();
+      const service = document.getElementById('modal-service').value.trim();
+      const customerEmail = document.getElementById('modal-email').value.trim();
+
+      // Osnovna email validacija če je vpisan
+      if (customerEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(customerEmail)) {
+        document.getElementById('modal-email-hint').textContent = '⚠ Vpišite veljaven e-poštni naslov.';
+        document.getElementById('modal-email-hint').style.color = '#c0392b';
+        return;
+      }
+
+      const res = await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: formatDate(currentDate), time: currentSlot, status, customerName, service })
+        body: JSON.stringify({ date: formatDate(currentDate), time: currentSlot, status, customerName, customerEmail, service })
       });
+      const data = await res.json();
+
       document.getElementById('modal-overlay').classList.remove('open');
+
+      // Pokaži potrditev če je bil poslan email
+      if (status === 'busy' && customerEmail && data.success) {
+        setTimeout(() => {
+          const hint = document.createElement('div');
+          hint.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#0a0a0a;color:#fff;padding:12px 20px;font-size:12px;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+          hint.textContent = '✅ Potrditveni e-mail poslan na ' + customerEmail;
+          document.body.appendChild(hint);
+          setTimeout(() => hint.remove(), 3500);
+        }, 200);
+      }
+
       loadSlots();
     }
 
