@@ -3,1139 +3,635 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BookWell.si — Avtomatizirajte Rezervacije</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=UnifrakturMaguntia&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+<title>BookWell — AI Recepcionist za Salone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-
-  :root {
-    --ink: #1a1410;
-    --ink-mid: #2d2520;
-    --ink-light: #4a3f35;
-    --ink-muted: #7a6e65;
-    --paper: #f5f0e8;
-    --paper-warm: #ede7d9;
-    --paper-dark: #ddd5c4;
-    --rule: #1a1410;
-    --gold: #b8941e;
-    --gold-light: #d4a824;
-    --column-gap: 24px;
-  }
-
-  html { scroll-behavior: smooth; }
-
-  body {
-    font-family: 'EB Garamond', Georgia, serif;
-    background: var(--paper);
-    color: var(--ink);
-    font-size: 15px;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  /* ─── PAPER TEXTURE ─── */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(26,20,16,0.04) 27px, rgba(26,20,16,0.04) 28px);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  .newspaper {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 0 32px 80px;
-    position: relative;
-    z-index: 1;
-  }
-
-  /* ─── MASTHEAD ─── */
-  .masthead {
-    border-bottom: 4px double var(--rule);
-    padding: 32px 0 0;
-    margin-bottom: 0;
-  }
-
-  .masthead-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--rule);
-    margin-bottom: 8px;
-  }
-
-  .masthead-meta {
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    color: var(--ink-muted);
-    text-transform: uppercase;
-    line-height: 1.8;
-  }
-
-  .masthead-title {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(60px, 10vw, 110px);
-    font-weight: 900;
-    letter-spacing: -0.03em;
-    color: var(--ink);
-    line-height: 0.9;
-    text-align: center;
-    flex: 1;
-    padding: 0 20px;
-  }
-
-  .masthead-price {
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    color: var(--ink-muted);
-    text-transform: uppercase;
-    text-align: right;
-    line-height: 1.8;
-  }
-
-  .masthead-gold-rule {
-    height: 4px;
-    background: var(--gold);
-    margin: 6px 0;
-  }
-
-  .masthead-tagline {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 24px;
-    padding: 8px 0 16px;
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--ink-light);
-    border-bottom: 3px solid var(--rule);
-  }
-
-  .masthead-tagline .dot {
-    width: 3px;
-    height: 3px;
-    border-radius: 50%;
-    background: var(--ink-muted);
-    flex-shrink: 0;
-  }
-
-  /* ─── SECTION LABELS ─── */
-  .section-label {
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--paper);
-    background: var(--ink);
-    display: inline-block;
-    padding: 2px 8px;
-    margin-bottom: 8px;
-  }
-
-  .section-label.gold {
-    background: var(--gold);
-  }
-
-  /* ─── COLUMN RULES ─── */
-  .columns {
-    display: grid;
-    gap: 0;
-    border-bottom: 2px solid var(--rule);
-    margin-bottom: 0;
-  }
-
-  .columns.c2 { grid-template-columns: 1fr 1fr; }
-  .columns.c3 { grid-template-columns: 1fr 1fr 1fr; }
-  .columns.c32 { grid-template-columns: 3fr 2fr; }
-  .columns.c23 { grid-template-columns: 2fr 3fr; }
-  .columns.c231 { grid-template-columns: 2fr 3fr 1.5fr; }
-  .columns.c12 { grid-template-columns: 1fr 2fr; }
-  .columns.c13 { grid-template-columns: 1fr 3fr; }
-
-  .col {
-    padding: 20px var(--column-gap);
-    border-right: 1px solid var(--rule);
-    position: relative;
-  }
-  .col:first-child { padding-left: 0; }
-  .col:last-child { border-right: none; padding-right: 0; }
-
-  /* ─── HEADLINES ─── */
-  .headline-mega {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(28px, 5vw, 52px);
-    font-weight: 900;
-    line-height: 1.0;
-    letter-spacing: -0.02em;
-    color: var(--ink);
-    margin-bottom: 12px;
-  }
-
-  .headline-major {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(22px, 3vw, 32px);
-    font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: -0.01em;
-    color: var(--ink);
-    margin-bottom: 10px;
-  }
-
-  .headline-minor {
-    font-family: 'Playfair Display', serif;
-    font-size: 20px;
-    font-weight: 700;
-    line-height: 1.15;
-    color: var(--ink);
-    margin-bottom: 8px;
-  }
-
-  .deck {
-    font-family: 'EB Garamond', serif;
-    font-size: 14px;
-    font-style: italic;
-    color: var(--ink-light);
-    line-height: 1.5;
-    margin-bottom: 10px;
-    border-bottom: 1px solid var(--paper-dark);
-    padding-bottom: 10px;
-  }
-
-  .byline {
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--ink-muted);
-    margin-bottom: 14px;
-  }
-
-  /* ─── BODY TEXT ─── */
-  p {
-    font-size: 14.5px;
-    line-height: 1.65;
-    color: var(--ink-mid);
-    margin-bottom: 10px;
-    text-align: justify;
-    hyphens: auto;
-  }
-
-  /* DROP CAP */
-  .drop-cap::first-letter {
-    font-family: 'Playfair Display', serif;
-    font-size: 64px;
-    font-weight: 900;
-    float: left;
-    line-height: 0.75;
-    padding: 6px 6px 0 0;
-    color: var(--ink);
-  }
-
-  /* ─── PULL QUOTE ─── */
-  .pull-quote {
-    border-top: 2px solid var(--rule);
-    border-bottom: 2px solid var(--rule);
-    margin: 18px 0;
-    padding: 12px 0;
-    text-align: center;
-  }
-
-  .pull-quote p {
-    font-family: 'Playfair Display', serif;
-    font-size: 18px;
-    font-style: italic;
-    font-weight: 400;
-    color: var(--ink);
-    text-align: center;
-    margin: 0;
-    line-height: 1.4;
-  }
-
-  .pull-quote cite {
-    display: block;
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--ink-muted);
-    margin-top: 6px;
-    font-style: normal;
-  }
-
-  /* ─── HORIZONTAL RULES ─── */
-  hr.thick { border: none; border-top: 2px solid var(--rule); margin: 16px 0; }
-  hr.thin  { border: none; border-top: 1px solid var(--rule); margin: 12px 0; }
-  hr.dot   { border: none; border-top: 1px dotted var(--ink-muted); margin: 10px 0; }
-  hr.gold  { border: none; border-top: 3px solid var(--gold); margin: 0 0 12px; }
-
-  /* ─── CHAT MOCKUP ─── */
-  .chat-box {
-    background: #1a1410;
-    border-radius: 0;
-    overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  }
-
-  .chat-header {
-    background: #0f0c09;
-    padding: 10px 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .chat-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: rgba(184,148,30,0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--gold);
-    font-size: 11px;
-    font-weight: 700;
-    flex-shrink: 0;
-  }
-
-  .chat-header-info { flex: 1; }
-  .chat-header-info h4 { color: #fff; font-size: 12px; font-weight: 600; margin: 0; }
-  .chat-header-info p { color: rgba(255,255,255,0.4); font-size: 10px; margin: 0; }
-  .chat-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; }
-
-  .chat-messages {
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-height: 280px;
-  }
-
-  .chat-bubble {
-    max-width: 80%;
-    padding: 8px 11px;
-    border-radius: 14px;
-    font-size: 12px;
-    line-height: 1.45;
-    opacity: 0;
-    animation: fadeInUp 0.4s ease forwards;
-  }
-
-  .chat-bubble.bot {
-    background: #2d2520;
-    color: #e8ddd0;
-    align-self: flex-start;
-    border-bottom-left-radius: 4px;
-  }
-
-  .chat-bubble.user {
-    background: var(--gold);
-    color: #1a1410;
-    align-self: flex-end;
-    border-bottom-right-radius: 4px;
-    font-weight: 500;
-  }
-
-  .chat-bubble.confirm {
-    background: #16a34a;
-    color: #dcfce7;
-    align-self: flex-start;
-    font-size: 11px;
-    border-bottom-left-radius: 4px;
-    max-width: 90%;
-  }
-
-  @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  .chat-input-bar {
-    background: #0f0c09;
-    padding: 8px 12px;
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    border-top: 1px solid rgba(255,255,255,0.08);
-  }
-
-  .chat-input-fake {
-    flex: 1;
-    background: rgba(255,255,255,0.07);
-    border-radius: 20px;
-    padding: 6px 12px;
-    font-size: 11px;
-    color: rgba(255,255,255,0.3);
-  }
-
-  .chat-send-btn {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--gold);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  /* ─── ADMIN GRID MOCKUP ─── */
-  .admin-mock {
-    background: #f7f7f5;
-    border: 1px solid #e0e0e0;
-    font-family: system-ui, sans-serif;
-    overflow: hidden;
-  }
-
-  .admin-mock-head {
-    background: #0a0a0a;
-    padding: 8px 14px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .admin-mock-head span {
-    font-family: 'Playfair Display', serif;
-    color: #fff;
-    font-size: 13px;
-    font-weight: 700;
-  }
-
-  .admin-mock-head .admin-tag {
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.4);
-  }
-
-  .admin-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1px;
-    background: #e0e0e0;
-    padding: 0;
-  }
-
-  .admin-slot {
-    background: #fff;
-    padding: 10px 12px;
-    position: relative;
-    transition: background 0.3s;
-  }
-
-  .admin-slot.busy { background: #0a0a0a; }
-  .admin-slot.bot  { background: #0a0a0a; }
-  .admin-slot.free { background: #fff; }
-
-  .admin-slot-time {
-    font-family: 'Playfair Display', serif;
-    font-size: 16px;
-    font-weight: 700;
-    color: #0a0a0a;
-    line-height: 1;
-    margin-bottom: 4px;
-  }
-  .admin-slot.busy .admin-slot-time,
-  .admin-slot.bot  .admin-slot-time { color: #fff; }
-
-  .admin-slot-name { font-size: 10px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .admin-slot.busy .admin-slot-name { color: rgba(255,255,255,0.5); }
-  .admin-slot.bot  .admin-slot-name { color: var(--gold); }
-
-  .admin-slot-label { font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #ccc; margin-top: 2px; }
-  .admin-slot.busy .admin-slot-label { color: rgba(255,255,255,0.3); }
-  .admin-slot.bot  .admin-slot-label { color: var(--gold-light); }
-
-  /* animate booking into admin grid */
-  @keyframes slotBusy {
-    0%   { background: #fff; }
-    100% { background: #0a0a0a; }
-  }
-
-  .admin-slot.animating { animation: slotBusy 0.6s ease forwards; }
-  .admin-slot.animating .admin-slot-time { color: #fff !important; }
-  .admin-slot.animating .admin-slot-name { color: rgba(255,255,255,0.5) !important; }
-
-  /* ─── PRICING / MARKET REPORT ─── */
-  .price-tier {
-    border: 1px solid var(--rule);
-    padding: 16px;
-    margin-bottom: 12px;
-    position: relative;
-  }
-
-  .price-tier.featured {
-    border-width: 2px;
-    border-color: var(--gold);
-    background: rgba(184,148,30,0.04);
-  }
-
-  .price-tier .badge {
-    position: absolute;
-    top: -10px;
-    left: 16px;
-    background: var(--gold);
-    color: var(--paper);
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    padding: 2px 10px;
-  }
-
-  .price-amount {
-    font-family: 'Playfair Display', serif;
-    font-size: 36px;
-    font-weight: 900;
-    color: var(--ink);
-    line-height: 1;
-    margin-bottom: 2px;
-  }
-
-  .price-per {
-    font-size: 11px;
-    color: var(--ink-muted);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 10px;
-  }
-
-  .price-features {
-    list-style: none;
-    font-size: 12.5px;
-    color: var(--ink-light);
-    line-height: 1.9;
-  }
-
-  .price-features li::before {
-    content: '— ';
-    color: var(--ink-muted);
-  }
-
-  /* ─── CTA ─── */
-  .cta-block {
-    text-align: center;
-    padding: 20px 0 4px;
-  }
-
-  .cta-btn {
-    display: inline-block;
-    background: var(--gold);
-    color: var(--paper) !important;
-    font-family: 'EB Garamond', serif;
-    font-size: 16px;
-    font-style: italic;
-    padding: 12px 36px;
-    text-decoration: none;
-    letter-spacing: 0.04em;
-    border: 2px solid var(--gold);
-    transition: all 0.2s;
-    cursor: pointer;
-  }
-
-  .cta-btn:hover {
-    background: transparent;
-    color: var(--gold) !important;
-  }
-
-  .cta-btn.inverse {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: var(--paper) !important;
-  }
-  .cta-btn.inverse:hover {
-    background: transparent;
-    color: var(--ink) !important;
-  }
-
-  .cta-sub {
-    font-size: 11px;
-    color: var(--ink-muted);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    margin-top: 8px;
-  }
-
-  /* ─── CLASSIFIEDS (FAQ) ─── */
-  .classifieds {
-    background: var(--paper-warm);
-    border: 2px solid var(--rule);
-    padding: 20px;
-    margin-top: 0;
-  }
-
-  .classifieds-head {
-    font-family: 'Playfair Display', serif;
-    font-size: 13px;
-    font-weight: 900;
-    letter-spacing: 0.06em;
-    text-align: center;
-    text-transform: uppercase;
-    border-bottom: 1px solid var(--rule);
-    padding-bottom: 8px;
-    margin-bottom: 12px;
-  }
-
-  .classified-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px var(--column-gap);
-  }
-
-  .classified-item {
-    border-top: 1px solid var(--rule);
-    padding-top: 8px;
-  }
-
-  .classified-q {
-    font-family: 'Playfair Display', serif;
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--ink);
-    margin-bottom: 4px;
-    line-height: 1.3;
-  }
-
-  .classified-a {
-    font-size: 12.5px;
-    color: var(--ink-light);
-    line-height: 1.5;
-    text-align: left;
-    margin: 0;
-  }
-
-  /* ─── STAT BOX ─── */
-  .stat-box {
-    border: 1px solid var(--rule);
-    padding: 12px;
-    text-align: center;
-    margin-bottom: 12px;
-  }
-
-  .stat-number {
-    font-family: 'Playfair Display', serif;
-    font-size: 42px;
-    font-weight: 900;
-    color: var(--gold);
-    line-height: 1;
-    display: block;
-  }
-
-  .stat-label {
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--ink-muted);
-    margin-top: 4px;
-    display: block;
-  }
-
-  /* ─── FOLIO LINE ─── */
-  .folio {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 0;
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink-muted);
-    border-top: 1px solid var(--rule);
-    border-bottom: 1px solid var(--rule);
-    margin-bottom: 16px;
-  }
-
-  /* ─── TICKER ─── */
-  .ticker-wrap {
-    overflow: hidden;
-    background: var(--ink);
-    padding: 5px 0;
-    position: relative;
-    margin-bottom: 0;
-  }
-  .ticker-inner {
-    display: flex;
-    white-space: nowrap;
-    animation: ticker 24s linear infinite;
-    gap: 0;
-  }
-  .ticker-inner span {
-    font-size: 10px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.6);
-    padding: 0 32px;
-    flex-shrink: 0;
-  }
-  .ticker-inner span strong {
-    color: var(--gold);
-    font-weight: 600;
-  }
-  @keyframes ticker {
-    from { transform: translateX(0); }
-    to   { transform: translateX(-50%); }
-  }
-
-  /* ─── RESPONSIVE ─── */
-  @media (max-width: 700px) {
-    .newspaper { padding: 0 16px 60px; }
-    .columns.c2, .columns.c3, .columns.c32, .columns.c23, .columns.c231, .columns.c12, .columns.c13 {
-      grid-template-columns: 1fr;
-    }
-    .col { border-right: none; border-bottom: 1px solid var(--rule); padding: 16px 0; }
-    .col:last-child { border-bottom: none; }
-    .classified-grid { grid-template-columns: 1fr 1fr; }
-    .admin-grid { grid-template-columns: repeat(2, 1fr); }
-    .masthead-title { font-size: 44px; }
-  }
+:root {
+  --black:    #0a0a08;
+  --ink:      #1e1c18;
+  --gold:     #c9984a;
+  --gold-lt:  #e2b96a;
+  --gold-dk:  #8c6830;
+  --gold-pale:#f5ecda;
+  --white:    #ffffff;
+  --paper:    #faf7f2;
+  --paper-md: #f2ece0;
+  --paper-dk: #e8dfc8;
+  --muted:    #8a8070;
+  --text:     #1e1c18;
+  --text-2:   #5a5448;
+  --border:   rgba(0,0,0,0.08);
+  --border-md:rgba(0,0,0,0.14);
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--paper);
+  color: var(--text);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+.nav {
+  position: fixed; top:0; left:0; right:0; z-index:500;
+  background: rgba(250,247,242,0.94);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(18px);
+  height: 64px;
+  display: flex; align-items: center;
+  padding: 0 6vw;
+  justify-content: space-between;
+}
+.logo { font-family:'Playfair Display',serif; font-size:22px; font-weight:900; letter-spacing:-0.02em; color:var(--black); }
+.logo span { color:var(--gold); }
+.nav-links { display:flex; align-items:center; gap:36px; }
+.nav-links a { font-size:12px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); text-decoration:none; transition:color .2s; }
+.nav-links a:hover { color:var(--black); }
+.nav-cta { background:var(--black)!important; color:var(--gold)!important; padding:9px 22px; font-size:11px!important; font-weight:700!important; letter-spacing:.12em!important; }
+
+.hero {
+  min-height:100vh; padding:128px 6vw 80px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+  position:relative; overflow:hidden; background:var(--paper);
+}
+.hero::before {
+  content:''; position:absolute; inset:0;
+  background:
+    radial-gradient(ellipse 900px 500px at 50% 0%, rgba(201,152,74,.09) 0%, transparent 65%),
+    repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(0,0,0,.025) 60px),
+    repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(0,0,0,.025) 60px);
+  pointer-events:none;
+}
+.hero-eyebrow {
+  font-size:10px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; color:var(--gold);
+  margin-bottom:28px; position:relative; display:flex; align-items:center; gap:16px;
+}
+.hero-eyebrow::before, .hero-eyebrow::after { content:''; display:block; width:36px; height:1px; background:var(--gold-dk); }
+.hero h1 {
+  font-family:'Playfair Display',serif; font-size:clamp(44px,7.5vw,96px); font-weight:900; line-height:.95;
+  letter-spacing:-.03em; color:var(--black); max-width:960px; margin-bottom:12px; position:relative;
+}
+.hero h1 em { font-style:italic; font-weight:400; color:var(--gold); }
+.hero-sub {
+  font-family:'Cormorant Garamond',serif; font-size:clamp(18px,2.4vw,26px); font-weight:300; font-style:italic;
+  color:var(--text-2); margin-bottom:52px; max-width:580px; position:relative; line-height:1.5;
+}
+.hero-ctas { display:flex; align-items:center; gap:24px; flex-wrap:wrap; justify-content:center; position:relative; }
+.btn-primary { background:var(--black); color:var(--gold); padding:15px 44px; font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; text-decoration:none; display:inline-block; transition:background .2s, transform .15s; }
+.btn-primary:hover { background:var(--ink); transform:translateY(-2px); }
+.btn-outline { color:var(--text-2); font-size:11px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; text-decoration:none; border-bottom:1px solid var(--border-md); padding-bottom:2px; transition:color .2s, border-color .2s; }
+.btn-outline:hover { color:var(--gold); border-color:var(--gold); }
+.hero-trust { margin-top:72px; position:relative; display:flex; align-items:center; gap:32px; flex-wrap:wrap; justify-content:center; }
+.trust-item { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:4px; }
+.trust-item strong { font-family:'Playfair Display',serif; font-size:22px; font-weight:900; letter-spacing:-.02em; color:var(--black); }
+.trust-sep { width:1px; height:36px; background:var(--border-md); }
+
+.gold-rule { width:100%; height:1px; background:linear-gradient(90deg,transparent,var(--gold-dk),transparent); }
+.s-label { font-size:10px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; color:var(--gold-dk); margin-bottom:20px; }
+
+.pain { padding:120px 6vw; background:var(--white); }
+.pain-inner { max-width:1100px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:80px; align-items:center; }
+.pain h2 { font-family:'Playfair Display',serif; font-size:clamp(30px,4vw,52px); font-weight:700; line-height:1.1; letter-spacing:-.02em; color:var(--black); margin-bottom:20px; }
+.pain h2 em { font-style:italic; color:var(--gold); font-weight:400; }
+.pain p { font-size:15px; line-height:1.8; color:var(--text-2); margin-bottom:14px; }
+.pain-list { list-style:none; display:flex; flex-direction:column; gap:0; }
+.pain-list li { display:flex; align-items:flex-start; gap:16px; font-size:14px; line-height:1.6; color:var(--text-2); padding:16px 0; border-bottom:1px solid var(--border); }
+.pain-list li:first-child { padding-top:0; }
+.pain-list li:last-child { border-bottom:none; }
+.pain-list li::before { content:''; flex-shrink:0; width:18px; height:1px; background:var(--gold); margin-top:10px; }
+
+/* ── DEMO ── */
+.demo { padding:120px 6vw; background:var(--paper); position:relative; }
+.demo::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 800px 400px at 60% 50%,rgba(201,152,74,.05) 0%,transparent 70%); pointer-events:none; }
+.demo-inner { max-width:1100px; margin:0 auto; }
+.demo-top { text-align:center; margin-bottom:80px; }
+.demo-top h2 { font-family:'Playfair Display',serif; font-size:clamp(30px,4vw,52px); font-weight:700; letter-spacing:-.02em; color:var(--black); margin-bottom:14px; }
+.demo-top h2 em { font-style:italic; color:var(--gold); font-weight:400; }
+.demo-top p { font-size:15px; color:var(--text-2); max-width:440px; margin:0 auto; line-height:1.7; }
+.demo-layout { display:grid; grid-template-columns:1fr 1fr; gap:80px; align-items:center; }
+
+/* iPhone */
+.iphone-scene { display:flex; justify-content:center; align-items:center; padding:20px 0; }
+.iphone {
+  position:relative; width:290px;
+  background:#1c1c1e;
+  border-radius:52px;
+  padding:14px;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.14),
+    0 0 0 2.5px #2c2c2e,
+    0 0 0 3.5px rgba(255,255,255,.04),
+    0 48px 96px rgba(0,0,0,.28),
+    0 16px 40px rgba(0,0,0,.18);
+  flex-shrink:0;
+}
+/* Dynamic island */
+.iphone::before {
+  content:''; position:absolute; top:18px; left:50%; transform:translateX(-50%);
+  width:100px; height:30px; background:#1c1c1e; border-radius:0 0 20px 20px; z-index:10;
+}
+/* Buttons */
+.iphone-side-r { position:absolute; right:-3.5px; top:108px; width:3.5px; height:64px; background:#2a2a2c; border-radius:0 2px 2px 0; }
+.iphone-side-r2 { position:absolute; right:-3.5px; top:186px; width:3.5px; height:44px; background:#2a2a2c; border-radius:0 2px 2px 0; }
+.iphone-vol-s { position:absolute; left:-3.5px; top:106px; width:3.5px; height:24px; background:#2a2a2c; border-radius:2px 0 0 2px; }
+.iphone-vol-1 { position:absolute; left:-3.5px; top:144px; width:3.5px; height:40px; background:#2a2a2c; border-radius:2px 0 0 2px; }
+.iphone-vol-2 { position:absolute; left:-3.5px; top:196px; width:3.5px; height:40px; background:#2a2a2c; border-radius:2px 0 0 2px; }
+
+.iphone-screen { background:#f5f0eb; border-radius:40px; overflow:hidden; height:596px; display:flex; flex-direction:column; }
+.iphone-sbar { height:48px; background:#1a1410; display:flex; align-items:flex-end; justify-content:space-between; padding:0 26px 8px; flex-shrink:0; }
+.iphone-time { font-size:13px; font-weight:700; color:#fff; letter-spacing:-.02em; font-family:-apple-system,sans-serif; }
+.iphone-sigs { display:flex; align-items:center; gap:5px; }
+.sbars { display:flex; align-items:flex-end; gap:1.5px; }
+.sbars span { background:#fff; border-radius:1px; width:3px; }
+.sbatt { width:24px; height:11px; border:1.5px solid rgba(255,255,255,.7); border-radius:3px; position:relative; }
+.sbatt::after { content:''; position:absolute; top:1.5px; left:1.5px; right:4px; bottom:1.5px; background:#fff; border-radius:1px; }
+.sbatt::before { content:''; position:absolute; top:50%; right:-4px; transform:translateY(-50%); width:2px; height:6px; background:rgba(255,255,255,.4); border-radius:1px; }
+.swifi::after { content:''; display:inline-block; width:10px; height:8px; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 9'%3E%3Cpath d='M6 7.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm0-3a4 4 0 0 1 2.83 1.17l1-1A5.5 5.5 0 0 0 6 3a5.5 5.5 0 0 0-3.83 1.67l1 1A4 4 0 0 1 6 4.5zm0-3a7 7 0 0 1 4.95 2.05l1-1A8.5 8.5 0 0 0 6 0 8.5 8.5 0 0 0 .05 2.55l1 1A7 7 0 0 1 6 1.5z' fill='%23fff'/%3E%3C/svg%3E") no-repeat center; }
+
+.phone-chatbar { background:#1a1410; padding:10px 16px 12px; display:flex; align-items:center; gap:10px; border-bottom:1px solid rgba(255,255,255,.06); flex-shrink:0; }
+.phone-avatar { width:34px; height:34px; background:rgba(201,152,74,.18); border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Playfair Display',serif; font-size:13px; font-weight:700; color:var(--gold); flex-shrink:0; }
+.phone-info h4 { font-size:12px; font-weight:600; color:#fff; line-height:1.2; }
+.phone-info p { font-size:10px; color:rgba(255,255,255,.35); }
+.phone-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; margin-left:auto; flex-shrink:0; }
+
+.phone-msgs { flex:1; overflow:hidden; padding:12px; display:flex; flex-direction:column; gap:7px; background:#f5f0eb; }
+.pm-b,.pm-u { display:flex; max-width:82%; }
+.pm-b { align-self:flex-start; }
+.pm-u { align-self:flex-end; }
+.bb { background:#fff; border:0.5px solid rgba(0,0,0,.08); box-shadow:0 1px 3px rgba(0,0,0,.06); padding:8px 11px; font-size:11.5px; line-height:1.5; color:#2d2520; border-radius:3px 14px 14px 3px; }
+.bu { background:#1a1410; padding:8px 11px; font-size:11.5px; line-height:1.5; color:rgba(255,255,255,.9); border-radius:14px 3px 3px 14px; }
+.bconf { background:rgba(74,222,128,.1); border:1px solid rgba(74,222,128,.3); padding:7px 10px; margin-top:3px; font-size:10px; color:#16a34a; line-height:1.4; border-radius:3px; }
+.bform { background:#fff; border:0.5px solid rgba(0,0,0,.1); border-radius:10px; overflow:hidden; width:210px; }
+.bform-h { background:#1a1410; padding:7px 11px; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.5); }
+.bform-b { padding:8px 11px; display:flex; flex-direction:column; gap:5px; }
+.bfinput { background:#f5f0eb; border:1px solid rgba(0,0,0,.08); padding:5px 8px; font-size:10px; color:#5a5448; border-radius:4px; }
+.bfbtn { background:#8c6830; color:#fff; padding:6px; font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; text-align:center; border-radius:4px; }
+
+.ptyping { display:flex; gap:3px; align-items:center; padding:9px 11px; background:#fff; border:0.5px solid rgba(0,0,0,.08); border-radius:3px 14px 14px 3px; width:fit-content; }
+.ptyping span { width:4px; height:4px; border-radius:50%; background:#bbb; animation:td 1.2s infinite; }
+.ptyping span:nth-child(2){animation-delay:.2s} .ptyping span:nth-child(3){animation-delay:.4s}
+@keyframes td{0%,100%{transform:translateY(0);opacity:.3}50%{transform:translateY(-3px);opacity:1}}
+
+.phone-inputbar { padding:10px 12px; background:#fff; border-top:1px solid rgba(0,0,0,.07); display:flex; gap:8px; align-items:center; flex-shrink:0; }
+.phone-fake { flex:1; padding:7px 12px; background:#f5f0eb; border:1px solid rgba(0,0,0,.08); border-radius:100px; font-size:11px; color:rgba(0,0,0,.3); font-family:'DM Sans',sans-serif; }
+.phone-sendbtn { width:30px; height:30px; background:#1a1410; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.phone-sendbtn::after { content:''; width:0; height:0; border-top:4px solid transparent; border-bottom:4px solid transparent; border-left:7px solid var(--gold); margin-left:2px; }
+.phone-home { height:22px; background:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.phone-home::after { content:''; width:90px; height:4px; background:#0a0a0a; border-radius:100px; }
+
+.demo-steps { display:flex; flex-direction:column; gap:36px; }
+.dstep { display:flex; gap:20px; align-items:flex-start; }
+.dstep-n { font-family:'Playfair Display',serif; font-size:44px; font-weight:900; color:rgba(201,152,74,.18); line-height:1; flex-shrink:0; width:48px; }
+.dstep-c h4 { font-size:15px; font-weight:600; color:var(--black); margin-bottom:6px; }
+.dstep-c p { font-size:13px; line-height:1.75; color:var(--text-2); }
+
+/* Admin */
+.admin { padding:120px 6vw; background:var(--white); }
+.admin-inner { max-width:1100px; margin:0 auto; }
+.admin-hdr { display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:end; margin-bottom:56px; }
+.admin-hdr h2 { font-family:'Playfair Display',serif; font-size:clamp(30px,4vw,52px); font-weight:700; letter-spacing:-.02em; color:var(--black); }
+.admin-hdr h2 em { font-style:italic; color:var(--gold); font-weight:400; }
+.admin-hdr p { font-size:15px; color:var(--text-2); line-height:1.7; }
+.admin-feats { display:flex; flex-direction:column; gap:0; margin-top:20px; }
+.admin-feat { display:flex; align-items:flex-start; gap:14px; font-size:13px; color:var(--text-2); line-height:1.5; padding:12px 0; border-bottom:1px solid var(--border); }
+.admin-feat:last-child { border-bottom:none; }
+.admin-feat::before { content:''; flex-shrink:0; width:2px; height:36px; background:var(--gold); }
+
+.admin-mockup { border:1px solid rgba(0,0,0,.10); background:#f7f7f5; box-shadow:0 4px 24px rgba(0,0,0,.06); overflow:hidden; }
+.am-mast { background:#fff; border-bottom:2px solid #0a0a0a; height:50px; display:flex; align-items:center; padding:0 24px; }
+.am-title { font-family:'Playfair Display',serif; font-size:16px; font-weight:900; color:#0a0a0a; padding-right:22px; border-right:1px solid #e0e0e0; }
+.am-lbl { font-size:9px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:#999; padding:0 18px; border-right:1px solid #e0e0e0; }
+.am-link { margin-left:auto; font-size:9px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:#aaa; }
+.am-nav { background:#fff; border-bottom:1px solid #e0e0e0; display:flex; padding:0 24px; }
+.am-tab { padding:11px 18px 9px; font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#aaa; border-bottom:2px solid transparent; }
+.am-tab.active { color:#0a0a0a; border-bottom-color:#c9984a; }
+.am-body { padding:24px; }
+.am-drow { display:flex; align-items:baseline; gap:12px; margin-bottom:6px; }
+.am-date { font-family:'Playfair Display',serif; font-size:22px; font-weight:700; color:#0a0a0a; }
+.am-date em { font-style:italic; color:#aaa; font-weight:400; }
+.am-today { font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#aaa; border:1px solid #ddd; padding:4px 10px; background:#fff; }
+.am-rule { height:2px; background:#0a0a0a; margin:10px 0 14px; }
+.am-stats { display:flex; align-items:center; font-size:11px; color:#aaa; margin-bottom:18px; }
+.asn { font-family:'Playfair Display',serif; font-size:18px; font-weight:700; margin-right:4px; }
+.asn.g{color:#2a7a2a} .asn.r{color:#8a1a1a} .asn.b{color:#1a3a7a}
+.asep{margin:0 12px;color:#ddd}
+.sgrid { display:grid; grid-template-columns:repeat(6,1fr); gap:1px; background:#e0e0e0; border:1px solid #e0e0e0; }
+.sc { background:#fff; padding:10px 10px 8px; }
+.sc.busy{background:#0a0a0a} .sc.bot{background:#0a0a0a}
+.sc-t { font-family:'Playfair Display',serif; font-size:13px; font-weight:700; color:#0a0a0a; line-height:1; margin-bottom:4px; }
+.sc.busy .sc-t,.sc.bot .sc-t{color:#fff}
+.sc-n{font-size:9px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sc.busy .sc-n,.sc.bot .sc-n{color:rgba(255,255,255,.4)}
+.sc-l{font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#ddd;margin-top:2px;}
+.sc.busy .sc-l{color:rgba(255,255,255,.2)} .sc.bot .sc-l{color:#c9984a}
+.am-legend{margin-top:10px;font-size:10px;color:#aaa;letter-spacing:.04em;}
+
+/* How */
+.how { padding:120px 6vw; background:var(--paper-md); }
+.how-inner { max-width:1100px; margin:0 auto; }
+.how-top { text-align:center; margin-bottom:72px; }
+.how-top h2 { font-family:'Playfair Display',serif; font-size:clamp(28px,4vw,52px); font-weight:700; letter-spacing:-.02em; color:var(--black); margin-bottom:14px; }
+.how-top h2 em { font-style:italic; color:var(--gold); font-weight:400; }
+.how-top p { font-size:15px; color:var(--text-2); }
+.how-steps { display:grid; grid-template-columns:repeat(3,1fr); gap:0; border:1px solid var(--border-md); background:var(--border-md); }
+.how-step { background:var(--white); padding:52px 36px; }
+.how-n { font-family:'Playfair Display',serif; font-size:72px; font-weight:900; color:rgba(201,152,74,.1); line-height:1; margin-bottom:20px; }
+.how-line { width:28px; height:2px; background:var(--gold); margin-bottom:20px; }
+.how-step h3 { font-size:16px; font-weight:700; color:var(--black); margin-bottom:10px; }
+.how-step p { font-size:13px; line-height:1.75; color:var(--text-2); }
+
+/* Pricing */
+.pricing { padding:120px 6vw; background:var(--white); }
+.pricing-inner { max-width:1080px; margin:0 auto; }
+.pricing-top { text-align:center; margin-bottom:72px; }
+.pricing-top h2 { font-family:'Playfair Display',serif; font-size:clamp(28px,4vw,52px); font-weight:700; letter-spacing:-.02em; color:var(--black); margin-bottom:14px; }
+.pricing-top h2 em { font-style:italic; color:var(--gold); font-weight:400; }
+.pricing-top p { font-size:15px; color:var(--text-2); }
+.plans { display:grid; grid-template-columns:repeat(3,1fr); border:1px solid var(--border-md); background:var(--border-md); gap:0; }
+.plan { background:var(--paper); padding:48px 36px; position:relative; }
+.plan.featured { background:var(--black); transform:translateY(-10px); box-shadow:0 24px 60px rgba(0,0,0,.18); z-index:2; }
+.plan-badge { font-size:9px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; background:var(--gold); color:var(--black); padding:4px 12px; display:inline-block; margin-bottom:20px; }
+.plan-name { font-family:'Playfair Display',serif; font-size:10px; font-weight:900; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+.plan.featured .plan-name{color:rgba(255,255,255,.3)}
+.plan-price { font-family:'Playfair Display',serif; font-size:56px; font-weight:900; letter-spacing:-.04em; color:var(--black); line-height:1; margin-bottom:4px; }
+.plan.featured .plan-price{color:var(--white)}
+.plan-price sup{font-size:22px;vertical-align:super;font-weight:400}
+.plan-price sub{font-size:14px;font-weight:400;color:var(--muted)}
+.plan.featured .plan-price sub{color:rgba(255,255,255,.3)}
+.plan-msgs{font-size:12px;color:var(--muted);padding-bottom:32px;margin-bottom:32px;border-bottom:1px solid var(--border);}
+.plan.featured .plan-msgs{color:rgba(255,255,255,.35);border-bottom-color:rgba(255,255,255,.1)}
+.plan-msgs strong{color:var(--black);font-weight:600}
+.plan.featured .plan-msgs strong{color:var(--gold-lt)}
+.plan-feats{list-style:none;display:flex;flex-direction:column;gap:11px;margin-bottom:36px;}
+.plan-feats li{font-size:13px;color:var(--text-2);display:flex;align-items:flex-start;gap:10px;line-height:1.4;}
+.plan.featured .plan-feats li{color:rgba(255,255,255,.55)}
+.plan-feats li.bold{color:var(--black);font-weight:600}
+.plan.featured .plan-feats li.bold{color:var(--white)}
+.plan-feats li::before{content:'';flex-shrink:0;width:12px;height:1px;background:var(--gold-dk);margin-top:7px;}
+.plan-btn{display:block;width:100%;padding:12px;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;text-align:center;text-decoration:none;font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white);border:none;cursor:pointer;transition:background .2s;}
+.plan-btn:hover{background:var(--ink)}
+.plan.featured .plan-btn{background:var(--gold);color:var(--black)}
+.plan.featured .plan-btn:hover{background:var(--gold-lt)}
+.pricing-note{text-align:center;margin-top:28px;font-size:12px;color:var(--muted);}
+.pricing-note strong{color:var(--black)}
+
+/* CTA */
+.cta{padding:100px 6vw;background:var(--black);text-align:center;}
+.cta h2{font-family:'Playfair Display',serif;font-size:clamp(28px,4vw,56px);font-weight:900;letter-spacing:-.02em;color:var(--white);margin-bottom:14px;}
+.cta h2 em{font-style:italic;color:var(--gold);font-weight:400;}
+.cta p{font-size:15px;color:rgba(255,255,255,.4);margin-bottom:44px;}
+.btn-gold{display:inline-block;background:var(--gold);color:var(--black);padding:16px 52px;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;text-decoration:none;transition:background .2s,transform .15s;}
+.btn-gold:hover{background:var(--gold-lt);transform:translateY(-2px)}
+
+footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.06);padding:44px 6vw;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:20px;}
+.foot-logo{font-family:'Playfair Display',serif;font-size:18px;font-weight:900;color:#fff;}
+.foot-logo span{color:var(--gold)}
+.foot-copy{font-size:11px;color:rgba(255,255,255,.2);}
+.foot-links{display:flex;gap:24px;}
+.foot-links a{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.3);text-decoration:none;transition:color .2s;}
+.foot-links a:hover{color:var(--gold)}
+
+.fade-up{opacity:0;transform:translateY(22px);transition:opacity .65s ease,transform .65s ease;}
+.fade-up.show{opacity:1;transform:translateY(0);}
+.fd2{transition-delay:.1s} .fd3{transition-delay:.2s} .fd4{transition-delay:.3s}
+
+@media(max-width:900px){
+  .pain-inner,.demo-layout,.admin-hdr,.how-steps,.plans{grid-template-columns:1fr}
+  .plan.featured{transform:none}
+  .nav-links{display:none}
+  .sgrid{grid-template-columns:repeat(3,1fr)}
+}
 </style>
 </head>
 <body>
 
-<!-- TICKER -->
-<div class="ticker-wrap">
-  <div class="ticker-inner">
-    <span>BookWell.si <strong>·</strong> AI rezervacijski sistem za salone, studije in bare <strong>·</strong> Brez kreditne kartice za začetek <strong>·</strong> 14-dnevni brezplačni preizkus <strong>·</strong> Podpora v slovenščini <strong>·</strong> Nastavitev v 5 minutah <strong>·</strong> BookWell.si</span>
-    <span>BookWell.si <strong>·</strong> AI rezervacijski sistem za salone, studije in bare <strong>·</strong> Brez kreditne kartice za začetek <strong>·</strong> 14-dnevni brezplačni preizkus <strong>·</strong> Podpora v slovenščini <strong>·</strong> Nastavitev v 5 minutah <strong>·</strong> BookWell.si</span>
+<header class="nav">
+  <div class="logo">Book<span>Well</span></div>
+  <nav class="nav-links">
+    <a href="#demo">Demo</a>
+    <a href="#admin">Admin</a>
+    <a href="#pricing">Cenik</a>
+    <a href="#pricing" class="nav-cta btn-primary" style="padding:9px 22px;font-size:11px;">Začnite danes</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="hero-eyebrow fade-up show">AI Recepcionist za Vaš Salon</div>
+  <h1 class="fade-up show fd2">Vaš salon sprejema<br>rezervacije <em>medtem ko spite.</em></h1>
+  <p class="hero-sub fade-up show fd3">BookWell je AI asistent, ki se pogovarja z vašimi strankami, preverja proste termine in rezervira — brez telefoniranja, brez zamude.</p>
+  <div class="hero-ctas fade-up show fd4">
+    <a href="#pricing" class="btn-primary">Začnite danes</a>
+    <a href="#demo" class="btn-outline">Oglejte si demo</a>
   </div>
-</div>
-
-<div class="newspaper">
-
-  <!-- MASTHEAD -->
-  <header class="masthead">
-    <div class="masthead-top">
-      <div class="masthead-meta">
-        Torek, 28. aprila 2026<br>
-        Letnik I · Številka 1
-      </div>
-      <div class="masthead-title">BookWell</div>
-      <div class="masthead-price">
-        Brezplačno za 14 dni<br>
-        Potem od 29 € / mes.
-      </div>
-    </div>
-    <div class="masthead-gold-rule"></div>
-    <div class="masthead-tagline">
-      <span>Avtomatizirajte rezervacije</span>
-      <span class="dot"></span>
-      <span>AI asistent 24/7</span>
-      <span class="dot"></span>
-      <span>Brezplačno za 14 dni</span>
-      <span class="dot"></span>
-      <span>Nastavitev v 5 minutah</span>
-    </div>
-  </header>
-
-  <!-- FOLIO -->
-  <div class="folio">
-    <span>Posebna izdaja · Digitalna transformacija</span>
-    <span>Rezervacije · Avtomatizacija · Rast</span>
-    <span>bookwell.si</span>
+  <div class="hero-trust fade-up show fd4">
+    <div class="trust-item"><strong>24/7</strong>Dostopnost</div>
+    <div class="trust-sep"></div>
+    <div class="trust-item"><strong>5 min</strong>Nastavitev</div>
+    <div class="trust-sep"></div>
+    <div class="trust-item"><strong>E-mail</strong>Potrditve</div>
+    <div class="trust-sep"></div>
+    <div class="trust-item"><strong>Admin</strong>Plošča</div>
   </div>
+</section>
 
-  <!-- STORY 1: MEGA HEADLINE + CHAT MOCKUP -->
-  <div class="columns c231" style="border-top: 2px solid var(--rule);">
+<div class="gold-rule"></div>
 
-    <!-- LEFT: Main story -->
-    <div class="col" style="padding-top: 20px;">
-      <div class="section-label">Vodilna zgodba</div>
-      <h1 class="headline-mega">Salon Aurora poveča zasedenost za 40% z AI asistentom</h1>
-      <div class="deck">Revolucionarna platforma BookWell.si prevzame upravljanje rezervacij — stranke rezervirajo same, salone pa čaka jutro s polnim urnikom.</div>
-      <div class="byline">Poroča redakcija BookWell · Ljubljana, april 2026</div>
-
-      <p class="drop-cap">Ko je lastnica salona Aurora v centru Ljubljane lani decembra namestila AI asistenta BookWell, ni pričakovala dramatičnih sprememb. Mesec dni pozneje je morala odpreti dve novi delovni mesti. »Telefon je nehal zvoniti,« pravi. »Stranke rezervirajo same, mi pa delamo.«</p>
-
-      <p>Sistem deluje preprosto: vsak salon dobi edinstveno spletno stran z vgrajenim AI pomočnikom, ki razume slovenščino, pozna urnik in cenik ter samodejno potrdi rezervacijo v realnem času. Nobenih telefonskih prekinitev, nobenih izgubljenih terminov.</p>
-
-      <div class="pull-quote">
-        <p>»Telefon je nehal zvoniti. Stranke rezervirajo same, mi pa delamo.«</p>
-        <cite>Lastnica Salona Aurora, Ljubljana</cite>
-      </div>
-
-      <p>Platforma BookWell deluje na vrhunski jezikovni tehnologiji in je optimizirana za slovensko poslovno okolje. Administrator nastavi delovni čas enkrat — sistem skrbi za vse ostalo. Vsaka potrjena rezervacija sproži e-poštno obvestilo tako stranki kot salonu.</p>
-
-      <p>Mesec po uvedbi: zasedenost +40 %, čas na telefonu −80 %, zadovoljstvo strank pa po lastnih besedah »višje kot kadarkoli«.</p>
-
-      <div class="stat-box">
-        <span class="stat-number">40%</span>
-        <span class="stat-label">Povprečna rast zasedenosti v prvem mesecu</span>
-      </div>
+<section class="pain">
+  <div class="pain-inner">
+    <div class="fade-up">
+      <div class="s-label">Problem</div>
+      <h2>Zamujeni klici.<br>Prazni termini.<br><em>Izgubljene stranke.</em></h2>
+      <p>Vsak neodgovorjen klic je potencialno izgubljena rezervacija. Stranke danes ne čakajo — grejo h konkurenci.</p>
     </div>
+    <ul class="pain-list fade-up fd2">
+      <li>Stranka kliče ob 22:00, ko je salon zaprt — termin je izgubljen</li>
+      <li>Recepcionist nima časa med delom odgovarjati na sporočila</li>
+      <li>Stranke raje pišejo kot kličejo — ni ustreznega sistema</li>
+      <li>Ročno upravljanje terminov je zamudno in nagnjeno k napakam</li>
+      <li>Brez avtomatskih potrditev stranke pozabijo na termin</li>
+    </ul>
+  </div>
+</section>
 
-    <!-- MIDDLE: Chat mockup -->
-    <div class="col" style="padding-top: 20px; background: rgba(26,20,16,0.02);">
-      <div class="section-label gold">V živo · AI asistent</div>
-      <p style="font-size: 12px; color: var(--ink-muted); margin-bottom: 12px; font-style: italic; text-align: center;">Dejanski pogovor s stranko — v realnem času</p>
-
-      <div class="chat-box" id="chat-demo">
-        <div class="chat-header">
-          <div class="chat-avatar">A</div>
-          <div class="chat-header-info">
-            <h4>Salon Aurora</h4>
-            <p>AI Asistent · Rezervacije 24/7</p>
-          </div>
-          <div class="chat-dot"></div>
-        </div>
-        <div class="chat-messages" id="chat-messages"></div>
-        <div class="chat-input-bar">
-          <div class="chat-input-fake" id="typing-indicator">Vpišite sporočilo...</div>
-          <div class="chat-send-btn">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="#1a1410"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
+<section class="demo" id="demo">
+  <div class="demo-inner">
+    <div class="demo-top fade-up">
+      <div class="s-label">Demo — AI Chat</div>
+      <h2>Glejte, kako <em>AI asistent</em><br>rezervira termin</h2>
+      <p>Stranka piše naravno — asistent razume, preveri termine in rezervira v sekundah.</p>
+    </div>
+    <div class="demo-layout">
+      <div class="iphone-scene fade-up fd2">
+        <div class="iphone">
+          <div class="iphone-side-r"></div>
+          <div class="iphone-side-r2"></div>
+          <div class="iphone-vol-s"></div>
+          <div class="iphone-vol-1"></div>
+          <div class="iphone-vol-2"></div>
+          <div class="iphone-screen">
+            <div class="iphone-sbar">
+              <div class="iphone-time">9:41</div>
+              <div class="iphone-sigs">
+                <div class="sbars">
+                  <span style="height:3px"></span><span style="height:5px"></span>
+                  <span style="height:7px"></span><span style="height:9px"></span>
+                </div>
+                <div class="swifi"></div>
+                <div class="sbatt"></div>
+              </div>
+            </div>
+            <div class="phone-chatbar">
+              <div class="phone-avatar">A</div>
+              <div class="phone-info"><h4>Salon Aurora</h4><p>AI Asistent · 24/7</p></div>
+              <div class="phone-dot"></div>
+            </div>
+            <div class="phone-msgs" id="phoneChat"></div>
+            <div class="phone-inputbar">
+              <div class="phone-fake" id="phoneInput">Vpišite sporočilo...</div>
+              <div class="phone-sendbtn"></div>
+            </div>
+            <div class="phone-home"></div>
           </div>
         </div>
       </div>
 
-      <hr class="thin" style="margin-top: 20px;">
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
-        <div class="stat-box" style="margin: 0;">
-          <span class="stat-number" style="font-size: 28px;">24/7</span>
-          <span class="stat-label">Dosegljivost</span>
-        </div>
-        <div class="stat-box" style="margin: 0;">
-          <span class="stat-number" style="font-size: 28px;">≤30s</span>
-          <span class="stat-label">Čas rezervacije</span>
-        </div>
+      <div class="demo-steps fade-up fd3">
+        <div class="dstep"><div class="dstep-n">1</div><div class="dstep-c"><h4>Stranka zapiše kar potrebuje</h4><p>Ni form, ni klicev. Stranka naravno opiše kaj želi — barvanje, frizuro, manikuro — in za kdaj.</p></div></div>
+        <div class="dstep"><div class="dstep-n">2</div><div class="dstep-c"><h4>AI preveri ažurne proste termine</h4><p>Asistent v realnem času vidi zasedene termine in predlaga prave proste ure — nikoli ne ponudi zasedenega termina.</p></div></div>
+        <div class="dstep"><div class="dstep-n">3</div><div class="dstep-c"><h4>Rezervacija potrjena — avtomatsko</h4><p>Ko stranka potrdi, se termin nemudoma zapiše v sistem. Oba prejmeta e-mail potrditev.</p></div></div>
+        <div class="dstep"><div class="dstep-n">4</div><div class="dstep-c"><h4>Vi vidite vse v admin panelu</h4><p>Vsak termin je takoj viden v vaši nadzorni plošči. Kadarkoli dodate ali izbrišete termin ročno.</p></div></div>
       </div>
     </div>
-
-    <!-- RIGHT: sidebar -->
-    <div class="col" style="padding-top: 20px;">
-      <div class="section-label">Za koga</div>
-      <h3 class="headline-minor" style="font-size: 16px;">Deluje za vsak salon, studio ali bar</h3>
-      <hr class="thin">
-
-      <div style="font-size: 13px; color: var(--ink-light); line-height: 2.2;">
-        <div>✦ Frizerski saloni</div>
-        <div>✦ Kozmetični studiji</div>
-        <div>✦ Masažni centri</div>
-        <div>✦ Nail studiji</div>
-        <div>✦ Tatoo & piercing</div>
-        <div>✦ Barber shopi</div>
-        <div>✦ Wellness centri</div>
-        <div>✦ Fizioterapije</div>
-        <div>✦ Zobozdravniki</div>
-        <div>✦ Coworking pisarne</div>
-      </div>
-
-      <hr class="thin">
-
-      <div class="pull-quote" style="padding: 8px 0; margin: 10px 0;">
-        <p style="font-size: 14px;">»Nastavitev traja 5 minut. Nič tehničnega znanja ni potrebno.«</p>
-      </div>
-
-      <div class="cta-block" style="padding: 12px 0 0;">
-        <a href="#pricelist" class="cta-btn" style="font-size: 14px; padding: 10px 20px; display: block; text-align: center;">
-          Začnite brezplačno →
-        </a>
-        <div class="cta-sub" style="margin-top: 6px;">14 dni · brez obveznosti</div>
-      </div>
-    </div>
-
-  </div><!-- /STORY 1 -->
-
-  <!-- FOLIO 2 -->
-  <div class="folio" style="margin-top: 0;">
-    <span>BookWell.si · Stran 2</span>
-    <span>Upravljanje terminarjev</span>
-    <span>bookwell.si/admin</span>
   </div>
+</section>
 
-  <!-- STORY 2: ADMIN PANEL -->
-  <div class="columns c32">
-
-    <div class="col" style="padding-top: 16px;">
-      <div class="section-label">Tehnološki pregled</div>
-      <h2 class="headline-major">Admin panel prikaže vse rezervacije v realnem času</h2>
-      <div class="deck">Elegantni nadzorni vmesnik preuredi kaos v jasno preglednico — vsak termin, vsaka stranka, vsak klik.</div>
-      <div class="byline">Poroča redakcija BookWell</div>
-
-      <p class="drop-cap">Vodenje terminov je bil pred BookWell za večino salonov mučen ritual: beležnice, klepetalnice, telefonske klice sredi šampona. Admin panel BookWell.si razbije ta obrazec z eno samo stranjo.</p>
-
-      <p>Vsak dan prikaže mrežo terminov. Prosti so beli, zasedeni ročno — črni, tisti ki so prišli prek AI bota pa so označeni z zlato — z imenom in storitvijo na vsakem polju. Klik na termin odpre modal za urejanje, dodajanje e-pošte stranki ali brisanje.</p>
-
-      <div class="pull-quote">
-        <p>»Zjutraj odpremo laptop, pogledamo dan in vemo točno kaj nas čaka.«</p>
-        <cite>Operativni vodja, Barber Studio K., Maribor</cite>
+<section class="admin" id="admin">
+  <div class="admin-inner">
+    <div class="admin-hdr">
+      <div class="fade-up">
+        <div class="s-label">Demo — Admin Panel</div>
+        <h2>Pregled vseh terminov<br>na <em>enem mestu</em></h2>
       </div>
-
-      <p>Sistem se osveži vsakih 30 sekund — spremembe, ki jih naredi AI v pogovoru s stranko, se takoj pokažejo v admin panelu. Ni treba usklajevati, ni treba klicati. Deluje.</p>
-
-      <p>Delovni čas se nastavi enkrat, za vsak dan posebej — salon Aurora ima recimo sobote samo do 14:00. AI to ve in strankam ne ponuja terminov izven tega okvirja. Nikoli.</p>
-    </div>
-
-    <div class="col" style="padding-top: 16px;">
-      <div class="admin-mock" id="admin-demo">
-        <div class="admin-mock-head">
-          <span>Salon Aurora</span>
-          <span class="admin-tag">Admin · Ponedeljek, 28. apr</span>
-        </div>
-        <div style="padding: 8px 12px; background: #f7f7f5; border-bottom: 1px solid #e0e0e0; display: flex; gap: 16px;">
-          <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #888;">
-            <b style="color: #0a0a0a;">12</b> terminov
-          </span>
-          <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #2a7a2a;">
-            <b>5</b> prostih
-          </span>
-          <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #8a1a1a;">
-            <b>7</b> zasedenih
-          </span>
-        </div>
-        <div class="admin-grid" id="admin-grid"></div>
-      </div>
-
-      <div style="margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
-        <div class="stat-box" style="margin: 0;">
-          <span class="stat-number" style="font-size: 24px; color: var(--ink);">∞</span>
-          <span class="stat-label">Saloni / račun</span>
-        </div>
-        <div class="stat-box" style="margin: 0;">
-          <span class="stat-number" style="font-size: 24px; color: var(--ink);">30s</span>
-          <span class="stat-label">Osvežitev</span>
-        </div>
-        <div class="stat-box" style="margin: 0;">
-          <span class="stat-number" style="font-size: 24px; color: var(--ink);">✉</span>
-          <span class="stat-label">E-mail stranki</span>
+      <div class="fade-up fd2">
+        <p>Jasna, urejena nadzorna plošča. Vidite kdo je rezerviral, kdaj in katera storitev. Ročno upravljanje terminov v enem kliku.</p>
+        <div class="admin-feats">
+          <div class="admin-feat">Dnevni pregled z imeni strank in storitvami</div>
+          <div class="admin-feat">Ročno upravljanje — dodajte termin kadarkoli</div>
+          <div class="admin-feat">Nastavljivi delovni čas za vsak dan posebej</div>
+          <div class="admin-feat">AI rezervacije so ločeno označene z zlato barvo</div>
         </div>
       </div>
     </div>
-
-  </div><!-- /STORY 2 -->
-
-  <!-- FOLIO 3 -->
-  <div class="folio" style="margin-top: 0;">
-    <span>BookWell.si · Stran 3</span>
-    <span>Tržno poročilo · Cene</span>
-    <span id="pricelist">bookwell.si/cene</span>
+    <div class="admin-mockup fade-up fd2">
+      <div class="am-mast">
+        <div class="am-title">Salon Aurora</div>
+        <div class="am-lbl">Admin Panel</div>
+        <div class="am-link">Javna stran</div>
+      </div>
+      <div class="am-nav">
+        <div class="am-tab active">Termini</div>
+        <div class="am-tab">Delovni čas</div>
+      </div>
+      <div class="am-body">
+        <div class="am-drow">
+          <span style="color:#aaa;font-size:16px">&#8592;</span>
+          <div class="am-date">Sreda, <em>29. april 2026 — danes</em></div>
+          <div class="am-today">Danes</div>
+          <span style="color:#aaa;font-size:16px">&#8594;</span>
+        </div>
+        <div class="am-rule"></div>
+        <div class="am-stats">
+          <span class="asn">24</span>&nbsp;terminov
+          <span class="asep">—</span><span class="asn g">16</span>&nbsp;prostih
+          <span class="asep">—</span><span class="asn r">8</span>&nbsp;zasedenih
+          <span class="asep">—</span><span class="asn b">5</span>&nbsp;bot rezervacij
+        </div>
+        <div class="sgrid">
+          <div class="sc"><div class="sc-t">08:00</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+          <div class="sc"><div class="sc-t">08:30</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+          <div class="sc busy"><div class="sc-t">09:00</div><div class="sc-n">Maja K.</div><div class="sc-l">Zaseden</div></div>
+          <div class="sc busy"><div class="sc-t">09:30</div><div class="sc-n">Petra N.</div><div class="sc-l">Zaseden</div></div>
+          <div class="sc"><div class="sc-t">10:00</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+          <div class="sc bot"><div class="sc-t">10:30</div><div class="sc-n">Ana S.</div><div class="sc-l">Bot</div></div>
+          <div class="sc"><div class="sc-t">11:00</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+          <div class="sc bot"><div class="sc-t">11:30</div><div class="sc-n">Lara M.</div><div class="sc-l">Bot</div></div>
+          <div class="sc busy"><div class="sc-t">12:00</div><div class="sc-n">Nina P.</div><div class="sc-l">Zaseden</div></div>
+          <div class="sc"><div class="sc-t">12:30</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+          <div class="sc bot"><div class="sc-t">13:00</div><div class="sc-n">Eva K.</div><div class="sc-l">Bot</div></div>
+          <div class="sc"><div class="sc-t">13:30</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+          <div class="sc"><div class="sc-t">14:00</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+          <div class="sc busy"><div class="sc-t">14:30</div><div class="sc-n">Tina R.</div><div class="sc-l">Zaseden</div></div>
+          <div class="sc bot"><div class="sc-t">15:00</div><div class="sc-n">Katja L.</div><div class="sc-l">Bot</div></div>
+          <div class="sc"><div class="sc-t">15:30</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+          <div class="sc"><div class="sc-t">16:00</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+          <div class="sc busy"><div class="sc-t">16:30</div><div class="sc-n">Sandra B.</div><div class="sc-l">Zaseden</div></div>
+          <div class="sc"><div class="sc-t">17:00</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+          <div class="sc"><div class="sc-t">17:30</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+          <div class="sc busy"><div class="sc-t">18:00</div><div class="sc-n">Maja Z.</div><div class="sc-l">Zaseden</div></div>
+          <div class="sc"><div class="sc-t">18:30</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+          <div class="sc"><div class="sc-t">19:00</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+          <div class="sc"><div class="sc-t">19:30</div><div class="sc-n">&nbsp;</div><div class="sc-l">Prost</div></div>
+        </div>
+        <div class="am-legend">Bela = prost &nbsp;&middot;&nbsp; Temno = ročno zaseden &nbsp;&middot;&nbsp; Temno + zlata oznaka = AI bot rezervacija</div>
+      </div>
+    </div>
   </div>
+</section>
 
-  <!-- STORY 3: PRICING AS MARKET REPORT -->
-  <div class="columns c23">
-
-    <div class="col" style="padding-top: 16px;">
-      <div class="section-label">Tržno poročilo</div>
-      <h2 class="headline-major" style="font-size: 24px;">Cenovno ugodna alternativa receptorju</h2>
-      <div class="deck">Analiza stroškov kaže: AI asistent stane manj kot ena ura dela receptorja — in dela 24 ur na dan.</div>
-      <hr class="thin">
-      <p style="font-size: 13px; color: var(--ink-light); line-height: 1.8;">
-        Povprečni strošek receptorja v slovenskem salonu: <b>800–1.200 €/mes.</b><br>
-        Povprečni strošek BookWell: <b>od 29 €/mes.</b><br>
-        Prihranek: <b>do 96%</b> stroškov sprejemanja klicev.
-      </p>
-      <hr class="dot">
-      <p style="font-size: 12px; color: var(--ink-muted); font-style: italic; margin: 0;">
-        Vir: lastna analiza BookWell, april 2026
-      </p>
+<section class="how">
+  <div class="how-inner">
+    <div class="how-top fade-up">
+      <div class="s-label">Kako deluje</div>
+      <h2>Nastavitev v <em>petih minutah</em></h2>
+      <p>Nič namestitev. Nič tehničnega znanja.</p>
     </div>
+    <div class="how-steps">
+      <div class="how-step fade-up"><div class="how-n">01</div><div class="how-line"></div><h3>Nastavite salon</h3><p>Vpišite ime, naslov, delovni čas in storitve s cenami. To je vse kar AI potrebuje za pričetek dela.</p></div>
+      <div class="how-step fade-up fd2"><div class="how-n">02</div><div class="how-line"></div><h3>Delite povezavo</h3><p>Vsak salon dobi edinstveno URL. Jo delite na Instagram, Facebook, Google ali spletni strani.</p></div>
+      <div class="how-step fade-up fd3"><div class="how-n">03</div><div class="how-line"></div><h3>AI dela namesto vas</h3><p>Stranke se pogovarjajo z asistentom, izbirajo termine in prejmejo potrditev — vse avtomatsko.</p></div>
+    </div>
+  </div>
+</section>
 
-    <div class="col" style="padding-top: 16px;">
-      <div class="section-label gold">Cenik · Izberi paket</div>
-
-      <div class="price-tier">
-        <div class="price-amount">0 €</div>
-        <div class="price-per">14 dni · Brezplačno · Brez kreditne kartice</div>
-        <ul class="price-features">
-          <li>Polni dostop do vseh funkcij</li>
-          <li>AI asistent + admin panel</li>
-          <li>E-poštna obvestila</li>
-          <li>Slovenščina</li>
+<section class="pricing" id="pricing">
+  <div class="pricing-inner">
+    <div class="pricing-top fade-up">
+      <div class="s-label">Cenik</div>
+      <h2>Transparentne cene.<br><em>Brez presenečenj.</em></h2>
+      <p>Vsak paket vključuje polno funkcionalnost. Razlika je le v mesečnem obsegu pogovorov.</p>
+    </div>
+    <div class="plans">
+      <div class="plan fade-up">
+        <div class="plan-name">Starter</div>
+        <div class="plan-price"><sup>€</sup>29<sub>/mes</sub></div>
+        <div class="plan-msgs"><strong>200 sporočil</strong> na mesec</div>
+        <ul class="plan-feats">
+          <li class="bold">1 salon / lokacija</li>
+          <li>AI chat asistent 24/7</li>
+          <li>Avtomatske e-mail potrditve</li>
+          <li>Admin nadzorna plošča</li>
+          <li>Nastavljiv delovni čas</li>
+          <li>Za manjše salone (~6 terminov/dan)</li>
         </ul>
+        <a href="#" class="plan-btn">Začnite s Starter</a>
       </div>
-
-      <div class="price-tier featured">
-        <div class="badge">Najpopularnejši</div>
-        <div class="price-amount">29 €</div>
-        <div class="price-per">mesec · 1 salon</div>
-        <ul class="price-features">
-          <li>Neomejen promet</li>
-          <li>AI chat 24/7</li>
-          <li>Prilagodljiv delovni čas</li>
-          <li>E-maili strankam + salonu</li>
-          <li>Admin panel z realnim časom</li>
-        </ul>
-      </div>
-
-      <div class="price-tier">
-        <div class="price-amount">79 €</div>
-        <div class="price-per">mesec · do 5 salonov</div>
-        <ul class="price-features">
-          <li>Vse iz paketa Solo</li>
-          <li>Centralizirani dashboard</li>
+      <div class="plan featured fade-up fd2">
+        <div class="plan-badge">Najpopularnejši</div>
+        <div class="plan-name">Pro</div>
+        <div class="plan-price"><sup>€</sup>49<sub>/mes</sub></div>
+        <div class="plan-msgs"><strong>1.000 sporočil</strong> na mesec</div>
+        <ul class="plan-feats">
+          <li class="bold">Do 3 saloni / lokacije</li>
+          <li>AI chat asistent 24/7</li>
+          <li>Avtomatske e-mail potrditve</li>
+          <li>Admin nadzorna plošča</li>
+          <li>Nastavljiv delovni čas</li>
           <li>Prioritetna podpora</li>
-          <li>Bela etiketa (white-label)</li>
+          <li class="bold">Primerno za večino salonov</li>
         </ul>
+        <a href="#" class="plan-btn">Začnite s Pro</a>
       </div>
-
-      <div class="cta-block">
-        <a href="https://bookwell.si" class="cta-btn">Začnite brezplačno — 14 dni</a>
-        <div class="cta-sub">Brez kreditne kartice · Brez obveznosti · Takoj aktivno</div>
+      <div class="plan fade-up fd3">
+        <div class="plan-name">Neomejeno</div>
+        <div class="plan-price"><sup>€</sup>99<sub>/mes</sub></div>
+        <div class="plan-msgs"><strong>Neomejeno sporočil</strong></div>
+        <ul class="plan-feats">
+          <li class="bold">Neomejeno salonov</li>
+          <li>AI chat asistent 24/7</li>
+          <li>Avtomatske e-mail potrditve</li>
+          <li>Admin nadzorna plošča</li>
+          <li>Nastavljiv delovni čas</li>
+          <li>Prednostna podpora</li>
+          <li class="bold">Za verige in studije z visokim prometom</li>
+        </ul>
+        <a href="#" class="plan-btn">Začnite z Neomejeno</a>
       </div>
     </div>
-
-  </div><!-- /STORY 3 -->
-
-  <!-- CLASSIFIEDS / FAQ -->
-  <div class="folio" style="margin-top: 0;">
-    <span>BookWell.si · Oglasnik</span>
-    <span>Pogosta vprašanja</span>
-    <span>Informacije za bralce</span>
+    <p class="pricing-note">Vsi paketi vključujejo <strong>7-dnevno preizkusno obdobje</strong>. Brez vezave. Kadar koli odpoveste.</p>
   </div>
+</section>
 
-  <div class="classifieds">
-    <div class="classifieds-head">Pogosta vprašanja · Rubrika za bralce</div>
-    <div class="classified-grid">
+<section class="cta">
+  <h2 class="fade-up">Vaš salon nikoli ne spi.<br><em>Zakaj bi vaš recepcionist?</em></h2>
+  <p class="fade-up fd2">Nastavitev traja 5 minut. Prva rezervacija bo prišla še danes.</p>
+  <a href="#pricing" class="btn-gold fade-up fd3">Začnite brezplačen preizkus</a>
+</section>
 
-      <div class="classified-item">
-        <div class="classified-q">Ali potrebujem tehnično znanje?</div>
-        <p class="classified-a">Absolutno ne. Nastavitev traja 5 minut z našim vodičem. Če zmorete poslati e-mail, zmorete nastaviti BookWell.</p>
-      </div>
-
-      <div class="classified-item">
-        <div class="classified-q">Kaj se zgodi po 14 dneh?</div>
-        <p class="classified-a">Izberete plačljivi paket ali pa sistem mirno ugasnemo. Nobenih skritih stroškov, nobenih samodejnih obremenitev.</p>
-      </div>
-
-      <div class="classified-item">
-        <div class="classified-q">Ali AI razume slovenščino?</div>
-        <p class="classified-a">Da, v celoti. Sistem je posebej prilagojen za slovensko govorno področje — razume narečja, pogovorne izraze in strokovne termine.</p>
-      </div>
-
-      <div class="classified-item">
-        <div class="classified-q">Kaj, če stranka želi klicati?</div>
-        <p class="classified-a">Bot vedno prikaže vaš telefonski number. Za stranke, ki raje kličejo, je klicanje še vedno možno — a večina raje piše.</p>
-      </div>
-
-      <div class="classified-item">
-        <div class="classified-q">Koliko salonov lahko upravljam?</div>
-        <p class="classified-a">S paketom Multi do 5 salonov iz enega dashboarda. Vsak salon dobi svojo stran, AI asistenta in admin panel.</p>
-      </div>
-
-      <div class="classified-item">
-        <div class="classified-q">Kako hitro je aktivno?</div>
-        <p class="classified-a">Takoj. Registrirate se, vnesete podatke o salonu in v 5 minutah dobite edinstveno spletno stran, ki jo delite s strankami.</p>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- FINAL CTA -->
-  <div style="border: 3px solid var(--gold); padding: 36px; text-align: center; margin-top: 0; background: rgba(184,148,30,0.03);">
-    <div style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 12px; font-weight: 600;">Posebna ponudba · Omejen čas</div>
-    <h2 class="headline-major" style="font-size: clamp(24px, 4vw, 40px); margin-bottom: 8px; color: var(--ink);">Začnite danes — brezplačno</h2>
-    <p style="font-size: 16px; color: var(--ink-light); font-style: italic; max-width: 480px; margin: 0 auto 24px; text-align: center;">14 dni brez kreditne kartice. Nastavitev v 5 minutah. Prve stranke rezervirajo še danes.</p>
-    <a href="https://bookwell.si" class="cta-btn inverse" style="font-size: 18px; padding: 14px 48px;">Odprite salon na BookWell.si →</a>
-    <div class="cta-sub" style="margin-top: 12px;">bookwell.si · podpora@bookwell.si · Slovenija</div>
-  </div>
-
-  <!-- COLOPHON -->
-  <div style="border-top: 4px double var(--rule); margin-top: 32px; padding-top: 12px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 8px;">
-    <div>
-      <div style="font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 900; color: var(--ink);">BookWell</div>
-      <div style="font-size: 10px; color: var(--ink-muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px;">Avtomatizirajte rezervacije · Ljubljana, Slovenija</div>
-    </div>
-    <div style="font-size: 11px; color: var(--ink-muted); text-align: right; line-height: 1.8;">
-      bookwell.si &nbsp;·&nbsp; podpora@bookwell.si<br>
-      © 2026 BookWell d.o.o. · Vse pravice pridržane
-    </div>
-  </div>
-
-</div><!-- /newspaper -->
+<footer>
+  <div class="foot-logo">Book<span>Well</span></div>
+  <div class="foot-copy">© 2026 BookWell.si — Vse pravice pridržane</div>
+  <div class="foot-links"><a href="#">Pogoji</a><a href="#">Zasebnost</a><a href="#">Kontakt</a></div>
+</footer>
 
 <script>
-  /* ─── CHAT ANIMATION ─── */
-  const msgs = [
-    { role: 'bot',     text: 'Pozdravljeni! Sem AI asistent Salona Aurora. Kako vam lahko pomagam?', delay: 500 },
-    { role: 'user',    text: 'Rada bi rezervirala ženski haircut za čim prej.', delay: 2000 },
-    { role: 'bot',     text: 'Odlično! Imamo prosto jutri v sredo: 9:00, 10:30, 14:00 in 16:00. Katera ura vam ustreza?', delay: 4000 },
-    { role: 'user',    text: '10:30 bi bilo super.', delay: 6000 },
-    { role: 'bot',     text: 'Perfektno! Potrebujem še vaše ime, e-pošto in telefon za potrditev.', delay: 8000 },
-    { role: 'user',    text: 'Ana Novak, ana@email.si, 041 123 456', delay: 10000 },
-    { role: 'confirm', text: '✅ Rezervacija potrjena! Sreda, 29. apr ob 10:30 · Ženski haircut · Potrditveni e-mail poslan na ana@email.si', delay: 12000 },
-  ];
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('show'); obs.unobserve(e.target); }});
+}, {threshold:.12});
+document.querySelectorAll('.fade-up:not(.show)').forEach(el => obs.observe(el));
 
-  const chatEl = document.getElementById('chat-messages');
-  const typingEl = document.getElementById('typing-indicator');
+const chatScript = [
+  { role:'bot',  text:'Pozdravljeni! Sem AI asistent salona Aurora. Kako vam lahko pomagam?', delay:700 },
+  { role:'user', text:'Bi rada rezervirala termin za barvanje las.', delay:2000 },
+  { role:'bot',  text:'Seveda! Prosti termini ta teden:\n\nSr 29. 4.: 10:00, 11:30, 14:00\nČe 30. 4.: 09:00, 12:30, 16:00\nPe 1. 5.: 09:30, 11:00, 15:30\n\nKateri vam ustreza?', delay:1600 },
+  { role:'user', text:'Četrtek ob 12:30.', delay:2200 },
+  { role:'bot',  text:'Odlično! Pred rezervacijo potrebujem še vaše podatke.', delay:1400 },
+  { role:'form', delay:500 },
+  { role:'user', text:'Ana Kovač | ana@email.com | 041 123 456', delay:900 },
+  { role:'bot',  text:'Rezervacija potrjena! Potrditev vam je bila poslana na e-mail.', delay:1300, booking:{ service:'Barvanje las', date:'30. 4.', time:'12:30' }},
+];
 
-  function addBubble(msg, delay) {
-    setTimeout(() => {
-      const b = document.createElement('div');
-      b.className = 'chat-bubble ' + msg.role;
-      b.textContent = msg.text;
-      b.style.animationDelay = '0s';
-      chatEl.appendChild(b);
-      chatEl.scrollTop = chatEl.scrollHeight;
-    }, delay);
+const chatEl = document.getElementById('phoneChat');
+const inputEl = document.getElementById('phoneInput');
+let step = 0;
+
+function addMsg(role, text, booking) {
+  const d = document.createElement('div');
+  if (role === 'user') {
+    d.className = 'pm-u';
+    d.innerHTML = `<div class="bu">${text.replace(/\n/g,'<br>')}</div>`;
+  } else if (role === 'bot') {
+    d.className = 'pm-b';
+    let extra = booking ? `<div class="bconf">Rezervacija potrjena: ${booking.service}, ${booking.date} ob ${booking.time}</div>` : '';
+    d.innerHTML = `<div class="bb">${text.replace(/\n/g,'<br>')}</div>${extra}`;
+  } else {
+    d.className = 'pm-b';
+    d.innerHTML = `<div class="bform"><div class="bform-h">Vaši podatki</div><div class="bform-b"><div class="bfinput">Ana Kovač</div><div class="bfinput">ana@email.com</div><div class="bfinput">041 123 456</div><div class="bfbtn">Potrdi rezervacijo</div></div></div>`;
   }
+  chatEl.appendChild(d);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+function showT() {
+  const t = document.createElement('div'); t.className='pm-b'; t.id='pty';
+  t.innerHTML='<div class="ptyping"><span></span><span></span><span></span></div>';
+  chatEl.appendChild(t); chatEl.scrollTop=chatEl.scrollHeight;
+}
+function hideT() { document.getElementById('pty')?.remove(); }
 
-  msgs.forEach(m => addBubble(m, m.delay));
-
-  // Restart chat after full cycle
-  setInterval(() => {
-    chatEl.innerHTML = '';
-    msgs.forEach(m => addBubble(m, m.delay - msgs[0].delay + 500));
-  }, 18000);
-
-  /* ─── ADMIN GRID ANIMATION ─── */
-  const slots = [
-    { time: '08:00', name: 'Maja K.', type: 'bot' },
-    { time: '08:30', name: 'Petra L.', type: 'busy' },
-    { time: '09:00', name: '', type: 'free' },
-    { time: '09:30', name: 'Sara M.', type: 'bot' },
-    { time: '10:00', name: 'Tina B.', type: 'busy' },
-    { time: '10:30', name: '', type: 'free' },
-    { time: '11:00', name: 'Ana N.', type: 'bot' },
-    { time: '11:30', name: 'Katja P.', type: 'busy' },
-    { time: '12:00', name: '', type: 'free' },
-    { time: '12:30', name: 'Mojca T.', type: 'busy' },
-    { time: '13:00', name: '', type: 'free' },
-    { time: '13:30', name: 'Nina S.', type: 'bot' },
-  ];
-
-  const grid = document.getElementById('admin-grid');
-  const labelMap = { busy: 'Zaseden', bot: 'Bot', free: 'Prost' };
-
-  function buildGrid(slotsData) {
-    grid.innerHTML = '';
-    slotsData.forEach((s, i) => {
-      const card = document.createElement('div');
-      card.className = 'admin-slot ' + s.type;
-      card.id = 'slot-' + i;
-      card.innerHTML = `
-        <div class="admin-slot-time">${s.time}</div>
-        <div class="admin-slot-name">${s.name || '&nbsp;'}</div>
-        <div class="admin-slot-label">${labelMap[s.type]}</div>
-      `;
-      grid.appendChild(card);
-    });
+function run() {
+  if (step >= chatScript.length) {
+    setTimeout(() => { chatEl.innerHTML=''; step=0; setTimeout(run,800); }, 5000);
+    return;
   }
+  const s = chatScript[step++];
+  setTimeout(() => {
+    if (s.role==='user') {
+      inputEl.textContent = s.text;
+      setTimeout(() => { inputEl.textContent='Vpišite sporočilo...'; addMsg('user',s.text); run(); }, 900);
+    } else if (s.role==='bot') {
+      showT();
+      setTimeout(() => { hideT(); addMsg('bot',s.text,s.booking); run(); }, 1100);
+    } else {
+      addMsg('form'); run();
+    }
+  }, s.delay);
+}
 
-  buildGrid(slots);
-
-  // Animate a booking appearing
-  function animateBooking() {
-    const freeSlots = slots.map((s, i) => ({ ...s, i })).filter(s => s.type === 'free');
-    if (!freeSlots.length) return;
-    const pick = freeSlots[Math.floor(Math.random() * freeSlots.length)];
-    const names = ['Lara V.', 'Eva H.', 'Nika Z.', 'Urša F.', 'Maja R.'];
-    const chosen = names[Math.floor(Math.random() * names.length)];
-    const card = document.getElementById('slot-' + pick.i);
-    if (!card) return;
-    card.classList.add('animating');
-    card.querySelector('.admin-slot-name').textContent = chosen;
-    card.querySelector('.admin-slot-label').textContent = 'Bot';
-    setTimeout(() => {
-      slots[pick.i].type = 'bot';
-      slots[pick.i].name = chosen;
-      buildGrid(slots);
-    }, 700);
-  }
-
-  setInterval(animateBooking, 3500);
+const dObs = new IntersectionObserver(entries => {
+  if(entries[0].isIntersecting){ run(); dObs.disconnect(); }
+}, {threshold:.3});
+dObs.observe(document.querySelector('.demo'));
 </script>
 </body>
 </html>
