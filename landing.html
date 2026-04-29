@@ -50,6 +50,8 @@ body {
 .nav-links a { font-size:12px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); text-decoration:none; transition:color .2s; }
 .nav-links a:hover { color:var(--black); }
 .nav-cta { background:var(--black)!important; color:var(--gold)!important; padding:9px 22px; font-size:11px!important; font-weight:700!important; letter-spacing:.12em!important; }
+/* Mobile nav — keep CTA visible */
+.nav-mobile-cta { display:none; }
 
 .hero {
   min-height:100vh; padding:128px 6vw 80px;
@@ -102,7 +104,7 @@ body {
 .pain-list li:last-child { border-bottom:none; }
 .pain-list li::before { content:''; flex-shrink:0; width:18px; height:1px; background:var(--gold); margin-top:10px; }
 
-/* ── DEMO ── */
+/* ── DEMO CHAT ── */
 .demo { padding:120px 6vw; background:var(--paper); position:relative; }
 .demo::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 800px 400px at 60% 50%,rgba(201,152,74,.05) 0%,transparent 70%); pointer-events:none; }
 .demo-inner { max-width:1100px; margin:0 auto; }
@@ -127,12 +129,10 @@ body {
     0 16px 40px rgba(0,0,0,.18);
   flex-shrink:0;
 }
-/* Dynamic island */
 .iphone::before {
   content:''; position:absolute; top:18px; left:50%; transform:translateX(-50%);
   width:100px; height:30px; background:#1c1c1e; border-radius:0 0 20px 20px; z-index:10;
 }
-/* Buttons */
 .iphone-side-r { position:absolute; right:-3.5px; top:108px; width:3.5px; height:64px; background:#2a2a2c; border-radius:0 2px 2px 0; }
 .iphone-side-r2 { position:absolute; right:-3.5px; top:186px; width:3.5px; height:44px; background:#2a2a2c; border-radius:0 2px 2px 0; }
 .iphone-vol-s { position:absolute; left:-3.5px; top:106px; width:3.5px; height:24px; background:#2a2a2c; border-radius:2px 0 0 2px; }
@@ -156,7 +156,8 @@ body {
 .phone-info p { font-size:10px; color:rgba(255,255,255,.35); }
 .phone-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; margin-left:auto; flex-shrink:0; }
 
-.phone-msgs { flex:1; overflow:hidden; padding:12px; display:flex; flex-direction:column; gap:7px; background:#f5f0eb; }
+.phone-msgs { flex:1; overflow:hidden; padding:12px; display:flex; flex-direction:column; gap:7px; background:#f5f0eb; transition: opacity .4s ease; }
+.phone-msgs.fading { opacity:0; }
 .pm-b,.pm-u { display:flex; max-width:82%; }
 .pm-b { align-self:flex-start; }
 .pm-u { align-self:flex-end; }
@@ -187,6 +188,42 @@ body {
 .dstep-c h4 { font-size:15px; font-weight:600; color:var(--black); margin-bottom:6px; }
 .dstep-c p { font-size:13px; line-height:1.75; color:var(--text-2); }
 
+/* ── LIVE CHAT ── */
+.livechat { padding:120px 6vw; background:var(--black); position:relative; overflow:hidden; }
+.livechat::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 700px 400px at 30% 50%, rgba(201,152,74,.06) 0%, transparent 70%); pointer-events:none; }
+.livechat-inner { max-width:1100px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:80px; align-items:center; }
+.livechat-copy { position:relative; }
+.livechat-copy .s-label { color:var(--gold); }
+.livechat-copy h2 { font-family:'Playfair Display',serif; font-size:clamp(28px,3.5vw,48px); font-weight:700; letter-spacing:-.02em; color:var(--white); margin-bottom:16px; line-height:1.1; }
+.livechat-copy h2 em { font-style:italic; color:var(--gold); font-weight:400; }
+.livechat-copy p { font-size:14px; line-height:1.8; color:rgba(255,255,255,.4); margin-bottom:8px; }
+.livechat-copy .hint { font-size:12px; color:rgba(201,152,74,.6); font-style:italic; margin-top:16px; }
+.live-widget { background:#1a1a14; border:1px solid rgba(201,152,74,.15); overflow:hidden; display:flex; flex-direction:column; height:480px; }
+.lw-head { background:#111108; border-bottom:1px solid rgba(255,255,255,.06); padding:14px 18px; display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.lw-avatar { width:32px; height:32px; background:rgba(201,152,74,.15); border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Playfair Display',serif; font-size:12px; font-weight:700; color:var(--gold); flex-shrink:0; }
+.lw-info h4 { font-size:12px; font-weight:600; color:#fff; }
+.lw-info p { font-size:10px; color:rgba(255,255,255,.3); }
+.lw-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; margin-left:auto; }
+.lw-msgs { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:8px; }
+.lw-msgs::-webkit-scrollbar { width:3px; }
+.lw-msgs::-webkit-scrollbar-thumb { background:rgba(255,255,255,.1); }
+.lw-b,.lw-u { display:flex; max-width:85%; }
+.lw-b { align-self:flex-start; }
+.lw-u { align-self:flex-end; }
+.lw-bb { background:#2a2820; border:0.5px solid rgba(255,255,255,.06); padding:9px 12px; font-size:12px; line-height:1.6; color:rgba(255,255,255,.8); border-radius:3px 12px 12px 3px; }
+.lw-bu { background:var(--gold-dk); padding:9px 12px; font-size:12px; line-height:1.6; color:rgba(255,255,255,.9); border-radius:12px 3px 3px 12px; }
+.lw-typing { display:flex; gap:3px; align-items:center; padding:9px 12px; background:#2a2820; border:0.5px solid rgba(255,255,255,.06); border-radius:3px 12px 12px 3px; width:fit-content; }
+.lw-typing span { width:4px; height:4px; border-radius:50%; background:rgba(255,255,255,.3); animation:td 1.2s infinite; }
+.lw-typing span:nth-child(2){animation-delay:.2s} .lw-typing span:nth-child(3){animation-delay:.4s}
+.lw-input-area { padding:12px; border-top:1px solid rgba(255,255,255,.06); display:flex; gap:8px; flex-shrink:0; background:#111108; }
+.lw-input { flex:1; background:#1a1a14; border:1px solid rgba(255,255,255,.1); color:#fff; font-size:13px; font-family:'DM Sans',sans-serif; padding:9px 14px; outline:none; border-radius:0; transition:border-color .2s; }
+.lw-input::placeholder { color:rgba(255,255,255,.2); }
+.lw-input:focus { border-color:rgba(201,152,74,.5); }
+.lw-send { background:var(--gold); border:none; width:38px; height:38px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background .2s; }
+.lw-send:hover { background:var(--gold-lt); }
+.lw-send::after { content:''; width:0; height:0; border-top:4px solid transparent; border-bottom:4px solid transparent; border-left:7px solid var(--black); margin-left:2px; }
+.lw-err { padding:8px 14px; font-size:11px; color:rgba(255,100,100,.7); background:rgba(255,0,0,.05); border-top:1px solid rgba(255,0,0,.1); display:none; flex-shrink:0; }
+
 /* Admin */
 .admin { padding:120px 6vw; background:var(--white); }
 .admin-inner { max-width:1100px; margin:0 auto; }
@@ -208,12 +245,12 @@ body {
 .am-tab { padding:11px 18px 9px; font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#aaa; border-bottom:2px solid transparent; }
 .am-tab.active { color:#0a0a0a; border-bottom-color:#c9984a; }
 .am-body { padding:24px; }
-.am-drow { display:flex; align-items:baseline; gap:12px; margin-bottom:6px; }
+.am-drow { display:flex; align-items:baseline; gap:12px; margin-bottom:6px; flex-wrap:wrap; }
 .am-date { font-family:'Playfair Display',serif; font-size:22px; font-weight:700; color:#0a0a0a; }
 .am-date em { font-style:italic; color:#aaa; font-weight:400; }
 .am-today { font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#aaa; border:1px solid #ddd; padding:4px 10px; background:#fff; }
 .am-rule { height:2px; background:#0a0a0a; margin:10px 0 14px; }
-.am-stats { display:flex; align-items:center; font-size:11px; color:#aaa; margin-bottom:18px; }
+.am-stats { display:flex; align-items:center; font-size:11px; color:#aaa; margin-bottom:18px; flex-wrap:wrap; gap:4px; }
 .asn { font-family:'Playfair Display',serif; font-size:18px; font-weight:700; margin-right:4px; }
 .asn.g{color:#2a7a2a} .asn.r{color:#8a1a1a} .asn.b{color:#1a3a7a}
 .asep{margin:0 12px;color:#ddd}
@@ -251,7 +288,7 @@ body {
 .pricing-top p { font-size:15px; color:var(--text-2); }
 .plans { display:grid; grid-template-columns:repeat(3,1fr); border:1px solid var(--border-md); background:var(--border-md); gap:0; }
 .plan { background:var(--paper); padding:48px 36px; position:relative; }
-.plan.featured { background:var(--black); transform:translateY(-10px); box-shadow:0 24px 60px rgba(0,0,0,.18); z-index:2; }
+.plan.featured { background:var(--black); z-index:2; box-shadow:0 24px 60px rgba(0,0,0,.18); }
 .plan-badge { font-size:9px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; background:var(--gold); color:var(--black); padding:4px 12px; display:inline-block; margin-bottom:20px; }
 .plan-name { font-family:'Playfair Display',serif; font-size:10px; font-weight:900; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
 .plan.featured .plan-name{color:rgba(255,255,255,.3)}
@@ -289,19 +326,24 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.06);padding:
 .foot-logo{font-family:'Playfair Display',serif;font-size:18px;font-weight:900;color:#fff;}
 .foot-logo span{color:var(--gold)}
 .foot-copy{font-size:11px;color:rgba(255,255,255,.2);}
-.foot-links{display:flex;gap:24px;}
+.foot-links{display:flex;gap:24px;flex-wrap:wrap;}
 .foot-links a{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.3);text-decoration:none;transition:color .2s;}
 .foot-links a:hover{color:var(--gold)}
+.foot-email{font-size:11px;color:rgba(255,255,255,.25);}
 
 .fade-up{opacity:0;transform:translateY(22px);transition:opacity .65s ease,transform .65s ease;}
 .fade-up.show{opacity:1;transform:translateY(0);}
 .fd2{transition-delay:.1s} .fd3{transition-delay:.2s} .fd4{transition-delay:.3s}
 
 @media(max-width:900px){
-  .pain-inner,.demo-layout,.admin-hdr,.how-steps,.plans{grid-template-columns:1fr}
-  .plan.featured{transform:none}
+  .pain-inner,.demo-layout,.admin-hdr,.how-steps,.plans,.livechat-inner{grid-template-columns:1fr}
+  .plan.featured{transform:none;box-shadow:0 8px 32px rgba(0,0,0,.15);}
   .nav-links{display:none}
+  .nav-mobile-cta{display:flex;align-items:center;}
+  .nav-mobile-cta a{background:var(--black);color:var(--gold);padding:8px 18px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;text-decoration:none;}
   .sgrid{grid-template-columns:repeat(3,1fr)}
+  .live-widget{height:400px;}
+  .asep{display:none;}
 }
 </style>
 </head>
@@ -315,6 +357,9 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.06);padding:
     <a href="#pricing">Cenik</a>
     <a href="#pricing" class="nav-cta btn-primary" style="padding:9px 22px;font-size:11px;">Začnite danes</a>
   </nav>
+  <div class="nav-mobile-cta">
+    <a href="#pricing">Začnite</a>
+  </div>
 </header>
 
 <section class="hero">
@@ -332,7 +377,7 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.06);padding:
     <div class="trust-sep"></div>
     <div class="trust-item"><strong>E-mail</strong>Potrditve</div>
     <div class="trust-sep"></div>
-    <div class="trust-item"><strong>Admin</strong>Plošča</div>
+    <div class="trust-item"><strong>Admin</strong>Nadzorna plošča</div>
   </div>
 </section>
 
@@ -402,6 +447,31 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.06);padding:
         <div class="dstep"><div class="dstep-n">2</div><div class="dstep-c"><h4>AI preveri ažurne proste termine</h4><p>Asistent v realnem času vidi zasedene termine in predlaga prave proste ure — nikoli ne ponudi zasedenega termina.</p></div></div>
         <div class="dstep"><div class="dstep-n">3</div><div class="dstep-c"><h4>Rezervacija potrjena — avtomatsko</h4><p>Ko stranka potrdi, se termin nemudoma zapiše v sistem. Oba prejmeta e-mail potrditev.</p></div></div>
         <div class="dstep"><div class="dstep-n">4</div><div class="dstep-c"><h4>Vi vidite vse v admin panelu</h4><p>Vsak termin je takoj viden v vaši nadzorni plošči. Kadarkoli dodate ali izbrišete termin ročno.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LIVE CHAT -->
+<section class="livechat" id="livechat">
+  <div class="livechat-inner">
+    <div class="livechat-copy fade-up">
+      <div class="s-label">Preizkusite v živo</div>
+      <h2>Pišite AI asistentu<br><em>zdaj, takoj.</em></h2>
+      <p>Spodaj je pravi BookWell AI asistent za demo salon Aurora v Ljubljani. Vprašajte za termin, storitev ali delovni čas.</p>
+      <p class="hint">Primer: "Kdaj imate prosto ta teden za barvanje?"</p>
+    </div>
+    <div class="live-widget fade-up fd2">
+      <div class="lw-head">
+        <div class="lw-avatar">A</div>
+        <div class="lw-info"><h4>Salon Aurora</h4><p>AI Asistent · BookWell Demo</p></div>
+        <div class="lw-dot"></div>
+      </div>
+      <div class="lw-msgs" id="lwMsgs"></div>
+      <div class="lw-err" id="lwErr"></div>
+      <div class="lw-input-area">
+        <input class="lw-input" id="lwInput" placeholder="Vpišite sporočilo..." />
+        <button class="lw-send" id="lwSend"></button>
       </div>
     </div>
   </div>
@@ -506,14 +576,14 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.06);padding:
       <div class="plan fade-up">
         <div class="plan-name">Starter</div>
         <div class="plan-price"><sup>€</sup>29<sub>/mes</sub></div>
-        <div class="plan-msgs"><strong>200 sporočil</strong> na mesec</div>
+        <div class="plan-msgs"><strong>500 sporočil</strong> na mesec</div>
         <ul class="plan-feats">
           <li class="bold">1 salon / lokacija</li>
           <li>AI chat asistent 24/7</li>
           <li>Avtomatske e-mail potrditve</li>
           <li>Admin nadzorna plošča</li>
           <li>Nastavljiv delovni čas</li>
-          <li>Za manjše salone (~6 terminov/dan)</li>
+          <li>Za manjše salone (~15 terminov/dan)</li>
         </ul>
         <a href="#" class="plan-btn">Začnite s Starter</a>
       </div>
@@ -521,7 +591,7 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.06);padding:
         <div class="plan-badge">Najpopularnejši</div>
         <div class="plan-name">Pro</div>
         <div class="plan-price"><sup>€</sup>49<sub>/mes</sub></div>
-        <div class="plan-msgs"><strong>1.000 sporočil</strong> na mesec</div>
+        <div class="plan-msgs"><strong>2.000 sporočil</strong> na mesec</div>
         <ul class="plan-feats">
           <li class="bold">Do 3 saloni / lokacije</li>
           <li>AI chat asistent 24/7</li>
@@ -556,21 +626,24 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.06);padding:
 <section class="cta">
   <h2 class="fade-up">Vaš salon nikoli ne spi.<br><em>Zakaj bi vaš recepcionist?</em></h2>
   <p class="fade-up fd2">Nastavitev traja 5 minut. Prva rezervacija bo prišla še danes.</p>
-  <a href="#pricing" class="btn-gold fade-up fd3">Začnite brezplačen preizkus</a>
+  <a href="#pricing" class="btn-gold fade-up fd3">Začnite 7-dnevni preizkus</a>
 </section>
 
 <footer>
   <div class="foot-logo">Book<span>Well</span></div>
   <div class="foot-copy">© 2026 BookWell.si — Vse pravice pridržane</div>
+  <div class="foot-email">info@bookwell.si</div>
   <div class="foot-links"><a href="#">Pogoji</a><a href="#">Zasebnost</a><a href="#">Kontakt</a></div>
 </footer>
 
 <script>
+/* ── SCROLL ANIMATIONS ── */
 const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('show'); obs.unobserve(e.target); }});
 }, {threshold:.12});
 document.querySelectorAll('.fade-up:not(.show)').forEach(el => obs.observe(el));
 
+/* ── ANIMATED CHAT DEMO ── */
 const chatScript = [
   { role:'bot',  text:'Pozdravljeni! Sem AI asistent salona Aurora. Kako vam lahko pomagam?', delay:700 },
   { role:'user', text:'Bi rada rezervirala termin za barvanje las.', delay:2000 },
@@ -585,6 +658,7 @@ const chatScript = [
 const chatEl = document.getElementById('phoneChat');
 const inputEl = document.getElementById('phoneInput');
 let step = 0;
+let demoRunning = false;
 
 function addMsg(role, text, booking) {
   const d = document.createElement('div');
@@ -611,7 +685,16 @@ function hideT() { document.getElementById('pty')?.remove(); }
 
 function run() {
   if (step >= chatScript.length) {
-    setTimeout(() => { chatEl.innerHTML=''; step=0; setTimeout(run,800); }, 5000);
+    // Graceful fade-out reset
+    setTimeout(() => {
+      chatEl.classList.add('fading');
+      setTimeout(() => {
+        chatEl.innerHTML = '';
+        step = 0;
+        chatEl.classList.remove('fading');
+        setTimeout(run, 800);
+      }, 400);
+    }, 4000);
     return;
   }
   const s = chatScript[step++];
@@ -629,9 +712,114 @@ function run() {
 }
 
 const dObs = new IntersectionObserver(entries => {
-  if(entries[0].isIntersecting){ run(); dObs.disconnect(); }
+  if(entries[0].isIntersecting && !demoRunning){ demoRunning=true; run(); dObs.disconnect(); }
 }, {threshold:.3});
 dObs.observe(document.querySelector('.demo'));
+
+/* ── LIVE CHAT ── */
+const SYSTEM_PROMPT = `Si AI asistent za frizerski salon Aurora v Ljubljani.
+Odgovarjaš VEDNO in SAMO v slovenščini. Nikoli ne uporabi markdown — piši navadno besedilo.
+Si prijazen, profesionalen in jedrnat.
+
+INFORMACIJE O SALONU:
+- Ime: Salon Aurora
+- Naslov: Copova 5, Ljubljana
+- Telefon: 01 234 5678
+
+DELOVNI ČAS:
+Ponedeljek–Petek: 08:00–20:00
+Sobota: 08:00–14:00
+Nedelja: zaprto
+
+STORITVE IN CENIK:
+- Ženski haircut: 25–45 EUR
+- Moški haircut: 15–20 EUR
+- Barvanje (celo): 60–120 EUR
+- Balayage/highlights: 80–150 EUR
+- Trajni kodri: 70–100 EUR
+- Frizura za posebne priložnosti: 40–65 EUR
+- Manikura: 20–30 EUR
+- Pedikura: 25–35 EUR
+
+PROSTI TERMINI (izmišljeni — samo za demo):
+Danes (sreda 29.4.): 10:00, 11:30, 14:00, 16:30, 18:00
+Četrtek 30.4.: 09:00, 10:30, 12:30, 15:00, 16:00, 18:30
+Petek 1.5.: 09:30, 11:00, 13:00, 15:30, 17:00
+Sobota 2.5.: 08:30, 10:00, 11:30
+
+PRAVILA:
+- To je demo — ne delaj pravih rezervacij, samo simuliraj pogovor
+- Ko stranka izbere termin, povej da je rezervacija potrjena (v resnici ni)
+- Odgovarjaj kratko in naravno
+- Ne izmišljuj terminov ki niso na seznamu`;
+
+const lwMsgs = document.getElementById('lwMsgs');
+const lwInput = document.getElementById('lwInput');
+const lwSend = document.getElementById('lwSend');
+const lwErr = document.getElementById('lwErr');
+let lwHistory = [];
+let lwBusy = false;
+
+function lwAddMsg(role, text) {
+  const d = document.createElement('div');
+  d.className = role === 'user' ? 'lw-u' : 'lw-b';
+  d.innerHTML = `<div class="${role === 'user' ? 'lw-bu' : 'lw-bb'}">${text.replace(/\n/g,'<br>')}</div>`;
+  lwMsgs.appendChild(d);
+  lwMsgs.scrollTop = lwMsgs.scrollHeight;
+}
+function lwShowTyping() {
+  const d = document.createElement('div'); d.className='lw-b'; d.id='lwTyping';
+  d.innerHTML='<div class="lw-typing"><span></span><span></span><span></span></div>';
+  lwMsgs.appendChild(d); lwMsgs.scrollTop=lwMsgs.scrollHeight;
+}
+function lwHideTyping() { document.getElementById('lwTyping')?.remove(); }
+
+async function lwSendMsg() {
+  if (lwBusy) return;
+  const text = lwInput.value.trim();
+  if (!text) return;
+  lwInput.value = '';
+  lwErr.style.display = 'none';
+  lwAddMsg('user', text);
+  lwHistory.push({ role:'user', content: text });
+  lwBusy = true;
+  lwShowTyping();
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1000,
+        system: SYSTEM_PROMPT,
+        messages: lwHistory
+      })
+    });
+    const data = await res.json();
+    lwHideTyping();
+    if (data.content && data.content[0]) {
+      const reply = data.content[0].text;
+      lwAddMsg('bot', reply);
+      lwHistory.push({ role:'assistant', content: reply });
+    } else {
+      throw new Error('No response');
+    }
+  } catch(e) {
+    lwHideTyping();
+    lwErr.textContent = 'Napaka pri povezavi. Poskusite znova.';
+    lwErr.style.display = 'block';
+  }
+  lwBusy = false;
+}
+
+// Init greeting
+setTimeout(() => {
+  lwAddMsg('bot', 'Pozdravljeni! Sem AI asistent salona Aurora. Vprašajte me za proste termine, storitve ali cenik.');
+}, 600);
+
+lwSend.addEventListener('click', lwSendMsg);
+lwInput.addEventListener('keydown', e => { if(e.key==='Enter') lwSendMsg(); });
 </script>
 </body>
 </html>
