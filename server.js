@@ -431,7 +431,7 @@ app.get('/admin-login/:id', async (req, res) => {
   res.send(buildLoginPage(salon));
 });
 
-app.post('/admin-login/:id', async (req, res) => {
+app.post('/admin-login/:id', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
   const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
   const salon = rows[0];
@@ -552,6 +552,14 @@ const chatLimiter = rateLimit({
   windowMs: 60 * 1000,  // 1 minuta
   max: 20,              // max 20 sporočil na minuto per IP
   message: { reply: 'Preveč zahtevkov. Počakajte minuto.', bookingDetected: null }
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Preveč neuspešnih poskusov. Počakajte 15 minut.' },
+  standardHeaders: true,
+  legacyHeaders: false
 });
 
 app.post('/chat', chatLimiter, async (req, res) => {
@@ -1686,14 +1694,81 @@ function buildAdminPage(salon) {
 </html>`;
 }
 
+// ─── CANCEL ENDPOINT ──────────────────────────────────────────────────────────
 app.get('/cancel/:token', async (req, res) => {
   const { token } = req.params;
   const { rows } = await pool.query(
-    "SELECT t.*, s.name as salon_name, s.phone as salon_phone, s.notification_email FROM timeslots t JOIN salons s ON t.salon_id = s.id WHERE t.cancel_token = $1 AND t.status = 'busy'",
+    "SELECT t.*, s.name as salon_name, s.phone as salon_phone, s.notification_email FROM timeslots t JOIN salons s ON t.salon_id = s.id WHERE t.cancel_token = $1 AND t.status = 'busy' AND t.date >= CURRENT_DATE",
     [token]
   );
   if (!rows[0]) {
-    return res.send(`<!DOCTYPE html><html lang="sl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Odpoved termina</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#f7f7f5;min-height:100vh;display:flex;align-items:center;justify-content:center}.card{background:#fff;border:1px solid #e0e0e0;max-width:400px;width:100%;overflow:hidden}.head{background:#0a0a0a;padding:28px 32px}.head h1{font-size:20px;color:#fff;font-weight:700}.body{padding:32px}.icon{font-size:40px;margin-bottom:16px}.msg{font-size:14px;color:#666;line-height:1.6}</style></head><body><div class="card"><div class="head"><h1>BookWell</h1></div><div class="body"><div class="icon">⚠️</div><p class="msg">Ta rezervacija ne obstaja ali je bila že odpovedana.</p></div></div></body></html>`);
+    return res.send(`<!DOCTYPE html><html lang="sl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Odpoved termina</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#f7f7f5;min-height:100vh;display:flex;align-items:center;justify-content:center}.card{background:#fff;border:1px solid #e0e0e0;max-width:400px;width:100%;overflow:hidden}.head{background:#0a0a0a;padding:28px 32px}.head h1{font-size:20px;color:#fff;font-weight:700}.body{padding:32px}.icon{font-size:40px;margin-bottom:16px}.msg{font-size:14px;color:#666;line-height:1.6}</style></head><body><div class="card"><div class="head"><h1>BookWell</h1></div><div class="body"><div class="icon">⚠️</div><p class="msg">Ta rezervacija ne obstaja, je že odpovedana ali je termin že minil.</p></div></div></body></html>`);
+  }
+
+  const slot = rows[0];
+  const dateFormatted = new Date(slot.date).toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  res.send(`<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Odpoved rezervacije</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:system-ui,sans-serif;background:#f7f7f5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+    .card{background:#fff;border:1px solid #e0e0e0;max-width:420px;width:100%;overflow:hidden}
+    .head{background:#0a0a0a;padding:28px 32px}
+    .head h1{font-size:20px;color:#fff;font-weight:700}
+    .head p{font-size:11px;color:rgba(255,255,255,.35);margin-top:4px;letter-spacing:.08em;text-transform:uppercase}
+    .body{padding:32px}
+    .icon{font-size:36px;margin-bottom:14px}
+    .title{font-size:17px;font-weight:700;color:#0a0a0a;margin-bottom:6px}
+    .subtitle{font-size:13px;color:#888;margin-bottom:20px;line-height:1.5}
+    .details{background:#f5f0eb;border-left:3px solid #c9984a;padding:14px 18px;margin-bottom:24px;font-size:13px;color:#444;line-height:2}
+    .warning{background:#fef3c7;border-left:3px solid #f59e0b;padding:12px 16px;font-size:12px;color:#92400e;margin-bottom:24px;line-height:1.6}
+    .btn-cancel{display:block;width:100%;padding:13px;background:#dc2626;border:none;color:#fff;font-size:13px;font-weight:700;letter-spacing:.06em;font-family:inherit;cursor:pointer;margin-bottom:10px;transition:background .15s}
+    .btn-cancel:hover{background:#b91c1c}
+    .btn-cancel:disabled{background:#ccc;cursor:not-allowed}
+    .btn-back{display:block;width:100%;padding:12px;background:#f7f7f5;border:1px solid #e0e0e0;color:#444;font-size:13px;font-family:inherit;cursor:pointer;transition:background .15s}
+    .btn-back:hover{background:#eee}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="head">
+      <h1>BookWell</h1>
+      <p>Odpoved rezervacije</p>
+    </div>
+    <div class="body">
+      <div class="icon">🗓️</div>
+      <div class="title">Ali res želite odpovedati?</div>
+      <div class="subtitle">Prosimo potrdite odpoved spodnje rezervacije.</div>
+      <div class="details">
+        <div>📅 ${dateFormatted}</div>
+        <div>🕐 ${slot.time}</div>
+        <div>💇 ${slot.service || '—'}</div>
+        <div>🏠 ${slot.salon_name}</div>
+      </div>
+      <div class="warning">⚠️ Tega dejanja ni mogoče razveljaviti. Po odpovedi boste morali rezervirati nov termin.</div>
+      <form method="POST" action="/cancel/${token}">
+        <button type="submit" class="btn-cancel" id="btn-confirm">Potrdi odpoved rezervacije</button>
+      </form>
+      <button class="btn-back" onclick="history.back()">← Nazaj, ne odpoveduj</button>
+    </div>
+  </div>
+</body>
+</html>`);
+});
+
+app.post('/cancel/:token', async (req, res) => {
+  const { token } = req.params;
+  const { rows } = await pool.query(
+    "SELECT t.*, s.name as salon_name, s.phone as salon_phone, s.notification_email FROM timeslots t JOIN salons s ON t.salon_id = s.id WHERE t.cancel_token = $1 AND t.status = 'busy' AND t.date >= CURRENT_DATE",
+    [token]
+  );
+  if (!rows[0]) {
+    return res.send(`<!DOCTYPE html><html lang="sl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Odpoved termina</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#f7f7f5;min-height:100vh;display:flex;align-items:center;justify-content:center}.card{background:#fff;border:1px solid #e0e0e0;max-width:400px;width:100%;overflow:hidden}.head{background:#0a0a0a;padding:28px 32px}.head h1{font-size:20px;color:#fff;font-weight:700}.body{padding:32px}.icon{font-size:40px;margin-bottom:16px}.msg{font-size:14px;color:#666;line-height:1.6}</style></head><body><div class="card"><div class="head"><h1>BookWell</h1></div><div class="body"><div class="icon">⚠️</div><p class="msg">Ta rezervacija ne obstaja, je že odpovedana ali je termin že minil.</p></div></div></body></html>`);
   }
 
   const slot = rows[0];
@@ -1701,32 +1776,33 @@ app.get('/cancel/:token', async (req, res) => {
 
   await pool.query('DELETE FROM timeslots WHERE cancel_token = $1', [token]);
 
-  // Obvesti salon
-  try {
-    await sgMail.send({
-      to: slot.notification_email,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
-      subject: `❌ Odpoved rezervacije - ${slot.salon_name} (${dateFormatted} ${slot.time})`,
-      html: `
-        <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#2d2520;">
-          <div style="background:#1a1410;padding:20px;border-radius:12px 12px 0 0;text-align:center;">
-            <h1 style="color:#c9a84c;margin:0;font-size:22px;">❌ Odpoved Rezervacije</h1>
-          </div>
-          <div style="background:#fff;padding:30px;border-radius:0 0 12px 12px;border:1px solid #e0e0e0;border-top:none;">
-            <p style="font-size:15px;margin:0 0 20px;">Stranka je odpovedala rezervacijo:</p>
-            <div style="background:#f5f0eb;padding:16px 20px;border-radius:8px;">
-              <div style="margin-bottom:10px;font-size:13px;"><span style="color:#6b5f52;">👤 Ime:</span> <strong>${slot.customer_name}</strong></div>
-              <div style="margin-bottom:10px;font-size:13px;"><span style="color:#6b5f52;">📅 Datum:</span> <strong>${dateFormatted}</strong></div>
-              <div style="margin-bottom:10px;font-size:13px;"><span style="color:#6b5f52;">🕐 Ura:</span> <strong>${slot.time}</strong></div>
-              <div style="font-size:13px;"><span style="color:#6b5f52;">💇 Storitev:</span> <strong>${slot.service || '—'}</strong></div>
+  if (slot.notification_email) {
+    try {
+      await sgMail.send({
+        to: slot.notification_email,
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
+        subject: `❌ Odpoved rezervacije - ${slot.salon_name} (${dateFormatted} ${slot.time})`,
+        html: `
+          <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#2d2520;">
+            <div style="background:#1a1410;padding:20px;border-radius:12px 12px 0 0;text-align:center;">
+              <h1 style="color:#c9a84c;margin:0;font-size:22px;">❌ Odpoved Rezervacije</h1>
             </div>
+            <div style="background:#fff;padding:30px;border-radius:0 0 12px 12px;border:1px solid #e0e0e0;border-top:none;">
+              <p style="font-size:15px;margin:0 0 20px;">Stranka je odpovedala rezervacijo:</p>
+              <div style="background:#f5f0eb;padding:16px 20px;border-radius:8px;">
+                <div style="margin-bottom:10px;font-size:13px;"><span style="color:#6b5f52;">👤 Ime:</span> <strong>${slot.customer_name}</strong></div>
+                <div style="margin-bottom:10px;font-size:13px;"><span style="color:#6b5f52;">📅 Datum:</span> <strong>${dateFormatted}</strong></div>
+                <div style="margin-bottom:10px;font-size:13px;"><span style="color:#6b5f52;">🕐 Ura:</span> <strong>${slot.time}</strong></div>
+                <div style="font-size:13px;"><span style="color:#6b5f52;">💇 Storitev:</span> <strong>${slot.service || '—'}</strong></div>
+              </div>
+            </div>
+            <div style="text-align:center;padding:16px;font-size:11px;color:#bbb;">BookWell.si</div>
           </div>
-          <div style="text-align:center;padding:16px;font-size:11px;color:#bbb;">BookWell.si</div>
-        </div>
-      `
-    });
-  } catch(e) {
-    console.error('❌ Odpoved email napaka:', e.message);
+        `
+      });
+    } catch(e) {
+      console.error('❌ Odpoved email napaka:', e.message);
+    }
   }
 
   res.send(`<!DOCTYPE html><html lang="sl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rezervacija odpovedana</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#f7f7f5;min-height:100vh;display:flex;align-items:center;justify-content:center}.card{background:#fff;border:1px solid #e0e0e0;max-width:420px;width:100%;overflow:hidden}.head{background:#0a0a0a;padding:28px 32px}.head h1{font-size:20px;color:#fff;font-weight:700}.body{padding:32px}.icon{font-size:40px;margin-bottom:16px}.title{font-size:18px;font-weight:700;color:#0a0a0a;margin-bottom:10px}.details{background:#f5f0eb;border-left:3px solid #c9984a;padding:14px 18px;margin:18px 0;font-size:13px;color:#444;line-height:2}.msg{font-size:13px;color:#888;line-height:1.6;margin-top:16px}</style></head><body><div class="card"><div class="head"><h1>BookWell</h1></div><div class="body"><div class="icon">✅</div><div class="title">Rezervacija odpovedana</div><div class="details"><div>📅 ${dateFormatted}</div><div>🕐 ${slot.time}</div><div>💇 ${slot.service || '—'}</div></div><p class="msg">Vaša rezervacija je bila uspešno odpovedana. Salon je bil obveščen.</p></div></div></body></html>`);
