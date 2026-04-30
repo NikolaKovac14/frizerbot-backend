@@ -38,8 +38,8 @@ app.post('/stripe-webhook',
       const amount = Math.round(session.amount_total) / 100;
 
       let plan = 'pro';
-      if (amount <= 29) plan = 'starter';
-      else if (amount <= 49) plan = 'pro';
+      if (amount <= 29.99) plan = 'starter';
+      else if (amount <= 49.99) plan = 'pro';
       else plan = 'agency';
 
       console.log(`✅ Novo plačilo: ${customerEmail} — ${plan} — ${amount}€`);
@@ -69,7 +69,7 @@ app.post('/stripe-webhook',
         await pool.query(`
           INSERT INTO subscriptions (salon_id, stripe_session_id, stripe_customer_id, plan, amount, customer_email, customer_name)
           VALUES ($1,$2,$3,$4,$5,$6,$7)
-        `, [salonId, session.id, session.customer || '', plan, Math.round(amount * 100), customerEmail, customerName]);
+        `, [salonId, session.id, session.customer || '', plan, amount, customerEmail, customerName]);
 
         const salonUrl = `${process.env.API_URL || 'https://bookwell.si'}/salon/${slug}`;
         const adminUrl = `${process.env.API_URL || 'https://bookwell.si'}/admin/${salonId}`;
@@ -135,9 +135,9 @@ const pool = new Pool({
 
 // ─── PLAN CONFIG ──────────────────────────────────────────────────────────────
 const PLANS = {
-  starter: { name: 'Starter', price: 29, chatLimit: 500 },
-  pro:     { name: 'Pro',     price: 49, chatLimit: 2000 },
-  agency:  { name: 'Agency',  price: 99, chatLimit: 999999 }
+  starter: { name: 'Starter', price: 29.99, chatLimit: 500 },
+  pro:     { name: 'Pro',     price: 49.99, chatLimit: 2000 },
+  agency:  { name: 'Agency',  price: 99.99, chatLimit: 999999 }
 };
 
 // Zamenjaj z resničnimi Stripe Payment Linki ko jih kreiraš v dashboardu
@@ -688,7 +688,7 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
     return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjaš VEDNO in SAMO v slovenščini.
 NIKOLI ne uporabi markdown formatiranja - piši navadno besedilo.
 Si prijazen, profesionalen in jedrnat.
-Piši brezhibno in slovnično pravilno slovensko. Primeri napak ki se jim izogni: "razumijem" → "razumem", "potvrjena" → "potrjena", "kakršnahkoli" → "kakršnih koli". In tako dalje - vedno preveri slovnico pred odgovorom.
+Piši brezhibno in slovnično pravilno slovensko. ABSOLUTNO PREPOVEDANO je pisanje v kateremkoli drugem jeziku — niti ene besede hrvaško, angleško ali v kateremkoli drugem jeziku. Če ne znaš odgovoriti v slovenščini, raje ne odgovori kot da bi uporabil tuj jezik. Primeri napak ki se jim izogni: "razumijem" → "razumem", "potvrjena" → "potrjena", "kakršnahkoli" → "kakršnih koli". In tako dalje - vedno preveri slovnico pred odgovorom.
 
 Današnji datum: ${todayStr}
 DATUM ZA TAGE: ${todayDateStr}
@@ -750,7 +750,7 @@ KRITIČNO:
     return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjaš VEDNO in SAMO v slovenščini.
 NIKOLI ne uporabi markdown formatiranja - piši navadno besedilo.
 Si prijazen, profesionalen in jedrnat.
-Piši brezhibno in slovnično pravilno slovensko. Primeri napak ki se jim izogni: "razumijem" → "razumem", "potvrjena" → "potrjena", "kakršnahkoli" → "kakršnih koli". In tako dalje - vedno preveri slovnico pred odgovorom.
+Piši brezhibno in slovnično pravilno slovensko. ABSOLUTNO PREPOVEDANO je pisanje v kateremkoli drugem jeziku — niti ene besede hrvaško, angleško ali v kateremkoli drugem jeziku. Če ne znaš odgovoriti v slovenščini, raje ne odgovori kot da bi uporabil tuj jezik. Primeri napak ki se jim izogni: "razumijem" → "razumem", "potvrjena" → "potrjena", "kakršnahkoli" → "kakršnih koli". In tako dalje - vedno preveri slovnico pred odgovorom.
 
 Današnji datum: ${todayStr}
 DATUM ZA TAGE: ${todayDateStr}
