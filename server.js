@@ -431,6 +431,20 @@ app.get('/admin-login/:id', async (req, res) => {
   res.send(buildLoginPage(salon));
 });
 
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,  // 1 minuta
+  max: 20,              // max 20 sporočil na minuto per IP
+  message: { reply: 'Preveč zahtevkov. Počakajte minuto.', bookingDetected: null }
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Preveč neuspešnih poskusov. Počakajte 15 minut.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 app.post('/admin-login/:id', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
   const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
@@ -548,19 +562,6 @@ app.post('/booking', async (req, res) => {
 });
 
 // ─── CHAT ─────────────────────────────────────────────────────────────────────
-const chatLimiter = rateLimit({
-  windowMs: 60 * 1000,  // 1 minuta
-  max: 20,              // max 20 sporočil na minuto per IP
-  message: { reply: 'Preveč zahtevkov. Počakajte minuto.', bookingDetected: null }
-});
-
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: { error: 'Preveč neuspešnih poskusov. Počakajte 15 minut.' },
-  standardHeaders: true,
-  legacyHeaders: false
-});
 
 app.post('/chat', chatLimiter, async (req, res) => {
   const { salonId, messages, customerInfo } = req.body;
