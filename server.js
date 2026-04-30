@@ -35,7 +35,7 @@ app.post('/stripe-webhook',
       const session = event.data.object;
       const customerEmail = session.customer_details?.email || session.customer_email || '';
       const customerName = session.customer_details?.name || '';
-      const amount = session.amount_total / 100;
+      const amount = Math.round(session.amount_total) / 100;
 
       let plan = 'pro';
       if (amount <= 29) plan = 'starter';
@@ -69,7 +69,7 @@ app.post('/stripe-webhook',
         await pool.query(`
           INSERT INTO subscriptions (salon_id, stripe_session_id, stripe_customer_id, plan, amount, customer_email, customer_name)
           VALUES ($1,$2,$3,$4,$5,$6,$7)
-        `, [salonId, session.id, session.customer || '', plan, amount, customerEmail, customerName]);
+        `, [salonId, session.id, session.customer || '', plan, Math.round(amount * 100), customerEmail, customerName]);
 
         const salonUrl = `${process.env.API_URL || 'https://bookwell.si'}/salon/${slug}`;
         const adminUrl = `${process.env.API_URL || 'https://bookwell.si'}/admin/${salonId}`;
