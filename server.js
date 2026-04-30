@@ -356,6 +356,23 @@ app.get('/pricing', (req, res) => {
   });
 });
 
+// ─── SALON SETTINGS ───────────────────────────────────────────────────────────
+app.get('/admin/:id/settings', requireAdminAuth, async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  res.json(rows[0]);
+});
+
+app.post('/admin/:id/settings', requireAdminAuth, async (req, res) => {
+  const { name, address, phone, services, notificationEmail } = req.body;
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salonId = salonRows[0]?.id;
+  await pool.query(
+    'UPDATE salons SET name=$1, address=$2, phone=$3, services=$4, notification_email=$5 WHERE id=$6',
+    [name, address, phone, services, notificationEmail, salonId]
+  );
+  res.json({ success: true });
+});
+
 // ─── HOSTED CHAT STRAN ────────────────────────────────────────────────────────
 app.get('/salon/:id', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [req.params.id]);
@@ -1267,6 +1284,7 @@ function buildAdminPage(salon) {
   <nav class="nav">
     <div class="nav-tab active" onclick="switchTab('termini')">Termini</div>
     <div class="nav-tab" onclick="switchTab('urnik')">Delovni čas</div>
+    <div class="nav-tab" onclick="switchTab('nastavitve')">Nastavitve</div>
   </nav>
   <div class="tab-content active" id="tab-termini">
     <div class="page">
@@ -1296,6 +1314,34 @@ function buildAdminPage(salon) {
       </div>
     </div>
   </div>
+  <div class="tab-content" id="tab-nastavitve">
+  <div class="page">
+    <div class="schedule-card">
+      <div class="schedule-head">
+        <div><div class="schedule-head-title">Nastavitve salona</div></div>
+        <div class="schedule-head-sub">Podatki & storitve</div>
+      </div>
+      <div style="padding:28px;">
+        <div id="settings-saved" style="display:none;color:#2a7a2a;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px;">✓ Shranjeno</div>
+        <div class="modal-field-label">Ime salona</div>
+        <input class="modal-input" type="text" id="s-name" style="margin-bottom:14px;" />
+        <div class="modal-field-label">Naslov</div>
+        <input class="modal-input" type="text" id="s-address" style="margin-bottom:14px;" />
+        <div class="modal-field-label">Telefon</div>
+        <input class="modal-input" type="text" id="s-phone" style="margin-bottom:14px;" />
+        <div class="modal-field-label">E-pošta za obvestila</div>
+        <input class="modal-input" type="email" id="s-email" style="margin-bottom:14px;" />
+        <div class="modal-field-label">Storitve in cenik</div>
+        <textarea class="modal-input" id="s-services" rows="10" style="resize:vertical;font-family:system-ui,sans-serif;line-height:1.6;margin-bottom:14px;"></textarea>
+        <div style="font-size:11px;color:#aaa;margin-bottom:20px;">Vsaka storitev v svoji vrstici, npr: - Ženski haircut: 25-45 EUR</div>
+      </div>
+      <div class="schedule-footer">
+        <div></div>
+        <button class="save-btn" onclick="saveSettings()">Shrani nastavitve</button>
+      </div>
+    </div>
+  </div>
+</div>
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
       <div class="modal-header">
@@ -1344,7 +1390,7 @@ function buildAdminPage(salon) {
     function getDayKey(d) { return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()]; }
 
     function switchTab(name) {
-      document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik'][i] === name));
+      document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik','nastavitve'][i] === name));
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
     }
@@ -1352,7 +1398,38 @@ function buildAdminPage(salon) {
     function formatDate(d) { return d.toISOString().split('T')[0]; }
     function formatDateSl(d) { return d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
     function isToday(d) { return d.toDateString() === new Date().toDateString(); }
+    // Naloži nastavitve
+    async function loadSettings() {
+      const res = await fetch(API_URL + '/admin/' + SALON_ID + '/settings');
+      const data = await res.json();
+      document.getElementById('s-name').value = data.name || '';
+      document.getElementById('s-address').value = data.address || '';
+      document.getElementById('s-phone').value = data.phone || '';
+      document.getElementById('s-email').value = data.notification_email || '';
+      document.getElementById('s-services').value = data.services || '';
+    }
 
+    async function saveSettings() {
+      const res = await fetch(API_URL + '/admin/' + SALON_ID + '/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('s-name').value.trim(),
+          address: document.getElementById('s-address').value.trim(),
+          phone: document.getElementById('s-phone').value.trim(),
+          notificationEmail: document.getElementById('s-email').value.trim(),
+          services: document.getElementById('s-services').value.trim()
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        const msg = document.getElementById('settings-saved');
+        msg.style.display = 'block';
+        setTimeout(() => msg.style.display = 'none', 2500);
+      }
+    }
+
+    loadSettings();
     async function loadSlots() {
       const dateStr = formatDate(currentDate);
       const isTodayFlag = isToday(currentDate);
