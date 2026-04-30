@@ -8,9 +8,114 @@ const { Pool } = require('pg');
 const sgMail = require('@sendgrid/mail');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 app.use(cors());
+
+// ─── STRIPE WEBHOOK (mora biti PRED express.json!) ────────────────────────────
+app.post('/stripe-webhook',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    let event;
+
+    try {
+      if (process.env.STRIPE_WEBHOOK_SECRET && sig) {
+        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+      } else {
+        event = JSON.parse(req.body);
+      }
+    } catch (err) {
+      console.error('❌ Webhook signature error:', err.message);
+      return res.status(400).send('Webhook Error: ' + err.message);
+    }
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const customerEmail = session.customer_details?.email || session.customer_email || '';
+      const customerName = session.customer_details?.name || '';
+      const amount = session.amount_total / 100;
+
+      let plan = 'pro';
+      if (amount <= 29) plan = 'starter';
+      else if (amount <= 49) plan = 'pro';
+      else plan = 'agency';
+
+      console.log(`✅ Novo plačilo: ${customerEmail} — ${plan} — ${amount}€`);
+
+      const salonId = 'salon_' + Date.now();
+      const slug = (customerEmail.split('@')[0].replace(/[^a-z0-9]/gi, '').toLowerCase() || 'salon') + '_' + Date.now();
+
+      try {
+        await pool.query(`
+          INSERT INTO salons (id, name, address, phone, hours, services, notification_email, schedule, plan, billing_period_start, stripe_customer_id, stripe_session_id, slug)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,CURRENT_DATE,$10,$11,$12)
+        `, [
+          salonId,
+          customerName ? customerName + ' — Salon' : 'Moj Salon',
+          'Naslov še ni nastavljen',
+          '',
+          '',
+          '- Dodajte storitve v admin panelu',
+          customerEmail,
+          JSON.stringify(DEFAULT_SCHEDULE),
+          plan,
+          session.customer || '',
+          session.id,
+          slug
+        ]);
+
+        await pool.query(`
+          INSERT INTO subscriptions (salon_id, stripe_session_id, stripe_customer_id, plan, amount, customer_email, customer_name)
+          VALUES ($1,$2,$3,$4,$5,$6,$7)
+        `, [salonId, session.id, session.customer || '', plan, amount, customerEmail, customerName]);
+
+        const salonUrl = `${process.env.API_URL || 'https://bookwell.si'}/salon/${slug}`;
+        const adminUrl = `${process.env.API_URL || 'https://bookwell.si'}/admin/${salonId}`;
+        const planNames = { starter: 'Starter', pro: 'Pro', agency: 'Agency' };
+        const chatLimits = { starter: '500', pro: '2.000', agency: 'Neomejeno' };
+
+        await sgMail.send({
+          to: customerEmail,
+          from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
+          subject: `🎉 Dobrodošli v BookWell — Vaš AI asistent je pripravljen`,
+          html: `
+            <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+              <div style="background:#0a0a0a;padding:28px;text-align:center;">
+                <h1 style="color:#c9984a;margin:0;font-size:28px;font-family:Georgia,serif;">BookWell</h1>
+                <p style="color:rgba(255,255,255,.35);margin:8px 0 0;font-size:11px;letter-spacing:.12em;text-transform:uppercase;">Plan: ${planNames[plan]} · ${chatLimits[plan]} sporočil/mes</p>
+              </div>
+              <div style="background:#fff;padding:36px;border:1px solid #e0e0e0;border-top:none;">
+                <p style="font-size:16px;margin:0 0 12px;">Pozdravljeni${customerName ? ' ' + customerName : ''}!</p>
+                <p style="color:#666;font-size:14px;line-height:1.7;margin:0 0 28px;">Vaše plačilo je uspešno. AI asistent za vaš salon je pripravljen za delo.</p>
+                <div style="background:#f7f7f5;border-left:3px solid #c9984a;padding:18px 20px;margin-bottom:28px;">
+                  <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#0a0a0a;">Naslednji koraki:</p>
+                  <p style="margin:0 0 8px;font-size:13px;color:#444;">1. Odprite admin panel in nastavite ime, naslov in telefon salona</p>
+                  <p style="margin:0 0 8px;font-size:13px;color:#444;">2. Dodajte storitve s cenami in delovni čas</p>
+                  <p style="margin:0;font-size:13px;color:#444;">3. Delite chat link na Instagram, Facebook ali spletni strani</p>
+                </div>
+                <a href="${adminUrl}" style="display:block;background:#0a0a0a;color:#c9984a;padding:15px 24px;text-decoration:none;font-weight:700;font-size:13px;text-align:center;letter-spacing:.08em;margin-bottom:10px;">→ Odpri Admin Panel</a>
+                <a href="${salonUrl}" style="display:block;background:#f7f7f5;color:#0a0a0a;padding:14px 24px;text-decoration:none;font-size:13px;text-align:center;border:1px solid #e0e0e0;">→ Vaš Chat Link (za stranke)</a>
+                <p style="margin:28px 0 0;font-size:11px;color:#aaa;line-height:1.6;">
+                  Vprašanja? Pišite na <a href="mailto:info@bookwell.si" style="color:#c9984a;">info@bookwell.si</a>
+                </p>
+              </div>
+              <div style="text-align:center;padding:16px;font-size:11px;color:#bbb;">BookWell.si · AI Recepcionist za salone</div>
+            </div>
+          `
+        });
+        console.log('✅ Welcome email poslan:', customerEmail);
+      } catch (err) {
+        console.error('❌ Webhook DB/email napaka:', err.message);
+      }
+    }
+
+    res.json({ received: true });
+  }
+);
+
+// ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
 app.use(express.json());
 
 app.use(session({
@@ -27,6 +132,20 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
+
+// ─── PLAN CONFIG ──────────────────────────────────────────────────────────────
+const PLANS = {
+  starter: { name: 'Starter', price: 29, chatLimit: 500 },
+  pro:     { name: 'Pro',     price: 49, chatLimit: 2000 },
+  agency:  { name: 'Agency',  price: 99, chatLimit: 999999 }
+};
+
+// Zamenjaj z resničnimi Stripe Payment Linki ko jih kreiraš v dashboardu
+const STRIPE_LINKS = {
+  starter: process.env.STRIPE_LINK_STARTER || 'https://buy.stripe.com/ZAMENJAJ_STARTER',
+  pro:     process.env.STRIPE_LINK_PRO     || 'https://buy.stripe.com/ZAMENJAJ_PRO',
+  agency:  process.env.STRIPE_LINK_AGENCY  || 'https://buy.stripe.com/ZAMENJAJ_AGENCY'
+};
 
 const DEFAULT_SCHEDULE = {
   mon: { open: true,  from: '08:00', to: '20:00' },
@@ -86,6 +205,16 @@ async function initDB() {
     )
   `);
   await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS schedule JSONB DEFAULT NULL`);
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE`);
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'salon'`);
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS admin_username TEXT`);
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS admin_password TEXT`);
+  // Stripe / plan stolpci
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'pro'`);
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS chat_count INTEGER DEFAULT 0`);
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS billing_period_start DATE DEFAULT CURRENT_DATE`);
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`);
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS stripe_session_id TEXT`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS timeslots (
       id SERIAL PRIMARY KEY,
@@ -101,21 +230,33 @@ async function initDB() {
       UNIQUE(salon_id, date, time)
     )
   `);
-  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE`);
-  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'salon'`);
-  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS admin_username TEXT`);
-  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS admin_password TEXT`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id SERIAL PRIMARY KEY,
+      salon_id TEXT REFERENCES salons(id),
+      stripe_session_id TEXT,
+      stripe_customer_id TEXT,
+      plan TEXT NOT NULL,
+      status TEXT DEFAULT 'active',
+      amount INTEGER,
+      customer_email TEXT,
+      customer_name TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
   const { rows } = await pool.query('SELECT id FROM salons WHERE id = $1', ['salon_1']);
   if (rows.length === 0) {
     await pool.query(`
-      INSERT INTO salons (id, name, address, phone, hours, services, notification_email, schedule)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO salons (id, name, address, phone, hours, services, notification_email, schedule, plan)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `, [
       'salon_1', 'Salon Aurora', 'Copova 5, Ljubljana', '01 234 5678',
       'Pon-Pet: 8:00-20:00, Sob: 8:00-14:00, Ned: zaprto',
       '- Ženski haircut: 25-45 EUR\n- Moški haircut: 15-20 EUR\n- Barvanje (celo): 60-120 EUR\n- Balayage/highlights: 80-150 EUR\n- Trajni kodri: 70-100 EUR\n- Frizura za posebne priložnosti: 40-65 EUR\n- Manikura: 20-30 EUR\n- Pedikura: 25-35 EUR',
       'salon@aurora.si',
-      JSON.stringify(DEFAULT_SCHEDULE)
+      JSON.stringify(DEFAULT_SCHEDULE),
+      'agency'
     ]);
   }
   console.log('DB inicializiran');
@@ -131,59 +272,36 @@ async function requireAdminAuth(req, res, next) {
   res.redirect(`/admin-login/${salonId}`);
 }
 
-// ─── EMAIL FUNKCIJE ──────────────────────────────────────────────────────────
+// ─── EMAIL FUNKCIJE ───────────────────────────────────────────────────────────
 async function sendConfirmationEmail(customerEmail, customerName, salon, date, time, service) {
   try {
     const dateLj = new Date(date + 'T00:00:00');
     const dateFormatted = dateLj.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    const msg = {
+    await sgMail.send({
       to: customerEmail,
       from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
       subject: `✅ Rezervacija potrjena - ${salon.name}`,
       html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #2d2520;">
-          <div style="background: #1a1410; padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
-            <h1 style="color: #c9a84c; margin: 0; font-size: 24px;">✅ Rezervacija Potrjena</h1>
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#2d2520;">
+          <div style="background:#1a1410;padding:20px;border-radius:12px 12px 0 0;text-align:center;">
+            <h1 style="color:#c9a84c;margin:0;font-size:24px;">✅ Rezervacija Potrjena</h1>
           </div>
-          <div style="background: #fff; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <p style="margin: 0 0 20px 0; font-size: 16px;">Pozdravljeni <strong>${customerName}</strong>,</p>
-            <p style="margin: 0 0 25px 0; font-size: 14px; color: #6b5f52;">Vaša rezervacija je bila uspešno potrjena. Podrobnosti so spodaj:</p>
-            <div style="background: #f5f0eb; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
-              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
-                <span style="color: #6b5f52;">📅 Datum:</span>
-                <strong style="color: #1a1410;">${dateFormatted}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
-                <span style="color: #6b5f52;">🕐 Ura:</span>
-                <strong style="color: #1a1410;">${time}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
-                <span style="color: #6b5f52;">💇 Storitev:</span>
-                <strong style="color: #1a1410;">${service}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; font-size: 14px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 12px;">
-                <span style="color: #6b5f52;">📍 Naslov:</span>
-                <strong style="color: #1a1410;">${salon.address}</strong>
-              </div>
+          <div style="background:#fff;padding:30px;border-radius:0 0 12px 12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+            <p style="margin:0 0 20px;font-size:16px;">Pozdravljeni <strong>${customerName}</strong>,</p>
+            <div style="background:#f5f0eb;padding:20px;border-radius:8px;margin-bottom:25px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px;"><span style="color:#6b5f52;">📅 Datum:</span><strong>${dateFormatted}</strong></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px;"><span style="color:#6b5f52;">🕐 Ura:</span><strong>${time}</strong></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px;"><span style="color:#6b5f52;">💇 Storitev:</span><strong>${service}</strong></div>
+              <div style="display:flex;justify-content:space-between;font-size:14px;border-top:1px solid rgba(0,0,0,0.1);padding-top:12px;"><span style="color:#6b5f52;">📍 Naslov:</span><strong>${salon.address}</strong></div>
             </div>
-            <div style="background: #dcfce7; border-left: 4px solid #4ade80; padding: 15px; border-radius: 4px; margin-bottom: 25px; font-size: 13px; color: #16a34a;">
-              <strong>💡 Nasvet:</strong> Prosimo, pridite 5 minut prej. Če morate odpovedati termin, nas pokličite na ${salon.phone}.
-            </div>
-            <div style="border-top: 1px solid #e5e7eb; padding-top: 20px;">
-              <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                Če potrebujete pomoč ali želite odpovedati termin, nas kontaktirajte:<br>
-                📞 <strong>${salon.phone}</strong><br>
-                📧 <strong>${salon.notification_email}</strong>
-              </p>
+            <div style="background:#dcfce7;border-left:4px solid #4ade80;padding:15px;border-radius:4px;font-size:13px;color:#16a34a;">
+              <strong>💡 Nasvet:</strong> Prosimo, pridite 5 minut prej. Če morate odpovedati, nas pokličite na ${salon.phone}.
             </div>
           </div>
-          <div style="text-align: center; padding: 15px; font-size: 11px; color: #aaa;">
-            <p style="margin: 0;">Poganja BookWell.si</p>
-          </div>
+          <div style="text-align:center;padding:15px;font-size:11px;color:#aaa;"><p style="margin:0;">Poganja BookWell.si</p></div>
         </div>
       `
-    };
-    await sgMail.send(msg);
+    });
     console.log('✅ Potrditveni e-mail poslan stranki:', customerEmail);
   } catch (err) {
     console.error('❌ Napaka pri pošiljanju e-maila stranki:', err);
@@ -194,61 +312,49 @@ async function sendNotificationToSalon(salon, customerName, customerEmail, custo
   try {
     const dateLj = new Date(date + 'T00:00:00');
     const dateFormatted = dateLj.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    const msg = {
+    await sgMail.send({
       to: salon.notification_email,
       from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
       subject: `🔔 Nova Rezervacija - ${salon.name} (${dateFormatted} ${time})`,
       html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #2d2520;">
-          <div style="background: #1a1410; padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
-            <h1 style="color: #c9a84c; margin: 0; font-size: 24px;">🔔 Nova Rezervacija</h1>
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#2d2520;">
+          <div style="background:#1a1410;padding:20px;border-radius:12px 12px 0 0;text-align:center;">
+            <h1 style="color:#c9a84c;margin:0;font-size:24px;">🔔 Nova Rezervacija</h1>
           </div>
-          <div style="background: #fff; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <p style="margin: 0 0 20px 0; font-size: 16px;">Nova rezervacija v salonu <strong>${salon.name}</strong>!</p>
-            <div style="background: #f5f0eb; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
-              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
-                <span style="color: #6b5f52;">👤 Ime:</span>
-                <strong style="color: #1a1410;">${customerName}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
-                <span style="color: #6b5f52;">📞 Telefon:</span>
-                <strong style="color: #1a1410;"><a href="tel:${customerPhone}" style="color: #1a1410; text-decoration: none;">${customerPhone}</a></strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
-                <span style="color: #6b5f52;">📧 E-pošta:</span>
-                <strong style="color: #1a1410;"><a href="mailto:${customerEmail}" style="color: #1a1410; text-decoration: none;">${customerEmail}</a></strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
-                <span style="color: #6b5f52;">📅 Datum:</span>
-                <strong style="color: #1a1410;">${dateFormatted}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
-                <span style="color: #6b5f52;">🕐 Ura:</span>
-                <strong style="color: #1a1410;">${time}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; font-size: 14px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 12px;">
-                <span style="color: #6b5f52;">💇 Storitev:</span>
-                <strong style="color: #1a1410;">${service}</strong>
-              </div>
+          <div style="background:#fff;padding:30px;border-radius:0 0 12px 12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+            <p style="margin:0 0 20px;font-size:16px;">Nova rezervacija v salonu <strong>${salon.name}</strong>!</p>
+            <div style="background:#f5f0eb;padding:20px;border-radius:8px;margin-bottom:25px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px;"><span style="color:#6b5f52;">👤 Ime:</span><strong>${customerName}</strong></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px;"><span style="color:#6b5f52;">📞 Telefon:</span><strong><a href="tel:${customerPhone}" style="color:#1a1410;text-decoration:none;">${customerPhone}</a></strong></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px;"><span style="color:#6b5f52;">📧 E-pošta:</span><strong>${customerEmail}</strong></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px;"><span style="color:#6b5f52;">📅 Datum:</span><strong>${dateFormatted}</strong></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px;"><span style="color:#6b5f52;">🕐 Ura:</span><strong>${time}</strong></div>
+              <div style="display:flex;justify-content:space-between;font-size:14px;border-top:1px solid rgba(0,0,0,0.1);padding-top:12px;"><span style="color:#6b5f52;">💇 Storitev:</span><strong>${service}</strong></div>
             </div>
-            <div style="text-align: center;">
-              <a href="${process.env.API_URL || 'https://bookwell.si'}/admin/${salon.id}" style="background: #1a1410; color: #c9a84c; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: 600; font-size: 14px;">
-                Odpri Admin Panel
-              </a>
+            <div style="text-align:center;">
+              <a href="${process.env.API_URL || 'https://bookwell.si'}/admin/${salon.id}" style="background:#1a1410;color:#c9a84c;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:600;font-size:14px;">Odpri Admin Panel</a>
             </div>
           </div>
-          <div style="text-align: center; padding: 15px; font-size: 11px; color: #aaa;">
-            <p style="margin: 0;">Poganja BookWell.si</p>
-          </div>
+          <div style="text-align:center;padding:15px;font-size:11px;color:#aaa;"><p style="margin:0;">Poganja BookWell.si</p></div>
         </div>
       `
-    };
-    await sgMail.send(msg);
+    });
     console.log('✅ Obvestilo e-mail poslano salonu:', salon.notification_email);
   } catch (err) {
     console.error('❌ Napaka pri pošiljanju obvestila salonu:', err);
   }
 }
+
+// ─── PRICING ENDPOINT ─────────────────────────────────────────────────────────
+app.get('/pricing', (req, res) => {
+  res.json({
+    plans: [
+      { id: 'starter', ...PLANS.starter, stripeLink: STRIPE_LINKS.starter },
+      { id: 'pro',     ...PLANS.pro,     stripeLink: STRIPE_LINKS.pro },
+      { id: 'agency',  ...PLANS.agency,  stripeLink: STRIPE_LINKS.agency }
+    ]
+  });
+});
 
 // ─── HOSTED CHAT STRAN ────────────────────────────────────────────────────────
 app.get('/salon/:id', async (req, res) => {
@@ -287,14 +393,9 @@ app.post('/admin-login/:id', async (req, res) => {
   const salon = rows[0];
   if (!salon) return res.status(404).json({ error: 'Not found' });
   if (!salon.admin_password) return res.status(400).json({ error: 'Račun še ni nastavljen' });
-
   const validUser = username === salon.admin_username;
   const validPass = await bcrypt.compare(password, salon.admin_password);
-
-  if (!validUser || !validPass) {
-    return res.status(401).json({ error: 'Napačno uporabniško ime ali geslo' });
-  }
-
+  if (!validUser || !validPass) return res.status(401).json({ error: 'Napačno uporabniško ime ali geslo' });
   req.session.adminSalonId = salon.id;
   res.json({ success: true, redirect: `/admin/${req.params.id}` });
 });
@@ -305,16 +406,9 @@ app.post('/admin-setup/:id', async (req, res) => {
   const salon = rows[0];
   if (!salon) return res.status(404).json({ error: 'Not found' });
   if (salon.admin_password) return res.status(400).json({ error: 'Račun je že nastavljen' });
-  if (!username || !password || password.length < 6) {
-    return res.status(400).json({ error: 'Geslo mora biti vsaj 6 znakov' });
-  }
-
+  if (!username || !password || password.length < 6) return res.status(400).json({ error: 'Geslo mora biti vsaj 6 znakov' });
   const hashed = await bcrypt.hash(password, 10);
-  await pool.query(
-    'UPDATE salons SET admin_username = $1, admin_password = $2 WHERE id = $3',
-    [username, hashed, salon.id]
-  );
-
+  await pool.query('UPDATE salons SET admin_username = $1, admin_password = $2 WHERE id = $3', [username, hashed, salon.id]);
   req.session.adminSalonId = salon.id;
   res.json({ success: true, redirect: `/admin/${req.params.id}` });
 });
@@ -336,14 +430,10 @@ app.get('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
   const { date } = req.query;
   const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
   const salonId = salonRows[0]?.id || req.params.id;
-  const { rows } = await pool.query(
-    'SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 ORDER BY time',
-    [salonId, date]
-  );
+  const { rows } = await pool.query('SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 ORDER BY time', [salonId, date]);
   res.json(rows);
 });
 
-// ─── SPREMENJEN: admin timeslots POST - zdaj sprejme tudi email in ga shrani + pošlje obvestilo ───
 app.post('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
   const { date, time, status, customerName, customerEmail, service } = req.body;
   const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
@@ -360,7 +450,6 @@ app.post('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
       SET status = $4, customer_name = $5, customer_email = $6, service = $7
     `, [salonId, date, time, status, customerName, cleanEmail, service]);
 
-    // Pošlji email stranki če je vpisan
     if (cleanEmail) {
       await sendConfirmationEmail(cleanEmail, customerName || 'Stranka', salon, date, time, service || '');
     }
@@ -370,7 +459,7 @@ app.post('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-// ─── SCHEDULE ENDPOINT ────────────────────────────────────────────────────────
+// ─── SCHEDULE ─────────────────────────────────────────────────────────────────
 app.get('/admin/:id/schedule', requireAdminAuth, async (req, res) => {
   const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
   const salonId = salonRows[0]?.id || req.params.id;
@@ -388,27 +477,21 @@ app.post('/admin/:id/schedule', requireAdminAuth, async (req, res) => {
 // ─── BOOKING ENDPOINT ─────────────────────────────────────────────────────────
 app.post('/booking', async (req, res) => {
   const { salonId, date, time, customerName, customerEmail, customerPhone, service } = req.body;
-  if (!salonId || !date || !time || !customerName || !service) {
-    return res.status(400).json({ error: 'Manjkajo podatki' });
-  }
-
+  if (!salonId || !date || !time || !customerName || !service) return res.status(400).json({ error: 'Manjkajo podatki' });
   const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [salonId]);
   const salon = salonRows[0];
   if (!salon) return res.status(404).json({ error: 'Salon not found' });
-
   const { rows: existing } = await pool.query(
-    "SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3 AND status = 'busy'",
+    "SELECT * FROM timeslots WHERE salon_id=$1 AND date=$2 AND time=$3 AND status='busy'",
     [salon.id, date, time]
   );
   if (existing.length > 0) return res.status(409).json({ error: 'Ta termin je že zaseden.' });
-
   await pool.query(`
     INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, customer_phone, service)
-    VALUES ($1, $2, $3, 'busy', $4, $5, $6, $7)
+    VALUES ($1,$2,$3,'busy',$4,$5,$6,$7)
     ON CONFLICT (salon_id, date, time) DO UPDATE
-    SET status = 'busy', customer_name = $4, customer_email = $5, customer_phone = $6, service = $7
+    SET status='busy', customer_name=$4, customer_email=$5, customer_phone=$6, service=$7
   `, [salon.id, date, time, customerName, customerEmail || '', customerPhone || '', service]);
-
   if (customerEmail) await sendConfirmationEmail(customerEmail, customerName, salon, date, time, service);
   if (salon.notification_email) await sendNotificationToSalon(salon, customerName, customerEmail || '', customerPhone || '', date, service, time);
   res.json({ success: true });
@@ -424,10 +507,34 @@ app.post('/chat', async (req, res) => {
   if (!salon) return res.status(404).json({ error: 'Salon not found' });
 
   const actualSalonId = salon.id;
+
+  // ─── PLAN LIMIT CHECK ────────────────────────────────────────────────────────
+  const plan = PLANS[salon.plan] || PLANS.pro;
+
+  if (salon.billing_period_start) {
+    const billingStart = new Date(salon.billing_period_start);
+    const now = new Date();
+    const monthsPassed = (now.getFullYear() - billingStart.getFullYear()) * 12
+      + (now.getMonth() - billingStart.getMonth());
+    if (monthsPassed >= 1) {
+      await pool.query('UPDATE salons SET chat_count = 0, billing_period_start = CURRENT_DATE WHERE id = $1', [actualSalonId]);
+      salon.chat_count = 0;
+    }
+  }
+
+  if ((salon.chat_count || 0) >= plan.chatLimit) {
+    return res.status(429).json({
+      reply: `Salon je dosegel mesečni limit sporočil. Za nadaljevanje prosimo kontaktirajte lastnika salona.`,
+      bookingDetected: null
+    });
+  }
+
+  await pool.query('UPDATE salons SET chat_count = chat_count + 1 WHERE id = $1', [actualSalonId]);
+
   const todayLj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
   const nextWeek = new Date(todayLj.getTime() + 7 * 24 * 60 * 60 * 1000);
   const { rows: busySlots } = await pool.query(
-    "SELECT date, time FROM timeslots WHERE salon_id = $1 AND date >= $2 AND date <= $3 AND status = 'busy' ORDER BY date, time",
+    "SELECT date, time FROM timeslots WHERE salon_id=$1 AND date>=$2 AND date<=$3 AND status='busy' ORDER BY date, time",
     [actualSalonId, todayLj.toISOString().split('T')[0], nextWeek.toISOString().split('T')[0]]
   );
 
@@ -447,10 +554,7 @@ app.post('/chat', async (req, res) => {
       try {
         const [date, time] = deleteMatch[1].trim().split('T');
         if (date && time) {
-          const result = await pool.query(
-            'DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3',
-            [actualSalonId, date, time]
-          );
+          const result = await pool.query('DELETE FROM timeslots WHERE salon_id=$1 AND date=$2 AND time=$3', [actualSalonId, date, time]);
           console.log('✅ Termin izbrisan - rows:', result.rowCount);
         }
       } catch (e) {
@@ -469,7 +573,7 @@ app.post('/chat', async (req, res) => {
       }
 
       const { rows: existing } = await pool.query(
-        "SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3 AND status = 'busy'",
+        "SELECT * FROM timeslots WHERE salon_id=$1 AND date=$2 AND time=$3 AND status='busy'",
         [actualSalonId, booking.date, booking.time]
       );
 
@@ -481,19 +585,18 @@ app.post('/chat', async (req, res) => {
 
       if (existing.length > 0) {
         if (existing[0].customer_email === finalEmail) {
-          await pool.query(`UPDATE timeslots SET service=$1 WHERE salon_id=$2 AND date=$3 AND time=$4`,
-            [finalService, actualSalonId, booking.date, booking.time]);
+          await pool.query('UPDATE timeslots SET service=$1 WHERE salon_id=$2 AND date=$3 AND time=$4', [finalService, actualSalonId, booking.date, booking.time]);
           const reply = raw.replace(/\[\[DELETE:[^\]]*\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
-          return res.json({ reply, bookingDetected: { date: booking.date, time: booking.time, customerName: finalName, service: finalService, email: finalEmail, phone: finalPhone }});
+          return res.json({ reply, bookingDetected: { date: booking.date, time: booking.time, customerName: finalName, service: finalService, email: finalEmail, phone: finalPhone } });
         }
         return res.json({ reply: 'Oprostite, ta termin je bil ravnokar zaseden. Izberite drug termin.', bookingDetected: null });
       }
 
       await pool.query(`
         INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, customer_phone, service)
-        VALUES ($1, $2, $3, 'busy', $4, $5, $6, $7)
+        VALUES ($1,$2,$3,'busy',$4,$5,$6,$7)
         ON CONFLICT (salon_id, date, time) DO UPDATE
-        SET status = 'busy', customer_name = $4, customer_email = $5, customer_phone = $6, service = $7
+        SET status='busy', customer_name=$4, customer_email=$5, customer_phone=$6, service=$7
       `, [actualSalonId, booking.date, booking.time, finalName, finalEmail, finalPhone, finalService]);
 
       if (finalEmail) await sendConfirmationEmail(finalEmail, finalName, salon, booking.date, booking.time, finalService);
@@ -526,8 +629,8 @@ app.post('/salons', async (req, res) => {
   const { name, address, phone, hours, services, notificationEmail, type } = req.body;
   const id = 'salon_' + Date.now();
   await pool.query(
-    'INSERT INTO salons (id, name, address, phone, hours, services, notification_email, schedule, type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-    [id, name, address, phone, hours, services, notificationEmail, JSON.stringify(DEFAULT_SCHEDULE), type || 'salon']
+    'INSERT INTO salons (id,name,address,phone,hours,services,notification_email,schedule,type,plan) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+    [id, name, address, phone, hours, services, notificationEmail, JSON.stringify(DEFAULT_SCHEDULE), type || 'salon', 'pro']
   );
   res.json({ success: true, salonId: id });
 });
@@ -535,7 +638,7 @@ app.post('/salons', async (req, res) => {
 app.put('/salons/:id', async (req, res) => {
   const { name, address, phone, hours, services, notificationEmail, active } = req.body;
   await pool.query(
-    'UPDATE salons SET name=$1, address=$2, phone=$3, hours=$4, services=$5, notification_email=$6, active=$7 WHERE id=$8',
+    'UPDATE salons SET name=$1,address=$2,phone=$3,hours=$4,services=$5,notification_email=$6,active=$7 WHERE id=$8',
     [name, address, phone, hours, services, notificationEmail, active, req.params.id]
   );
   res.json({ success: true });
@@ -567,7 +670,6 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
     if (allHours.length === 0) continue;
     const busy = busyByDate[dateStr] || new Set();
     let free = allHours.filter(h => !busy.has(h));
-
     if (dateStr === todayDateStr) {
       free = free.filter(h => {
         const [hh, mm] = h.split(':').map(Number);
@@ -576,10 +678,7 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
         return false;
       });
     }
-
-    if (free.length > 0) {
-      days.push(dateStr + ' (' + dayName + '): ' + free.join(', '));
-    }
+    if (free.length > 0) days.push(dateStr + ' (' + dayName + '): ' + free.join(', '));
   }
 
   const slotsText = days.length > 0 ? days.join('\n') : 'Trenutno ni prostih terminov v naslednjih 7 dneh.';
@@ -703,7 +802,7 @@ function buildLoginPage(salon) {
     body { font-family: system-ui, sans-serif; background: #f7f7f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
     .card { background: #fff; border: 1px solid #e0e0e0; width: 100%; max-width: 380px; overflow: hidden; }
     .card-head { background: #0a0a0a; padding: 32px 36px; }
-    .card-head h1 { font-family: 'Playfair Display', serif; font-size: 22px; color: #fff; margin-bottom: 4px; }
+    .card-head h1 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 4px; }
     .card-head p { font-size: 12px; color: rgba(255,255,255,0.4); letter-spacing: 0.08em; text-transform: uppercase; }
     .card-body { padding: 32px 36px; }
     .field { margin-bottom: 20px; }
@@ -769,7 +868,7 @@ function buildSetupPage(salon) {
     body { font-family: system-ui, sans-serif; background: #f7f7f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
     .card { background: #fff; border: 1px solid #e0e0e0; width: 100%; max-width: 400px; overflow: hidden; }
     .card-head { background: #0a0a0a; padding: 32px 36px; }
-    .card-head h1 { font-family: 'Playfair Display', serif; font-size: 22px; color: #fff; margin-bottom: 4px; }
+    .card-head h1 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 4px; }
     .card-head p { font-size: 12px; color: rgba(255,255,255,0.4); letter-spacing: 0.08em; text-transform: uppercase; }
     .notice { background: #fef9c3; border-left: 3px solid #ca8a04; padding: 12px 16px; margin: 24px 36px 0; font-size: 13px; color: #713f12; line-height: 1.5; }
     .card-body { padding: 24px 36px 32px; }
@@ -1001,22 +1100,16 @@ function buildChatPage(salon) {
         removeTyping();
         if (data.needInfo && !customerInfo) {
           addBotMsg(data.reply);
-          if (data.reply && data.reply.trim()) {
-            messages.push({ role: 'assistant', content: data.reply });
-          }
+          if (data.reply && data.reply.trim()) messages.push({ role: 'assistant', content: data.reply });
           showContactForm();
         } else if (data.bookingDetected) {
           addBotMsg(data.reply, data.bookingDetected);
-          if (data.reply && data.reply.trim()) {
-            messages.push({ role: 'assistant', content: data.reply });
-          }
+          if (data.reply && data.reply.trim()) messages.push({ role: 'assistant', content: data.reply });
           messages.push({ role: 'user', content: '[SISTEM: Rezervacija uspešno shranjena.]' });
           messages.push({ role: 'assistant', content: 'Rezervacija je potrjena.' });
         } else {
           addBotMsg(data.reply);
-          if (data.reply && data.reply.trim()) {
-            messages.push({ role: 'assistant', content: data.reply });
-          }
+          if (data.reply && data.reply.trim()) messages.push({ role: 'assistant', content: data.reply });
         }
       } catch(e) {
         removeTyping();
@@ -1048,616 +1141,151 @@ function buildAdminPage(salon) {
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <style>
     :root {
-      --black: #0a0a0a;
-      --white: #ffffff;
-      --off-white: #f7f7f5;
-      --rule: #e0e0e0;
-      --muted: #888888;
-      --ink-light: #444444;
-      --gold: #c9984a;
-      --gold-hover: #b8863a;
+      --black: #0a0a0a; --white: #ffffff; --off-white: #f7f7f5; --rule: #e0e0e0;
+      --muted: #888888; --ink-light: #444444; --gold: #c9984a; --gold-hover: #b8863a;
     }
-
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; }
-
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background: var(--off-white);
-      color: var(--black);
-      font-size: 13px;
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ─── MASTHEAD ─── */
-    .masthead {
-      background: var(--white);
-      border-bottom: 2px solid var(--black);
-      padding: 0 40px;
-      display: flex;
-      align-items: stretch;
-      height: 60px;
-    }
-    .masthead-title {
-      font-family: 'Playfair Display', serif;
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      color: var(--black);
-      display: flex;
-      align-items: center;
-      padding-right: 32px;
-      border-right: 1px solid var(--rule);
-      white-space: nowrap;
-    }
-    .masthead-label {
-      display: flex;
-      align-items: center;
-      padding: 0 24px;
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--muted);
-      border-right: 1px solid var(--rule);
-    }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--off-white); color: var(--black); font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    .masthead { background: var(--white); border-bottom: 2px solid var(--black); padding: 0 40px; display: flex; align-items: stretch; height: 60px; }
+    .masthead-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: var(--black); display: flex; align-items: center; padding-right: 32px; border-right: 1px solid var(--rule); white-space: nowrap; }
+    .masthead-label { display: flex; align-items: center; padding: 0 24px; font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); border-right: 1px solid var(--rule); }
     .masthead-spacer { flex: 1; }
-    .masthead-link {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 0 20px;
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--muted);
-      text-decoration: none;
-      border-left: 1px solid var(--rule);
-      transition: color 0.15s;
-    }
+    .masthead-link { display: flex; align-items: center; gap: 6px; padding: 0 20px; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-decoration: none; border-left: 1px solid var(--rule); transition: color 0.15s; }
     .masthead-link:hover { color: var(--black); }
     .masthead-link svg { width: 10px; height: 10px; }
-
-    /* ─── NAV ─── */
-    .nav {
-      background: var(--white);
-      border-bottom: 1px solid var(--rule);
-      padding: 0 40px;
-      display: flex;
-      gap: 0;
-    }
-    .nav-tab {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 14px 24px 12px;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--muted);
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-      margin-bottom: -1px;
-      transition: color 0.15s;
-      user-select: none;
-    }
+    .nav { background: var(--white); border-bottom: 1px solid var(--rule); padding: 0 40px; display: flex; gap: 0; }
+    .nav-tab { display: flex; align-items: center; gap: 8px; padding: 14px 24px 12px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s; user-select: none; }
     .nav-tab:hover { color: var(--black); }
-    .nav-tab.active {
-      color: var(--black);
-      border-bottom-color: var(--gold);
-    }
-
-    /* ─── LAYOUT ─── */
+    .nav-tab.active { color: var(--black); border-bottom-color: var(--gold); }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     .page { max-width: 880px; margin: 0 auto; padding: 40px 32px; }
-
-    /* ─── DATE NAVIGATION ─── */
-    .date-nav {
-      display: flex;
-      align-items: baseline;
-      gap: 20px;
-      margin-bottom: 8px;
-    }
-    .date-heading {
-      font-family: 'Playfair Display', serif;
-      font-size: 32px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1;
-      color: var(--black);
-      flex: 1;
-    }
-    .date-heading em {
-      font-style: italic;
-      font-weight: 400;
-      color: var(--muted);
-    }
-    .nav-arrow {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--muted);
-      padding: 4px 2px;
-      font-size: 20px;
-      line-height: 1;
-      transition: color 0.12s;
-      font-family: 'Playfair Display', serif;
-    }
+    .date-nav { display: flex; align-items: baseline; gap: 20px; margin-bottom: 8px; }
+    .date-heading { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--black); flex: 1; }
+    .date-heading em { font-style: italic; font-weight: 400; color: var(--muted); }
+    .nav-arrow { background: none; border: none; cursor: pointer; color: var(--muted); padding: 4px 2px; font-size: 20px; line-height: 1; transition: color 0.12s; font-family: 'Playfair Display', serif; }
     .nav-arrow:hover { color: var(--black); }
-    .today-btn {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--muted);
-      background: none;
-      border: 1px solid var(--rule);
-      padding: 5px 12px;
-      cursor: pointer;
-      transition: all 0.12s;
-    }
+    .today-btn { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); background: none; border: 1px solid var(--rule); padding: 5px 12px; cursor: pointer; transition: all 0.12s; }
     .today-btn:hover { border-color: var(--black); color: var(--black); }
-
-    /* ─── RULE ─── */
-    .section-rule {
-      border: none;
-      border-top: 1px solid var(--rule);
-      margin: 16px 0 28px;
-    }
-    .section-rule.thick {
-      border-top: 2px solid var(--black);
-      margin: 0 0 28px;
-    }
-
-    /* ─── STATS ROW ─── */
-    .stats-row {
-      font-size: 12px;
-      font-weight: 500;
-      letter-spacing: 0.04em;
-      color: var(--muted);
-      margin-bottom: 32px;
-      display: flex;
-      align-items: center;
-      gap: 0;
-      flex-wrap: wrap;
-    }
-    .stat-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .stat-item .num {
-      font-family: 'Playfair Display', serif;
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--black);
-      letter-spacing: -0.01em;
-    }
+    .section-rule { border: none; border-top: 1px solid var(--rule); margin: 16px 0 28px; }
+    .section-rule.thick { border-top: 2px solid var(--black); margin: 0 0 28px; }
+    .stats-row { font-size: 12px; font-weight: 500; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 32px; display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
+    .stat-item { display: flex; align-items: center; gap: 6px; }
+    .stat-item .num { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: var(--black); letter-spacing: -0.01em; }
     .stat-item .num.green { color: #2a7a2a; }
     .stat-item .num.red { color: #8a1a1a; }
     .stat-item .num.blue { color: #1a3a7a; }
-    .stat-sep {
-      margin: 0 14px;
-      color: var(--rule);
-      font-size: 16px;
-      font-weight: 300;
-    }
-
-    /* ─── CLOSED BANNER ─── */
-    .closed-banner {
-      border: 1px solid var(--rule);
-      background: var(--white);
-      padding: 56px 40px;
-      text-align: center;
-    }
-    .closed-title {
-      font-family: 'Playfair Display', serif;
-      font-size: 22px;
-      font-weight: 400;
-      font-style: italic;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }
-    .closed-sub {
-      font-size: 12px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--rule);
-      font-weight: 600;
-    }
-
-    /* ─── SLOTS GRID ─── */
-    .slots-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-      gap: 1px;
-      background: var(--rule);
-      border: 1px solid var(--rule);
-    }
-    .slot-card {
-      background: var(--white);
-      padding: 16px 18px 14px;
-      cursor: pointer;
-      transition: background 0.1s;
-      position: relative;
-    }
+    .stat-sep { margin: 0 14px; color: var(--rule); font-size: 16px; font-weight: 300; }
+    .closed-banner { border: 1px solid var(--rule); background: var(--white); padding: 56px 40px; text-align: center; }
+    .closed-title { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 400; font-style: italic; color: var(--muted); margin-bottom: 6px; }
+    .closed-sub { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--rule); font-weight: 600; }
+    .slots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+    .slot-card { background: var(--white); padding: 16px 18px 14px; cursor: pointer; transition: background 0.1s; position: relative; }
     .slot-card:hover { background: var(--off-white); }
     .slot-card.busy { background: var(--black); }
     .slot-card.busy:hover { background: #1a1a1a; }
     .slot-card.bot { background: var(--black); }
     .slot-card.bot:hover { background: #1a1a1a; }
-
-    .slot-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-    }
-    .slot-time {
-      font-family: 'Playfair Display', serif;
-      font-size: 19px;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      color: var(--black);
-      line-height: 1;
-    }
-    .slot-card.busy .slot-time,
-    .slot-card.bot .slot-time {
-      color: var(--white);
-    }
-    .slot-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #ccc;
-      flex-shrink: 0;
-    }
+    .slot-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .slot-time { font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 700; letter-spacing: -0.01em; color: var(--black); line-height: 1; }
+    .slot-card.busy .slot-time, .slot-card.bot .slot-time { color: var(--white); }
+    .slot-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
     .slot-card:not(.busy):not(.bot) .slot-dot { background: #b0b0b0; }
     .slot-card.busy .slot-dot { background: var(--white); }
     .slot-card.bot .slot-dot { background: var(--gold); }
-
-    .slot-name {
-      font-size: 11px;
-      font-weight: 400;
-      color: var(--ink-light);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      line-height: 1.3;
-    }
-    .slot-card.busy .slot-name,
-    .slot-card.bot .slot-name {
-      color: rgba(255,255,255,0.55);
-    }
-    .slot-label {
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-top: 2px;
-    }
+    .slot-name { font-size: 11px; font-weight: 400; color: var(--ink-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+    .slot-card.busy .slot-name, .slot-card.bot .slot-name { color: rgba(255,255,255,0.55); }
+    .slot-label { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
     .slot-card.busy .slot-label { color: rgba(255,255,255,0.3); }
     .slot-card.bot .slot-label { color: var(--gold); }
-
-    /* ─── MODAL ─── */
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.6);
-      z-index: 200;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; align-items: center; justify-content: center; padding: 24px; }
     .modal-overlay.open { display: flex; }
-    .modal {
-      background: var(--white);
-      width: 100%;
-      max-width: 360px;
-      box-shadow: 0 32px 80px rgba(0,0,0,0.3);
-      overflow: hidden;
-    }
-    .modal-header {
-      background: var(--black);
-      padding: 24px 28px 20px;
-      border-bottom: 1px solid #222;
-    }
-    .modal-time-display {
-      font-family: 'Playfair Display', serif;
-      font-size: 36px;
-      font-weight: 700;
-      color: var(--white);
-      letter-spacing: -0.02em;
-      line-height: 1;
-    }
-    .modal-date-label {
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.3);
-      margin-top: 6px;
-    }
+    .modal { background: var(--white); width: 100%; max-width: 360px; box-shadow: 0 32px 80px rgba(0,0,0,0.3); overflow: hidden; }
+    .modal-header { background: var(--black); padding: 24px 28px 20px; border-bottom: 1px solid #222; }
+    .modal-time-display { font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 700; color: var(--white); letter-spacing: -0.02em; line-height: 1; }
+    .modal-date-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.3); margin-top: 6px; }
     .modal-body { padding: 22px 28px; }
-    .modal-info-card {
-      background: var(--off-white);
-      border-left: 2px solid var(--gold);
-      padding: 10px 14px;
-      margin-bottom: 18px;
-      font-size: 12px;
-      color: var(--ink-light);
-      line-height: 1.8;
-      display: none;
-    }
+    .modal-info-card { background: var(--off-white); border-left: 2px solid var(--gold); padding: 10px 14px; margin-bottom: 18px; font-size: 12px; color: var(--ink-light); line-height: 1.8; display: none; }
     .modal-info-card.visible { display: block; }
-    .modal-info-row { display: flex; align-items: center; gap: 8px; }
-    .modal-field-label {
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 5px;
-      margin-top: 14px;
-    }
+    .modal-field-label { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; margin-top: 14px; }
     .modal-field-label:first-child { margin-top: 0; }
-    .modal-field-label .optional {
-      font-weight: 400;
-      letter-spacing: 0;
-      text-transform: none;
-      font-size: 9px;
-      color: #bbb;
-      margin-left: 4px;
-    }
-    .modal-input {
-      width: 100%;
-      padding: 9px 12px;
-      border: 1px solid var(--rule);
-      background: var(--off-white);
-      font-size: 13px;
-      font-family: system-ui, sans-serif;
-      color: var(--black);
-      outline: none;
-      transition: border-color 0.12s;
-      border-radius: 0;
-    }
+    .modal-field-label .optional { font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 9px; color: #bbb; margin-left: 4px; }
+    .modal-input { width: 100%; padding: 9px 12px; border: 1px solid var(--rule); background: var(--off-white); font-size: 13px; font-family: system-ui, sans-serif; color: var(--black); outline: none; transition: border-color 0.12s; border-radius: 0; }
     .modal-input:focus { border-color: var(--black); background: var(--white); }
-    .modal-email-hint {
-      font-size: 10px;
-      color: var(--muted);
-      margin-top: 4px;
-    }
-    .modal-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 8px;
-      margin-top: 20px;
-      padding-top: 18px;
-      border-top: 1px solid var(--rule);
-    }
-    .modal-btn {
-      padding: 9px 10px;
-      border: 1px solid var(--rule);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      font-family: system-ui, sans-serif;
-      cursor: pointer;
-      background: var(--white);
-      color: var(--black);
-      transition: all 0.12s;
-      border-radius: 0;
-    }
+    .modal-email-hint { font-size: 10px; color: var(--muted); margin-top: 4px; }
+    .modal-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--rule); }
+    .modal-btn { padding: 9px 10px; border: 1px solid var(--rule); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-family: system-ui, sans-serif; cursor: pointer; background: var(--white); color: var(--black); transition: all 0.12s; border-radius: 0; }
     .modal-btn:hover { background: var(--off-white); }
-    .modal-btn.btn-busy {
-      background: var(--black);
-      color: var(--white);
-      border-color: var(--black);
-    }
+    .modal-btn.btn-busy { background: var(--black); color: var(--white); border-color: var(--black); }
     .modal-btn.btn-busy:hover { background: #222; }
-    .modal-btn.btn-primary-action {
-      background: var(--gold);
-      color: var(--white);
-      border-color: var(--gold);
-    }
-    .modal-btn.btn-primary-action:hover { background: var(--gold-hover); border-color: var(--gold-hover); }
-
-    /* ─── SCHEDULE ─── */
-    .schedule-card {
-      background: var(--white);
-      border: 1px solid var(--rule);
-    }
-    .schedule-head {
-      padding: 22px 28px;
-      border-bottom: 2px solid var(--black);
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 16px;
-    }
-    .schedule-head-title {
-      font-family: 'Playfair Display', serif;
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--black);
-    }
-    .schedule-head-sub {
-      font-size: 11px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--muted);
-      font-weight: 500;
-    }
-    .day-row {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      padding: 15px 28px;
-      border-bottom: 1px solid var(--rule);
-      transition: background 0.1s;
-    }
+    .schedule-card { background: var(--white); border: 1px solid var(--rule); }
+    .schedule-head { padding: 22px 28px; border-bottom: 2px solid var(--black); display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+    .schedule-head-title { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: var(--black); }
+    .schedule-head-sub { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+    .day-row { display: flex; align-items: center; gap: 20px; padding: 15px 28px; border-bottom: 1px solid var(--rule); transition: background 0.1s; }
     .day-row:last-child { border-bottom: none; }
     .day-row:hover { background: var(--off-white); }
-    .day-name {
-      width: 110px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--black);
-      flex-shrink: 0;
-    }
-    .toggle-wrap {
-      position: relative;
-      width: 36px;
-      height: 18px;
-      flex-shrink: 0;
-    }
+    .day-name { width: 110px; font-size: 13px; font-weight: 500; color: var(--black); flex-shrink: 0; }
+    .toggle-wrap { position: relative; width: 36px; height: 18px; flex-shrink: 0; }
     .toggle-wrap input { opacity: 0; width: 0; height: 0; }
-    .toggle-slider {
-      position: absolute;
-      inset: 0;
-      background: var(--rule);
-      cursor: pointer;
-      transition: 0.2s;
-      border-radius: 0;
-    }
+    .toggle-slider { position: absolute; inset: 0; background: var(--rule); cursor: pointer; transition: 0.2s; border-radius: 0; }
     .toggle-wrap input:checked + .toggle-slider { background: var(--gold); }
-    .toggle-slider::before {
-      content: '';
-      position: absolute;
-      height: 12px;
-      width: 12px;
-      left: 3px;
-      top: 3px;
-      background: var(--white);
-      transition: 0.2s;
-    }
+    .toggle-slider::before { content: ''; position: absolute; height: 12px; width: 12px; left: 3px; top: 3px; background: var(--white); transition: 0.2s; }
     .toggle-wrap input:checked + .toggle-slider::before { transform: translateX(18px); }
-    .day-times {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 13px;
-      color: var(--muted);
-    }
+    .day-times { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
     .day-times.disabled { opacity: 0.25; pointer-events: none; }
-    .day-times input[type=time] {
-      padding: 5px 10px;
-      border: 1px solid var(--rule);
-      font-size: 13px;
-      font-family: system-ui, sans-serif;
-      color: var(--black);
-      background: var(--off-white);
-      outline: none;
-      transition: border-color 0.12s;
-      border-radius: 0;
-    }
+    .day-times input[type=time] { padding: 5px 10px; border: 1px solid var(--rule); font-size: 13px; font-family: system-ui, sans-serif; color: var(--black); background: var(--off-white); outline: none; transition: border-color 0.12s; border-radius: 0; }
     .day-times input[type=time]:focus { border-color: var(--black); background: var(--white); }
     .day-sep { color: var(--rule); font-weight: 300; }
-
-    .schedule-footer {
-      padding: 18px 28px;
-      border-top: 2px solid var(--black);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .save-btn {
-      background: var(--gold);
-      color: var(--white);
-      border: none;
-      padding: 10px 28px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      font-family: system-ui, sans-serif;
-      cursor: pointer;
-      transition: background 0.15s;
-      border-radius: 0;
-    }
+    .schedule-footer { padding: 18px 28px; border-top: 2px solid var(--black); display: flex; align-items: center; justify-content: space-between; }
+    .save-btn { background: var(--gold); color: var(--white); border: none; padding: 10px 28px; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; font-family: system-ui, sans-serif; cursor: pointer; transition: background 0.15s; border-radius: 0; }
     .save-btn:hover { background: var(--gold-hover); }
-    .save-msg {
-      display: none;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #2a7a2a;
-    }
+    .save-msg { display: none; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #2a7a2a; }
     .save-msg.visible { display: flex; align-items: center; gap: 6px; }
-
-    /* ─── SCROLLBAR ─── */
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--rule); }
-
-    /* ─── RESPONSIVE ─── */
     @media (max-width: 600px) {
-      .masthead { padding: 0 20px; }
-      .nav { padding: 0 20px; }
-      .page { padding: 24px 20px; }
-      .date-heading { font-size: 24px; }
-      .slots-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
-      .day-row { padding: 12px 20px; gap: 12px; }
-      .day-name { width: 90px; }
-      .schedule-head, .schedule-footer { padding: 16px 20px; }
-      .modal-body { padding: 18px 22px; }
+      .masthead { padding: 0 20px; } .nav { padding: 0 20px; } .page { padding: 24px 20px; }
+      .date-heading { font-size: 24px; } .slots-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+      .day-row { padding: 12px 20px; gap: 12px; } .day-name { width: 90px; }
+      .schedule-head, .schedule-footer { padding: 16px 20px; } .modal-body { padding: 18px 22px; }
     }
   </style>
 </head>
 <body>
-
   <div class="masthead">
     <div class="masthead-title">${salon.name}</div>
     <div class="masthead-label">Admin Panel</div>
     <div class="masthead-spacer"></div>
     <a href="/${salon.type || 'salon'}/${salon.slug || salon.id}" class="masthead-link">
-      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M4.5 1.5H2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h8a.5.5 0 0 0 .5-.5V7.5M7 1.5h3.5m0 0v3.5m0-3.5L5 7"/>
-      </svg>
+      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.5 1.5H2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h8a.5.5 0 0 0 .5-.5V7.5M7 1.5h3.5m0 0v3.5m0-3.5L5 7"/></svg>
       Javna stran
     </a>
   </div>
-
   <nav class="nav">
     <div class="nav-tab active" onclick="switchTab('termini')">Termini</div>
     <div class="nav-tab" onclick="switchTab('urnik')">Delovni čas</div>
   </nav>
-
-  <!-- TERMINI -->
   <div class="tab-content active" id="tab-termini">
     <div class="page">
-
       <div class="date-nav">
         <button class="nav-arrow" id="prev">&#8592;</button>
         <div class="date-heading" id="dateTitle"></div>
         <button class="today-btn" id="today">Danes</button>
         <button class="nav-arrow" id="next">&#8594;</button>
       </div>
-
       <hr class="section-rule thick">
-
       <div class="stats-row" id="stats-row"></div>
-
       <div id="slots-container"></div>
-
     </div>
   </div>
-
-  <!-- URNIK -->
   <div class="tab-content" id="tab-urnik">
     <div class="page">
       <div class="schedule-card">
         <div class="schedule-head">
-          <div>
-            <div class="schedule-head-title">Delovni čas</div>
-          </div>
+          <div><div class="schedule-head-title">Delovni čas</div></div>
           <div class="schedule-head-sub">Urnik terminov</div>
         </div>
         <div id="schedule-rows"></div>
@@ -1668,8 +1296,6 @@ function buildAdminPage(salon) {
       </div>
     </div>
   </div>
-
-  <!-- MODAL -->
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
       <div class="modal-header">
@@ -1693,7 +1319,6 @@ function buildAdminPage(salon) {
       </div>
     </div>
   </div>
-
   <script>
     const API_URL = '${apiUrl}';
     const SALON_ID = '${salon.id}';
@@ -1716,60 +1341,41 @@ function buildAdminPage(salon) {
       return slots;
     }
 
-    function getDayKey(d) {
-      return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()];
-    }
+    function getDayKey(d) { return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()]; }
 
     function switchTab(name) {
-      document.querySelectorAll('.nav-tab').forEach((t, i) =>
-        t.classList.toggle('active', ['termini','urnik'][i] === name));
+      document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik'][i] === name));
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
     }
 
     function formatDate(d) { return d.toISOString().split('T')[0]; }
-
-    function formatDateSl(d) {
-      return d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    }
-
-    function isToday(d) {
-      return d.toDateString() === new Date().toDateString();
-    }
+    function formatDateSl(d) { return d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
+    function isToday(d) { return d.toDateString() === new Date().toDateString(); }
 
     async function loadSlots() {
       const dateStr = formatDate(currentDate);
       const isTodayFlag = isToday(currentDate);
       const dateHeading = document.getElementById('dateTitle');
-
       const dayName = currentDate.toLocaleDateString('sl-SI', { weekday: 'long' });
       const dayNum = currentDate.toLocaleDateString('sl-SI', { day: 'numeric', month: 'long', year: 'numeric' });
       dateHeading.innerHTML = dayName + ', <em>' + dayNum + (isTodayFlag ? ' — danes' : '') + '</em>';
-
       const dayKey = getDayKey(currentDate);
       const daySchedule = schedule[dayKey];
       const container = document.getElementById('slots-container');
-
       if (!daySchedule || !daySchedule.open) {
-        container.innerHTML = \`
-          <div class="closed-banner">
-            <div class="closed-title">Salon je zaprt</div>
-            <div class="closed-sub">Ta dan ni delovnega časa</div>
-          </div>\`;
+        container.innerHTML = \`<div class="closed-banner"><div class="closed-title">Salon je zaprt</div><div class="closed-sub">Ta dan ni delovnega časa</div></div>\`;
         document.getElementById('stats-row').innerHTML = '';
         return;
       }
-
       const res = await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots?date=' + dateStr);
       const data = await res.json();
       slotsData = {};
       data.forEach(s => { slotsData[s.time] = s; });
-
       const hours = generateSlots(daySchedule.from, daySchedule.to);
       const busyCount = hours.filter(h => slotsData[h] && slotsData[h].status === 'busy').length;
       const botCount = hours.filter(h => slotsData[h] && slotsData[h].status === 'busy' && slotsData[h].customer_email).length;
       const freeCount = hours.length - busyCount;
-
       document.getElementById('stats-row').innerHTML = \`
         <div class="stat-item"><span class="num">\${hours.length}</span>&nbsp;terminov</div>
         <span class="stat-sep">—</span>
@@ -1779,7 +1385,6 @@ function buildAdminPage(salon) {
         <span class="stat-sep">—</span>
         <div class="stat-item"><span class="num blue">\${botCount}</span>&nbsp;bot rezervacij</div>
       \`;
-
       container.innerHTML = '<div class="slots-grid" id="slots"></div>';
       renderSlots(hours);
     }
@@ -1793,23 +1398,11 @@ function buildAdminPage(salon) {
         const isBusy = slot && slot.status === 'busy';
         const isBot = isBusy && slot.customer_email;
         const cls = isBusy ? (isBot ? 'bot' : 'busy') : '';
-
         const card = document.createElement('div');
         card.className = 'slot-card ' + cls;
-
         const statusLabel = isBusy ? (isBot ? 'Bot' : 'Zaseden') : 'Prost';
-        const nameHtml = slot && slot.customer_name
-          ? \`<div class="slot-name">\${slot.customer_name}</div>\`
-          : \`<div class="slot-name">&nbsp;</div>\`;
-
-        card.innerHTML = \`
-          <div class="slot-top">
-            <div class="slot-time">\${hour}</div>
-            <div class="slot-dot"></div>
-          </div>
-          \${nameHtml}
-          <div class="slot-label">\${statusLabel}</div>
-        \`;
+        const nameHtml = slot && slot.customer_name ? \`<div class="slot-name">\${slot.customer_name}</div>\` : \`<div class="slot-name">&nbsp;</div>\`;
+        card.innerHTML = \`<div class="slot-top"><div class="slot-time">\${hour}</div><div class="slot-dot"></div></div>\${nameHtml}<div class="slot-label">\${statusLabel}</div>\`;
         card.addEventListener('click', () => openModal(hour, slot));
         grid.appendChild(card);
       });
@@ -1823,14 +1416,10 @@ function buildAdminPage(salon) {
       document.getElementById('modal-service').value = slot?.service || '';
       document.getElementById('modal-email').value = slot?.customer_email || '';
       document.getElementById('modal-email-hint').textContent = '';
-
       const infoCard = document.getElementById('modal-info-card');
       if (slot && slot.customer_email) {
         infoCard.className = 'modal-info-card visible';
-        infoCard.innerHTML = \`
-          <div class="modal-info-row"><span>✉</span>&nbsp;\${slot.customer_email}</div>
-          <div class="modal-info-row"><span>☏</span>&nbsp;\${slot.customer_phone || '–'}</div>
-        \`;
+        infoCard.innerHTML = \`<div>✉ \${slot.customer_email}</div><div>☏ \${slot.customer_phone || '–'}</div>\`;
       } else {
         infoCard.className = 'modal-info-card';
         infoCard.innerHTML = '';
@@ -1842,24 +1431,18 @@ function buildAdminPage(salon) {
       const customerName = document.getElementById('modal-customer').value.trim();
       const service = document.getElementById('modal-service').value.trim();
       const customerEmail = document.getElementById('modal-email').value.trim();
-
-      // Osnovna email validacija če je vpisan
-      if (customerEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(customerEmail)) {
+      if (customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
         document.getElementById('modal-email-hint').textContent = '⚠ Vpišite veljaven e-poštni naslov.';
         document.getElementById('modal-email-hint').style.color = '#c0392b';
         return;
       }
-
       const res = await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: formatDate(currentDate), time: currentSlot, status, customerName, customerEmail, service })
       });
       const data = await res.json();
-
       document.getElementById('modal-overlay').classList.remove('open');
-
-      // Pokaži potrditev če je bil poslan email
       if (status === 'busy' && customerEmail && data.success) {
         setTimeout(() => {
           const hint = document.createElement('div');
@@ -1869,7 +1452,6 @@ function buildAdminPage(salon) {
           setTimeout(() => hint.remove(), 3500);
         }, 200);
       }
-
       loadSlots();
     }
 
@@ -1882,10 +1464,7 @@ function buildAdminPage(salon) {
         row.className = 'day-row';
         row.innerHTML = \`
           <div class="day-name">\${DAY_NAMES_SL[key]}</div>
-          <label class="toggle-wrap">
-            <input type="checkbox" id="open-\${key}" \${d.open ? 'checked' : ''} onchange="toggleDay('\${key}')">
-            <span class="toggle-slider"></span>
-          </label>
+          <label class="toggle-wrap"><input type="checkbox" id="open-\${key}" \${d.open ? 'checked' : ''} onchange="toggleDay('\${key}')"><span class="toggle-slider"></span></label>
           <div class="day-times \${d.open ? '' : 'disabled'}" id="times-\${key}">
             <input type="time" id="from-\${key}" value="\${d.from}" step="1800">
             <span class="day-sep">–</span>
@@ -1922,26 +1501,14 @@ function buildAdminPage(salon) {
       loadSlots();
     }
 
-    // ── Events ──
-    document.getElementById('modal-cancel').addEventListener('click', () =>
-      document.getElementById('modal-overlay').classList.remove('open'));
-    document.getElementById('modal-overlay').addEventListener('click', e => {
-      if (e.target === document.getElementById('modal-overlay'))
-        document.getElementById('modal-overlay').classList.remove('open');
-    });
+    document.getElementById('modal-cancel').addEventListener('click', () => document.getElementById('modal-overlay').classList.remove('open'));
+    document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target === document.getElementById('modal-overlay')) document.getElementById('modal-overlay').classList.remove('open'); });
     document.getElementById('modal-set-busy').addEventListener('click', () => saveSlot('busy'));
     document.getElementById('modal-set-free').addEventListener('click', () => saveSlot('free'));
-    document.getElementById('prev').addEventListener('click', () => {
-      currentDate.setDate(currentDate.getDate() - 1); loadSlots();
-    });
-    document.getElementById('next').addEventListener('click', () => {
-      currentDate.setDate(currentDate.getDate() + 1); loadSlots();
-    });
-    document.getElementById('today').addEventListener('click', () => {
-      currentDate = new Date(); loadSlots();
-    });
+    document.getElementById('prev').addEventListener('click', () => { currentDate.setDate(currentDate.getDate() - 1); loadSlots(); });
+    document.getElementById('next').addEventListener('click', () => { currentDate.setDate(currentDate.getDate() + 1); loadSlots(); });
+    document.getElementById('today').addEventListener('click', () => { currentDate = new Date(); loadSlots(); });
 
-    // ── Init ──
     loadSlots();
     buildScheduleUI();
     setInterval(loadSlots, 30000);
