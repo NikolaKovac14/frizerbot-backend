@@ -786,22 +786,19 @@ async function lwSendMsg() {
   lwShowTyping();
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://bookwell.si/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1000,
-        system: SYSTEM_PROMPT,
+        salonId: 'salon_1',
         messages: lwHistory
       })
     });
     const data = await res.json();
     lwHideTyping();
-    if (data.content && data.content[0]) {
-      const reply = data.content[0].text;
-      lwAddMsg('bot', reply);
-      lwHistory.push({ role:'assistant', content: reply });
+    if (data.reply) {
+      lwAddMsg('bot', data.reply);
+      lwHistory.push({ role:'assistant', content: data.reply });
     } else {
       throw new Error('No response');
     }

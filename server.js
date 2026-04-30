@@ -374,6 +374,19 @@ app.post('/admin/:id/settings', requireAdminAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/admin/:id/change-password', requireAdminAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salon = rows[0];
+  if (!salon) return res.status(404).json({ error: 'Not found' });
+  const valid = await bcrypt.compare(currentPassword, salon.admin_password);
+  if (!valid) return res.status(401).json({ error: 'Trenutno geslo je napačno' });
+  if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: 'Novo geslo mora biti vsaj 6 znakov' });
+  const hashed = await bcrypt.hash(newPassword, 10);
+  await pool.query('UPDATE salons SET admin_password = $1 WHERE id = $2', [hashed, salon.id]);
+  res.json({ success: true });
+});
+
 // ─── HOSTED CHAT STRAN ────────────────────────────────────────────────────────
 app.get('/salon/:id', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [req.params.id]);
@@ -1330,6 +1343,11 @@ function buildAdminPage(salon) {
       </div>
       <div style="padding:28px;">
         <div id="settings-saved" style="display:none;color:#2a7a2a;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px;">✓ Shranjeno</div>
+        <div style="background:#f7f7f5;border-left:3px solid #c9984a;padding:16px 20px;margin-bottom:24px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:8px;">Poraba sporočil ta mesec</div>
+          <div style="font-family:'Playfair Display',serif;font-size:32px;font-weight:700;color:#0a0a0a;" id="s-chat-count">—</div>
+          <div style="font-size:11px;color:#aaa;margin-top:4px;" id="s-chat-limit"></div>
+        </div>
         <div class="modal-field-label">Ime salona</div>
         <input class="modal-input" type="text" id="s-name" style="margin-bottom:14px;" />
         <div class="modal-field-label">Naslov</div>
@@ -1345,6 +1363,20 @@ function buildAdminPage(salon) {
       <div class="schedule-footer">
         <div></div>
         <button class="save-btn" onclick="saveSettings()">Shrani nastavitve</button>
+      </div>
+      <div style="padding:0 28px 28px;">
+        <div style="border-top:1px solid #e0e0e0;padding-top:24px;margin-top:8px;">
+          <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;margin-bottom:16px;">Sprememba gesla</div>
+          <div id="pw-err" style="display:none;background:#fee2e2;border-left:3px solid #ef4444;padding:10px 14px;font-size:12px;color:#991b1b;margin-bottom:12px;"></div>
+          <div id="pw-ok" style="display:none;background:#dcfce7;border-left:3px solid #4ade80;padding:10px 14px;font-size:12px;color:#16a34a;margin-bottom:12px;">✓ Geslo uspešno spremenjeno</div>
+          <div class="modal-field-label">Trenutno geslo</div>
+          <input class="modal-input" type="password" id="pw-current" style="margin-bottom:10px;" />
+          <div class="modal-field-label">Novo geslo (min. 6 znakov)</div>
+          <input class="modal-input" type="password" id="pw-new" style="margin-bottom:10px;" />
+          <div class="modal-field-label">Potrdi novo geslo</div>
+          <input class="modal-input" type="password" id="pw-new2" style="margin-bottom:16px;" />
+          <button class="save-btn" onclick="changePassword()">Spremeni geslo</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1383,6 +1415,32 @@ function buildAdminPage(salon) {
     const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
     const DAY_NAMES_SL = { mon:'Ponedeljek', tue:'Torek', wed:'Sreda', thu:'Četrtek', fri:'Petek', sat:'Sobota', sun:'Nedelja' };
 
+    async function changePassword() {
+      const current = document.getElementById('pw-current').value;
+      const newPw = document.getElementById('pw-new').value;
+      const newPw2 = document.getElementById('pw-new2').value;
+      const err = document.getElementById('pw-err');
+      const ok = document.getElementById('pw-ok');
+      err.style.display = 'none'; ok.style.display = 'none';
+      if (!current || !newPw || !newPw2) { err.textContent = 'Izpolnite vsa polja.'; err.style.display = 'block'; return; }
+      if (newPw !== newPw2) { err.textContent = 'Novi gesli se ne ujemata.'; err.style.display = 'block'; return; }
+      if (newPw.length < 6) { err.textContent = 'Geslo mora biti vsaj 6 znakov.'; err.style.display = 'block'; return; }
+      const res = await fetch(API_URL + '/admin/' + SALON_ID + '/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: current, newPassword: newPw })
+      });
+      const data = await res.json();
+      if (data.success) {
+        ok.style.display = 'block';
+        document.getElementById('pw-current').value = '';
+        document.getElementById('pw-new').value = '';
+        document.getElementById('pw-new2').value = '';
+      } else {
+        err.textContent = data.error || 'Napaka.';
+        err.style.display = 'block';
+      }
+    }
     function generateSlots(from, to) {
       const slots = [];
       let [h, m] = from.split(':').map(Number);
@@ -1414,6 +1472,10 @@ function buildAdminPage(salon) {
       document.getElementById('s-phone').value = data.phone || '';
       document.getElementById('s-email').value = data.notification_email || '';
       document.getElementById('s-services').value = data.services || '';
+      const planLimits = { starter: 500, pro: 2000, agency: 'Neomejeno' };
+      const limit = planLimits[data.plan] || 2000;
+      document.getElementById('s-chat-count').textContent = (data.chat_count || 0) + ' sporočil';
+      document.getElementById('s-chat-limit').textContent = 'Plan: ' + (data.plan || 'pro') + ' · Limit: ' + limit;
     }
 
     async function saveSettings() {
