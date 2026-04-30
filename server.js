@@ -10,6 +10,7 @@ const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 
 const app = express();
 app.use(cors());
@@ -245,6 +246,7 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS cancel_token TEXT UNIQUE`);
 
   const { rows } = await pool.query('SELECT id FROM salons WHERE id = $1', ['salon_1']);
   if (rows.length === 0) {
@@ -274,10 +276,14 @@ async function requireAdminAuth(req, res, next) {
 }
 
 // ─── EMAIL FUNKCIJE ───────────────────────────────────────────────────────────
-async function sendConfirmationEmail(customerEmail, customerName, salon, date, time, service) {
+async function sendConfirmationEmail(customerEmail, customerName, salon, date, time, service, cancelToken) {
   try {
     const dateLj = new Date(date + 'T00:00:00');
     const dateFormatted = dateLj.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const cancelUrl = cancelToken
+      ? `${process.env.API_URL || 'https://bookwell.si'}/cancel/${cancelToken}`
+      : null;
+
     await sgMail.send({
       to: customerEmail,
       from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
@@ -295,9 +301,16 @@ async function sendConfirmationEmail(customerEmail, customerName, salon, date, t
               <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px;"><span style="color:#6b5f52;">💇 Storitev:</span><strong>${service}</strong></div>
               <div style="display:flex;justify-content:space-between;font-size:14px;border-top:1px solid rgba(0,0,0,0.1);padding-top:12px;"><span style="color:#6b5f52;">📍 Naslov:</span><strong>${salon.address}</strong></div>
             </div>
-            <div style="background:#dcfce7;border-left:4px solid #4ade80;padding:15px;border-radius:4px;font-size:13px;color:#16a34a;">
+            <div style="background:#dcfce7;border-left:4px solid #4ade80;padding:15px;border-radius:4px;font-size:13px;color:#16a34a;margin-bottom:${cancelUrl ? '20px' : '0'};">
               <strong>💡 Nasvet:</strong> Prosimo, pridite 5 minut prej. Če morate odpovedati, nas pokličite na ${salon.phone}.
             </div>
+            ${cancelUrl ? `
+            <div style="text-align:center;padding-top:4px;">
+              <a href="${cancelUrl}" style="display:inline-block;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:11px 24px;text-decoration:none;font-size:13px;font-weight:600;border-radius:6px;">
+                ✕ Odpovej rezervacijo
+              </a>
+              <p style="margin:8px 0 0;font-size:11px;color:#aaa;">Gumb deluje samo enkrat in samo za to rezervacijo.</p>
+            </div>` : ''}
           </div>
           <div style="text-align:center;padding:15px;font-size:11px;color:#aaa;"><p style="margin:0;">Poganja BookWell.si</p></div>
         </div>
@@ -482,7 +495,9 @@ app.post('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
     `, [salonId, date, time, status, customerName, cleanEmail, service]);
 
     if (cleanEmail) {
-      await sendConfirmationEmail(cleanEmail, customerName || 'Stranka', salon, date, time, service || '');
+      const cancelToken = crypto.randomBytes(20).toString('hex');
+      await pool.query('UPDATE timeslots SET cancel_token = $1 WHERE salon_id = $2 AND date = $3 AND time = $4', [cancelToken, salonId, date, time]);
+      await sendConfirmationEmail(cleanEmail, customerName || 'Stranka', salon, date, time, service || '', cancelToken);
     }
   } else {
     await pool.query('DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3', [salonId, date, time]);
@@ -523,7 +538,11 @@ app.post('/booking', async (req, res) => {
     ON CONFLICT (salon_id, date, time) DO UPDATE
     SET status='busy', customer_name=$4, customer_email=$5, customer_phone=$6, service=$7
   `, [salon.id, date, time, customerName, customerEmail || '', customerPhone || '', service]);
-  if (customerEmail) await sendConfirmationEmail(customerEmail, customerName, salon, date, time, service);
+  if (customerEmail) {
+    const cancelToken = crypto.randomBytes(20).toString('hex');
+    await pool.query('UPDATE timeslots SET cancel_token = $1 WHERE salon_id = $2 AND date = $3 AND time = $4', [cancelToken, salon.id, date, time]);
+    await sendConfirmationEmail(customerEmail, customerName, salon, date, time, service, cancelToken);
+  }
   if (salon.notification_email) await sendNotificationToSalon(salon, customerName, customerEmail || '', customerPhone || '', date, service, time);
   res.json({ success: true });
 });
@@ -636,7 +655,11 @@ app.post('/chat', chatLimiter, async (req, res) => {
         SET status='busy', customer_name=$4, customer_email=$5, customer_phone=$6, service=$7
       `, [actualSalonId, booking.date, booking.time, finalName, finalEmail, finalPhone, finalService]);
 
-      if (finalEmail) await sendConfirmationEmail(finalEmail, finalName, salon, booking.date, booking.time, finalService);
+      if (finalEmail) {
+        const cancelToken = crypto.randomBytes(20).toString('hex');
+        await pool.query('UPDATE timeslots SET cancel_token = $1 WHERE salon_id = $2 AND date = $3 AND time = $4', [cancelToken, actualSalonId, booking.date, booking.time]);
+        await sendConfirmationEmail(finalEmail, finalName, salon, booking.date, booking.time, finalService, cancelToken);
+      }
       if (salon.notification_email) await sendNotificationToSalon(salon, finalName, finalEmail, finalPhone, booking.date, finalService, booking.time);
 
       const reply = raw.replace(/\[\[DELETE:[^\]]*\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
@@ -1662,6 +1685,52 @@ function buildAdminPage(salon) {
 </body>
 </html>`;
 }
+
+app.get('/cancel/:token', async (req, res) => {
+  const { token } = req.params;
+  const { rows } = await pool.query(
+    "SELECT t.*, s.name as salon_name, s.phone as salon_phone, s.notification_email FROM timeslots t JOIN salons s ON t.salon_id = s.id WHERE t.cancel_token = $1 AND t.status = 'busy'",
+    [token]
+  );
+  if (!rows[0]) {
+    return res.send(`<!DOCTYPE html><html lang="sl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Odpoved termina</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#f7f7f5;min-height:100vh;display:flex;align-items:center;justify-content:center}.card{background:#fff;border:1px solid #e0e0e0;max-width:400px;width:100%;overflow:hidden}.head{background:#0a0a0a;padding:28px 32px}.head h1{font-size:20px;color:#fff;font-weight:700}.body{padding:32px}.icon{font-size:40px;margin-bottom:16px}.msg{font-size:14px;color:#666;line-height:1.6}</style></head><body><div class="card"><div class="head"><h1>BookWell</h1></div><div class="body"><div class="icon">⚠️</div><p class="msg">Ta rezervacija ne obstaja ali je bila že odpovedana.</p></div></div></body></html>`);
+  }
+
+  const slot = rows[0];
+  const dateFormatted = new Date(slot.date).toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  await pool.query('DELETE FROM timeslots WHERE cancel_token = $1', [token]);
+
+  // Obvesti salon
+  try {
+    await sgMail.send({
+      to: slot.notification_email,
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
+      subject: `❌ Odpoved rezervacije - ${slot.salon_name} (${dateFormatted} ${slot.time})`,
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#2d2520;">
+          <div style="background:#1a1410;padding:20px;border-radius:12px 12px 0 0;text-align:center;">
+            <h1 style="color:#c9a84c;margin:0;font-size:22px;">❌ Odpoved Rezervacije</h1>
+          </div>
+          <div style="background:#fff;padding:30px;border-radius:0 0 12px 12px;border:1px solid #e0e0e0;border-top:none;">
+            <p style="font-size:15px;margin:0 0 20px;">Stranka je odpovedala rezervacijo:</p>
+            <div style="background:#f5f0eb;padding:16px 20px;border-radius:8px;">
+              <div style="margin-bottom:10px;font-size:13px;"><span style="color:#6b5f52;">👤 Ime:</span> <strong>${slot.customer_name}</strong></div>
+              <div style="margin-bottom:10px;font-size:13px;"><span style="color:#6b5f52;">📅 Datum:</span> <strong>${dateFormatted}</strong></div>
+              <div style="margin-bottom:10px;font-size:13px;"><span style="color:#6b5f52;">🕐 Ura:</span> <strong>${slot.time}</strong></div>
+              <div style="font-size:13px;"><span style="color:#6b5f52;">💇 Storitev:</span> <strong>${slot.service || '—'}</strong></div>
+            </div>
+          </div>
+          <div style="text-align:center;padding:16px;font-size:11px;color:#bbb;">BookWell.si</div>
+        </div>
+      `
+    });
+  } catch(e) {
+    console.error('❌ Odpoved email napaka:', e.message);
+  }
+
+  res.send(`<!DOCTYPE html><html lang="sl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rezervacija odpovedana</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#f7f7f5;min-height:100vh;display:flex;align-items:center;justify-content:center}.card{background:#fff;border:1px solid #e0e0e0;max-width:420px;width:100%;overflow:hidden}.head{background:#0a0a0a;padding:28px 32px}.head h1{font-size:20px;color:#fff;font-weight:700}.body{padding:32px}.icon{font-size:40px;margin-bottom:16px}.title{font-size:18px;font-weight:700;color:#0a0a0a;margin-bottom:10px}.details{background:#f5f0eb;border-left:3px solid #c9984a;padding:14px 18px;margin:18px 0;font-size:13px;color:#444;line-height:2}.msg{font-size:13px;color:#888;line-height:1.6;margin-top:16px}</style></head><body><div class="card"><div class="head"><h1>BookWell</h1></div><div class="body"><div class="icon">✅</div><div class="title">Rezervacija odpovedana</div><div class="details"><div>📅 ${dateFormatted}</div><div>🕐 ${slot.time}</div><div>💇 ${slot.service || '—'}</div></div><p class="msg">Vaša rezervacija je bila uspešno odpovedana. Salon je bil obveščen.</p></div></div></body></html>`);
+});
 
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/landing.html');
