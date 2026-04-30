@@ -9,6 +9,7 @@ const sgMail = require('@sendgrid/mail');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.use(cors());
@@ -515,7 +516,13 @@ app.post('/booking', async (req, res) => {
 });
 
 // ─── CHAT ─────────────────────────────────────────────────────────────────────
-app.post('/chat', async (req, res) => {
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,  // 1 minuta
+  max: 20,              // max 20 sporočil na minuto per IP
+  message: { reply: 'Preveč zahtevkov. Počakajte minuto.', bookingDetected: null }
+});
+
+app.post('/chat', chatLimiter, async (req, res) => {
   const { salonId, messages, customerInfo } = req.body;
   const filteredMessages = (messages || []).filter(m => m && m.content && m.content.trim() !== '');
 
