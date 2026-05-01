@@ -2213,9 +2213,21 @@ app.get('/dpa', (req, res) => {
   res.sendFile(__dirname + '/dpa.html');
 });
 
+app.get('/gdpr', (req, res) => {
+  res.sendFile(__dirname + '/gdpr.html');
+});
+
+app.get('/contact', (req, res) => {
+  res.sendFile(__dirname + '/contact.html');
+});
+
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/landing.html');
 });
+
+app.use((req, res) => {
+  res.status(404).sendFile(__dirname + '/404.html');
+}); 
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
