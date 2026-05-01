@@ -507,10 +507,24 @@ app.get('/admin-login/:id', async (req, res) => {
   res.send(buildLoginPage(salon));
 });
 
+// Obstoječi chatLimiter ostane
 const chatLimiter = rateLimit({
-  windowMs: 60 * 1000,  // 1 minuta
-  max: 20,              // max 20 sporočil na minuto per IP
+  windowMs: 60 * 1000,
+  max: 20,
   message: { reply: 'Preveč zahtevkov. Počakajte minuto.', bookingDetected: null }
+});
+
+// NOVO — mesečni IP limiter
+const monthlyIpLimiter = rateLimit({
+  windowMs: 30 * 24 * 60 * 60 * 1000, // 30 dni
+  max: 1000,
+  keyGenerator: (req) => req.ip,
+  message: { reply: 'Mesečna omejitev demo chata je dosežena.', bookingDetected: null },
+  skip: (req) => {
+    // Preskoči limiter za prave salone (ne za salon_1 demo)
+    const { salonId } = req.body || {};
+    return salonId && salonId !== 'salon_1';
+  }
 });
 
 const loginLimiter = rateLimit({
@@ -645,7 +659,7 @@ app.post('/booking', async (req, res) => {
 
 // ─── CHAT ─────────────────────────────────────────────────────────────────────
 
-app.post('/chat', chatLimiter, async (req, res) => {
+app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
   const { salonId, messages, customerInfo } = req.body;
   const filteredMessages = (messages || []).filter(m => m && m.content && m.content.trim() !== '');
 
