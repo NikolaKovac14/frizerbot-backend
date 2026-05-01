@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Uveljavljanje pravic (GDPR) — BookWell</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black: #0a0a08;
+      --white: #ffffff;
+      --paper: #faf7f2;
+      --text: #1e1c18;
+      --text-2: #5a5448;
+      --gold: #c9984a;
+      --gold-dk: #8c6830;
+      --muted: #8a8070;
+      --border: rgba(0,0,0,0.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--paper);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+      background: rgba(250,247,242,0.94);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(18px);
+      height: 64px;
+      display: flex; align-items: center;
+      padding: 0 6vw;
+      justify-content: space-between;
+    }
+    .logo { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 900; color: var(--black); text-decoration: none; }
+    .logo span { color: var(--gold); }
+    .nav-link { font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+    .nav-link:hover { color: var(--black); }
+
+    .container { max-width: 720px; margin: 0 auto; padding: 120px 6vw 80px; }
+
+    .page-header { text-align: center; margin-bottom: 56px; }
+    .page-header .eyebrow {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--gold-dk); margin-bottom: 16px; display: block;
+    }
+    .page-header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: 700; letter-spacing: -0.02em;
+      color: var(--black); margin-bottom: 12px; line-height: 1.1;
+    }
+    .page-header p { font-size: 14px; color: var(--text-2); line-height: 1.7; max-width: 480px; margin: 0 auto; }
+
+    /* Pravice kartice */
+    .rights-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-bottom: 48px;
+    }
+    .right-card {
+      background: var(--white);
+      padding: 24px;
+      cursor: pointer;
+      transition: background 0.15s;
+      border: 2px solid transparent;
+    }
+    .right-card:hover { background: #fdf9f3; }
+    .right-card.selected { background: var(--black); border-color: var(--black); }
+    .right-card .rc-icon { font-size: 24px; margin-bottom: 10px; display: block; }
+    .right-card h3 { font-size: 14px; font-weight: 700; color: var(--black); margin-bottom: 6px; }
+    .right-card.selected h3 { color: var(--white); }
+    .right-card p { font-size: 12px; color: var(--text-2); line-height: 1.6; }
+    .right-card.selected p { color: rgba(255,255,255,0.5); }
+    .right-card .rc-badge {
+      display: inline-block; margin-top: 10px;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+      background: rgba(201,152,74,0.12); color: var(--gold-dk);
+      padding: 3px 10px;
+    }
+    .right-card.selected .rc-badge { background: rgba(201,152,74,0.2); color: var(--gold); }
+
+    /* Forma */
+    .form-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .form-head {
+      background: var(--black);
+      padding: 20px 28px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .form-head-icon { font-size: 20px; }
+    .form-head h2 { font-size: 15px; font-weight: 700; color: var(--white); }
+    .form-head p { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+    .form-body { padding: 28px; }
+
+    .field { margin-bottom: 20px; }
+    .field label {
+      display: block; font-size: 10px; font-weight: 700;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 7px;
+    }
+    .field input, .field select {
+      width: 100%; padding: 11px 14px;
+      border: 1px solid #ddd; background: var(--paper);
+      font-size: 14px; font-family: inherit; color: var(--black);
+      outline: none; transition: border-color 0.15s, background 0.15s;
+      border-radius: 0;
+    }
+    .field input:focus, .field select:focus { border-color: var(--black); background: var(--white); }
+    .field .hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+    .selected-action-display {
+      background: rgba(201,152,74,0.08);
+      border-left: 3px solid var(--gold);
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: var(--text);
+      display: none;
+    }
+    .selected-action-display.visible { display: block; }
+    .selected-action-display strong { color: var(--black); }
+
+    .submit-btn {
+      width: 100%; padding: 14px;
+      background: var(--black); color: var(--gold);
+      border: none; font-size: 11px; font-weight: 700;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      font-family: inherit; cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .submit-btn:hover { opacity: 0.85; }
+    .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .msg-box {
+      padding: 14px 18px; font-size: 13px; line-height: 1.6;
+      margin-top: 16px; display: none;
+    }
+    .msg-box.success { background: #dcfce7; border-left: 3px solid #4ade80; color: #16a34a; display: block; }
+    .msg-box.error { background: #fee2e2; border-left: 3px solid #ef4444; color: #991b1b; display: block; }
+
+    /* Info blok */
+    .info-section { margin-top: 48px; }
+    .info-section h2 {
+      font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700;
+      color: var(--black); margin-bottom: 20px;
+      padding-bottom: 12px; border-bottom: 1px solid var(--border);
+    }
+    .info-list { display: flex; flex-direction: column; gap: 0; }
+    .info-item {
+      display: flex; gap: 16px; padding: 16px 0;
+      border-bottom: 1px solid var(--border); align-items: flex-start;
+    }
+    .info-item:last-child { border-bottom: none; }
+    .info-item .ii-icon { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+    .info-item h4 { font-size: 14px; font-weight: 600; color: var(--black); margin-bottom: 4px; }
+    .info-item p { font-size: 13px; color: var(--text-2); line-height: 1.6; }
+
+    footer {
+      background: var(--text); color: var(--white);
+      padding: 40px 6vw; margin-top: 80px;
+      text-align: center; font-size: 12px;
+    }
+    footer a { color: var(--gold); text-decoration: none; }
+
+    @media (max-width: 600px) {
+      .container { padding: 80px 5vw 60px; }
+      .rights-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="logo">Book<span>Well</span></a>
+  <a href="/" class="nav-link">← Nazaj</a>
+</nav>
+
+<div class="container">
+  <div class="page-header">
+    <span class="eyebrow">GDPR — Vaše pravice</span>
+    <h1>Uveljavljanje pravic<br>varstva podatkov</h1>
+    <p>Izberite vrsto zahtevka. Poslali vam bomo e-mail s potrditveno povezavo. Odgovorimo v 30 dneh.</p>
+  </div>
+
+  <!-- Izbira pravice -->
+  <div class="rights-grid" id="rightsGrid">
+    <div class="right-card" data-action="access" onclick="selectAction(this)">
+      <span class="rc-icon">📋</span>
+      <h3>Dostop do podatkov</h3>
+      <p>Prejmite kopijo vseh osebnih podatkov, ki jih hranimo o vas.</p>
+      <span class="rc-badge">GDPR čl. 15</span>
+    </div>
+    <div class="right-card" data-action="deletion" onclick="selectAction(this)">
+      <span class="rc-icon">🗑️</span>
+      <h3>Izbris podatkov</h3>
+      <p>Zahtevajte trajni izbris vašega računa in osebnih podatkov.</p>
+      <span class="rc-badge">GDPR čl. 17</span>
+    </div>
+    <div class="right-card" data-action="portability" onclick="selectAction(this)">
+      <span class="rc-icon">📦</span>
+      <h3>Izvoz podatkov</h3>
+      <p>Prejmite svoje podatke v strukturirani obliki (JSON/CSV) za prenos.</p>
+      <span class="rc-badge">GDPR čl. 20</span>
+    </div>
+    <div class="right-card" data-action="rectification" onclick="selectAction(this)">
+      <span class="rc-icon">✏️</span>
+      <h3>Popravek podatkov</h3>
+      <p>Zahtevajte popravek netočnih ali nepopolnih osebnih podatkov.</p>
+      <span class="rc-badge">GDPR čl. 16</span>
+    </div>
+  </div>
+
+  <!-- Forma -->
+  <div class="form-card">
+    <div class="form-head">
+      <div class="form-head-icon">🔒</div>
+      <div>
+        <h2>Oddajte zahtevek</h2>
+        <p>Varno in zaupno — odgovorimo v 30 dneh</p>
+      </div>
+    </div>
+    <div class="form-body">
+      <div class="selected-action-display" id="actionDisplay"></div>
+
+      <div class="field">
+        <label>Vaš e-poštni naslov</label>
+        <input type="email" id="emailInput" placeholder="vas@email.com" />
+        <div class="hint">Na ta naslov vam pošljemo potrditveno povezavo.</div>
+      </div>
+
+      <div class="field">
+        <label>Vrsta zahtevka</label>
+        <select id="actionSelect">
+          <option value="">— Izberite vrsto zahtevka —</option>
+          <option value="access">Dostop do podatkov (čl. 15)</option>
+          <option value="deletion">Izbris podatkov (čl. 17)</option>
+          <option value="portability">Izvoz podatkov (čl. 20)</option>
+          <option value="rectification">Popravek podatkov (čl. 16)</option>
+        </select>
+      </div>
+
+      <button class="submit-btn" id="submitBtn" onclick="submitRequest()">
+        Pošlji zahtevek →
+      </button>
+
+      <div class="msg-box" id="msgBox"></div>
+    </div>
+  </div>
+
+  <!-- Info -->
+  <div class="info-section">
+    <h2>Kako poteka postopek</h2>
+    <div class="info-list">
+      <div class="info-item">
+        <div class="ii-icon">1️⃣</div>
+        <div>
+          <h4>Oddajte zahtevek</h4>
+          <p>Vpišite e-poštni naslov in izberite vrsto zahtevka. Deluje samo za e-naslove, ki so registrirani v sistemu BookWell.</p>
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="ii-icon">2️⃣</div>
+        <div>
+          <h4>Potrdite z e-mailom</h4>
+          <p>Prejmete e-mail s potrditveno povezavo, ki velja 24 ur. S klikom potrdite svojo identiteto.</p>
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="ii-icon">3️⃣</div>
+        <div>
+          <h4>Zahtevek se izvede</h4>
+          <p>Po potrditvi se zahtevek samodejno izvede. Za dostop in izvoz prejmete datoteko takoj, za izbris v 30 dneh.</p>
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="ii-icon">📞</div>
+        <div>
+          <h4>Potrebujete pomoč?</h4>
+          <p>Pišite nam na <a href="mailto:info@bookwell.si" style="color:var(--gold);">info@bookwell.si</a>. Odgovorimo v 2 delovnih dneh.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>&copy; 2026 BookWell.si — Vse pravice pridržane</p>
+  <p style="margin-top:10px;">
+    <a href="/">Domača stran</a> •
+    <a href="/privacy">Politika zasebnosti</a> •
+    <a href="/dpa">DPA</a>
+  </p>
+</footer>
+
+<script>
+  let selectedAction = '';
+
+  const actionLabels = {
+    access: '📋 Dostop do podatkov — prejmete CSV z vsemi vašimi podatki',
+    deletion: '🗑️ Izbris podatkov — trajno brisanje računa in vseh osebnih podatkov',
+    portability: '📦 Izvoz podatkov — prejmete JSON datoteko za prenos k drugemu ponudniku',
+    rectification: '✏️ Popravek podatkov — kontaktirali vas bomo za ureditev napak'
+  };
+
+  function selectAction(card) {
+    document.querySelectorAll('.right-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedAction = card.dataset.action;
+    document.getElementById('actionSelect').value = selectedAction;
+    const display = document.getElementById('actionDisplay');
+    display.innerHTML = '<strong>Izbrana pravica:</strong> ' + actionLabels[selectedAction];
+    display.classList.add('visible');
+  }
+
+  document.getElementById('actionSelect').addEventListener('change', function() {
+    selectedAction = this.value;
+    if (selectedAction) {
+      document.querySelectorAll('.right-card').forEach(c => {
+        c.classList.toggle('selected', c.dataset.action === selectedAction);
+      });
+      const display = document.getElementById('actionDisplay');
+      display.innerHTML = '<strong>Izbrana pravica:</strong> ' + actionLabels[selectedAction];
+      display.classList.add('visible');
+    }
+  });
+
+  async function submitRequest() {
+    const email = document.getElementById('emailInput').value.trim();
+    const action = document.getElementById('actionSelect').value;
+    const btn = document.getElementById('submitBtn');
+    const msgBox = document.getElementById('msgBox');
+
+    msgBox.className = 'msg-box';
+    msgBox.textContent = '';
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      msgBox.className = 'msg-box error';
+      msgBox.textContent = 'Vpišite veljaven e-poštni naslov.';
+      return;
+    }
+    if (!action) {
+      msgBox.className = 'msg-box error';
+      msgBox.textContent = 'Izberite vrsto zahtevka.';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Pošiljam...';
+
+    try {
+      const res = await fetch('/api/gdpr/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, action })
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        msgBox.className = 'msg-box success';
+        msgBox.textContent = '✅ ' + (data.message || 'Zahtevek je bil poslan. Preverite e-pošto in kliknite potrditveno povezavo.');
+        document.getElementById('emailInput').value = '';
+        document.getElementById('actionSelect').value = '';
+        document.querySelectorAll('.right-card').forEach(c => c.classList.remove('selected'));
+        document.getElementById('actionDisplay').classList.remove('visible');
+        selectedAction = '';
+      } else {
+        msgBox.className = 'msg-box error';
+        msgBox.textContent = '❌ ' + (data.error || 'Prišlo je do napake. Poskusite znova ali pišite na info@bookwell.si.');
+      }
+    } catch (e) {
+      msgBox.className = 'msg-box error';
+      msgBox.textContent = '❌ Napaka pri povezavi. Poskusite znova.';
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Pošlji zahtevek →';
+  }
+
+  document.getElementById('emailInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitRequest();
+  });
+</script>
+</body>
+</html>

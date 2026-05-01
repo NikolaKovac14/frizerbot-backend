@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kontakt — BookWell</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black: #0a0a08;
+      --white: #ffffff;
+      --paper: #faf7f2;
+      --text: #1e1c18;
+      --text-2: #5a5448;
+      --gold: #c9984a;
+      --gold-dk: #8c6830;
+      --muted: #8a8070;
+      --border: rgba(0,0,0,0.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--text); -webkit-font-smoothing: antialiased; }
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+      background: rgba(250,247,242,0.94); border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(18px); height: 64px;
+      display: flex; align-items: center; padding: 0 6vw; justify-content: space-between;
+    }
+    .logo { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 900; color: var(--black); text-decoration: none; }
+    .logo span { color: var(--gold); }
+    .nav-link { font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+    .nav-link:hover { color: var(--black); }
+
+    .container { max-width: 800px; margin: 0 auto; padding: 120px 6vw 80px; }
+
+    .page-header { text-align: center; margin-bottom: 64px; }
+    .page-header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(32px, 5vw, 52px); font-weight: 700;
+      letter-spacing: -0.02em; color: var(--black); margin-bottom: 12px;
+    }
+    .page-header p { font-size: 15px; color: var(--text-2); }
+
+    .contact-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 48px; }
+    .contact-card { background: var(--white); padding: 32px; }
+    .contact-card .cc-icon { font-size: 28px; margin-bottom: 14px; display: block; }
+    .contact-card h3 { font-size: 14px; font-weight: 700; color: var(--black); margin-bottom: 8px; letter-spacing: 0.04em; }
+    .contact-card p { font-size: 13px; color: var(--text-2); line-height: 1.7; }
+    .contact-card a { color: var(--gold); text-decoration: none; font-weight: 600; }
+    .contact-card a:hover { text-decoration: underline; }
+    .contact-card .response-time {
+      display: inline-block; margin-top: 12px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--gold-dk); background: rgba(201,152,74,0.1); padding: 4px 10px;
+    }
+
+    /* Forma */
+    .form-card { background: var(--white); border: 1px solid var(--border); overflow: hidden; }
+    .form-head { background: var(--black); padding: 22px 28px; }
+    .form-head h2 { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+    .form-head p { font-size: 12px; color: rgba(255,255,255,0.35); }
+    .form-body { padding: 28px; }
+
+    .field { margin-bottom: 18px; }
+    .field label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 11px 14px; border: 1px solid #ddd;
+      background: var(--paper); font-size: 14px; font-family: inherit;
+      color: var(--black); outline: none; transition: border-color 0.15s, background 0.15s; border-radius: 0;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--black); background: var(--white); }
+    .field textarea { resize: vertical; min-height: 120px; line-height: 1.6; }
+
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    .submit-btn {
+      width: 100%; padding: 14px; background: var(--black); color: var(--gold);
+      border: none; font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+      text-transform: uppercase; font-family: inherit; cursor: pointer; transition: opacity 0.15s;
+    }
+    .submit-btn:hover { opacity: 0.85; }
+    .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .msg-box { padding: 14px 18px; font-size: 13px; line-height: 1.6; margin-top: 16px; display: none; }
+    .msg-box.success { background: #dcfce7; border-left: 3px solid #4ade80; color: #16a34a; display: block; }
+    .msg-box.error { background: #fee2e2; border-left: 3px solid #ef4444; color: #991b1b; display: block; }
+
+    footer {
+      background: var(--text); color: var(--white);
+      padding: 40px 6vw; margin-top: 80px; text-align: center; font-size: 12px;
+    }
+    footer a { color: var(--gold); text-decoration: none; }
+
+    @media (max-width: 600px) {
+      .container { padding: 80px 5vw 60px; }
+      .contact-layout { grid-template-columns: 1fr; }
+      .field-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="logo">Book<span>Well</span></a>
+  <a href="/" class="nav-link">← Nazaj</a>
+</nav>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Kontakt</h1>
+    <p>Smo tu za vas. Pišite nam — odgovorimo hitro.</p>
+  </div>
+
+  <div class="contact-layout">
+    <div class="contact-card">
+      <span class="cc-icon">📧</span>
+      <h3>Splošne zadeve</h3>
+      <p>Vprašanja o storitvi, cenah, naročnini ali splošne informacije.</p>
+      <p style="margin-top:10px;"><a href="mailto:info@bookwell.si">info@bookwell.si</a></p>
+      <span class="response-time">Odgovor v 24 urah</span>
+    </div>
+    <div class="contact-card">
+      <span class="cc-icon">🛠️</span>
+      <h3>Tehnična podpora</h3>
+      <p>Težave z aplikacijo, admin panelom, rezervacijami ali AI asistentom.</p>
+      <p style="margin-top:10px;"><a href="mailto:info@bookwell.si">info@bookwell.si</a></p>
+      <span class="response-time">Odgovor v 4 urah</span>
+    </div>
+    <div class="contact-card">
+      <span class="cc-icon">🔒</span>
+      <h3>Zasebnost in GDPR</h3>
+      <p>Zahtevki za dostop, izbris ali izvoz podatkov.</p>
+      <p style="margin-top:10px;"><a href="/gdpr">Obrazec za GDPR zahtevke →</a></p>
+      <span class="response-time">Odgovor v 30 dneh</span>
+    </div>
+    <div class="contact-card">
+      <span class="cc-icon">🤝</span>
+      <h3>Partnerstva</h3>
+      <p>Dogovori za verige salonov, agencije ali posebne integracije.</p>
+      <p style="margin-top:10px;"><a href="mailto:info@bookwell.si">info@bookwell.si</a></p>
+      <span class="response-time">Odgovor v 48 urah</span>
+    </div>
+  </div>
+
+  <!-- Kontaktni obrazec -->
+  <div class="form-card">
+    <div class="form-head">
+      <h2>Pošljite sporočilo</h2>
+      <p>Izpolnite obrazec in odgovorimo v najkrajšem možnem času.</p>
+    </div>
+    <div class="form-body">
+      <div class="field-row">
+        <div class="field">
+          <label>Ime in priimek</label>
+          <input type="text" id="c-name" placeholder="Ana Novak" />
+        </div>
+        <div class="field">
+          <label>E-poštni naslov</label>
+          <input type="email" id="c-email" placeholder="ana@email.com" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Zadeva</label>
+        <select id="c-subject">
+          <option value="">— Izberite temo —</option>
+          <option value="Splošno vprašanje">Splošno vprašanje</option>
+          <option value="Tehnična podpora">Tehnična podpora</option>
+          <option value="Naročnina in plačilo">Naročnina in plačilo</option>
+          <option value="Zasebnost / GDPR">Zasebnost / GDPR</option>
+          <option value="Partnerstvo">Partnerstvo</option>
+          <option value="Drugo">Drugo</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Sporočilo</label>
+        <textarea id="c-message" placeholder="Opišite vašo težavo ali vprašanje..."></textarea>
+      </div>
+      <button class="submit-btn" id="c-submit" onclick="sendContact()">Pošlji sporočilo →</button>
+      <div class="msg-box" id="c-msg"></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>&copy; 2026 BookWell.si — Vse pravice pridržane</p>
+  <p style="margin-top:10px;">
+    <a href="/">Domača stran</a> •
+    <a href="/terms">Pogoji</a> •
+    <a href="/privacy">Zasebnost</a> •
+    <a href="/gdpr">GDPR</a>
+  </p>
+</footer>
+
+<script>
+  async function sendContact() {
+    const name = document.getElementById('c-name').value.trim();
+    const email = document.getElementById('c-email').value.trim();
+    const subject = document.getElementById('c-subject').value;
+    const message = document.getElementById('c-message').value.trim();
+    const btn = document.getElementById('c-submit');
+    const msg = document.getElementById('c-msg');
+
+    msg.className = 'msg-box';
+    msg.textContent = '';
+
+    if (!name) { msg.className='msg-box error'; msg.textContent='Vpišite ime in priimek.'; return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { msg.className='msg-box error'; msg.textContent='Vpišite veljaven e-poštni naslov.'; return; }
+    if (!subject) { msg.className='msg-box error'; msg.textContent='Izberite zadevo.'; return; }
+    if (!message || message.length < 10) { msg.className='msg-box error'; msg.textContent='Sporočilo mora biti dolgo vsaj 10 znakov.'; return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Pošiljam...';
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, subject, message })
+      });
+
+      if (res.ok) {
+        msg.className = 'msg-box success';
+        msg.textContent = '✅ Sporočilo je bilo poslano! Odgovorili vam bomo čim prej.';
+        document.getElementById('c-name').value = '';
+        document.getElementById('c-email').value = '';
+        document.getElementById('c-subject').value = '';
+        document.getElementById('c-message').value = '';
+      } else {
+        throw new Error();
+      }
+    } catch(e) {
+      // Fallback — odpre mail klient
+      const mailBody = encodeURIComponent(`Ime: ${name}\nE-pošta: ${email}\nZadeva: ${subject}\n\n${message}`);
+      window.location.href = `mailto:info@bookwell.si?subject=${encodeURIComponent(subject)}&body=${mailBody}`;
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Pošlji sporočilo →';
+  }
+</script>
+</body>
+</html>
