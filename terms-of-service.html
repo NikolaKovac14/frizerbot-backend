@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pogoji uporabe — BookWell</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black: #0a0a08;
+      --white: #ffffff;
+      --paper: #faf7f2;
+      --text: #1e1c18;
+      --text-2: #5a5448;
+      --gold: #c9984a;
+      --muted: #8a8070;
+      --border: rgba(0,0,0,0.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--paper);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+      background: rgba(250,247,242,0.94);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(18px);
+      height: 64px;
+      display: flex; align-items: center;
+      padding: 0 6vw;
+      justify-content: space-between;
+    }
+    .logo { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 900; color: var(--black); }
+    .logo span { color: var(--gold); }
+    .nav-link { font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.2s; }
+    .nav-link:hover { color: var(--black); }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 120px 6vw 80px;
+    }
+    .page-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+    .page-header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(32px, 5vw, 56px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--black);
+      margin-bottom: 12px;
+    }
+    .page-header p {
+      font-size: 14px;
+      color: var(--text-2);
+    }
+    
+    .content h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--black);
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+    .content h2:first-of-type {
+      border-top: none;
+      padding-top: 0;
+      margin-top: 0;
+    }
+    .content h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--black);
+      margin-top: 24px;
+      margin-bottom: 12px;
+    }
+    .content p {
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--text-2);
+      margin-bottom: 14px;
+    }
+    .content ul, .content ol {
+      margin-left: 24px;
+      margin-bottom: 16px;
+    }
+    .content li {
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--text-2);
+      margin-bottom: 8px;
+    }
+    .highlight {
+      background: rgba(201, 152, 74, 0.08);
+      border-left: 3px solid var(--gold);
+      padding: 16px 20px;
+      margin: 20px 0;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+    .warning {
+      background: rgba(239, 68, 68, 0.08);
+      border-left: 3px solid #ef4444;
+      padding: 16px 20px;
+      margin: 20px 0;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #7f1d1d;
+    }
+    
+    footer {
+      background: var(--text);
+      color: var(--white);
+      padding: 40px 6vw;
+      margin-top: 80px;
+      text-align: center;
+      font-size: 12px;
+    }
+    footer a {
+      color: var(--gold);
+      text-decoration: none;
+    }
+    
+    @media (max-width: 600px) {
+      .container { padding: 80px 5vw 60px; }
+      .page-header h1 { font-size: 28px; }
+      .content h2 { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="logo">Book<span>Well</span></a>
+  <a href="/" class="nav-link">← Nazaj na domačo stran</a>
+</nav>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Pogoji uporabe</h1>
+    <p>Veljavni od 1. maja 2026 • Zadnja posodobitev: 1. maj 2026</p>
+  </div>
+
+  <div class="content">
+    <h2>1. Splošno</h2>
+    <p>
+      Ti pogoji uporabe (v nadaljevanju: "Pogoji") predstavljajo pravno pogodbo med vami in BookWell.si 
+      (v nadaljevanju: "podjetje", "mi", "naš"). Z dostopom do in uporabo te spletne strani ter storitev 
+      se strinjate z vsemi pogoji, ki sledijo.
+    </p>
+    <p>
+      Če se s katerim koli pogojema ne strinjate, prosimo, da ne uporabljate naših storitev. 
+      Uporaba storitve pomeni vašo sprejetost vseh pogojev.
+    </p>
+
+    <h2>2. Opredelitev storitve</h2>
+    <p>
+      BookWell je AI asistent za rezervacijske sisteme salonov (frizerski saloni, studiji lepote, itd.). 
+      Storitev omogoča:
+    </p>
+    <ul>
+      <li>24/7 AI chatbot za upravljanje rezervacij strank</li>
+      <li>Admin panel za upravljanje terminov in nastave salona</li>
+      <li>Avtomatske e-mail potrditve in obvestila</li>
+      <li>Upravljanje delovnih ur in storitev</li>
+    </ul>
+    <p>
+      Pravica je do opisa storitve in njenih funkcionalnosti na spletni strani.
+    </p>
+
+    <h2>3. Prijava in račun</h2>
+    
+    <h3>3.1. Registracija</h3>
+    <p>
+      Da uporabljate storitev, se morate registrirati in ustvariti račun. 
+      Vi ste odgovorni za zagotavljanje pravilnih, popolnih in ažurnih podatkov pri registraciji.
+    </p>
+
+    <h3>3.2. Geslo</h3>
+    <p>
+      Ste sami odgovorni za varnost vašega gesla. Ne smete ga deliti z drugimi. 
+      Ste odgovorni za vse dejavnosti, ki se zgodijo pod vašim računom.
+    </p>
+
+    <h3>3.3. Prekinitev računa</h3>
+    <p>
+      Lahko obvestite nas, da želite zapreti račun. Podatki bodo izbrisani v 30 dneh 
+      (razen tistih, ki so po zakonu obvezno hranjeni).
+    </p>
+
+    <h2>4. Naročnina in plačilo</h2>
+    
+    <h3>4.1. Plačilni pogoji</h3>
+    <p>
+      Naročnina za BookWell je mesečna. Cene so:
+    </p>
+    <ul>
+      <li><strong>Starter:</strong> 29,99 € / mesec (500 sporočil)</li>
+      <li><strong>Pro:</strong> 49,99 € / mesec (2.000 sporočil)</li>
+      <li><strong>Unlimited:</strong> 99,99 € / mesec (neomejeno sporočil)</li>
+    </ul>
+    <p>
+      Vsi paketi vključujejo <strong>7-dnevno brezplačno preizkušnje obdobje</strong> brez potrebe za kartice.
+    </p>
+
+    <h3>4.2. Avtomatsko obnovljanje</h3>
+    <p>
+      Naročnina se samodejno obnovlja vsak mesec na vaš izbrani dan plačila. 
+      Plačilo bo obdelano prek Stripe ali drugega plačilnega procesorja.
+    </p>
+
+    <h3>4.3. Odpoved naročnine</h3>
+    <p>
+      Naročnino lahko odpoveste kadarkoli. Brez dodatnih stroškov. 
+      Storitev bo dostopna do konca veljavnega obdobja, nato pa bo izklopljena.
+    </p>
+
+    <h3>4.4. Povratne zahteve in refundacije</h3>
+    <p>
+      Če ste neplačani račun v prvem tednu, vam vrnemo denar v celoti. 
+      Po prvem tednu refundacije niso mogoče (pogrešati pa je mogoče v naslednjem ciklu).
+    </p>
+
+    <h3>4.5. Spremembe cen</h3>
+    <p>
+      Pravica je spremeniti cene. Vas bomo obvestili 30 dni vnaprej po e-pošti. 
+      Če se s spremenjenimi cenami ne strinjate, lahko odpoveste naročnino.
+    </p>
+
+    <div class="highlight">
+      <strong>💰 Pomembno:</strong> Odgovorni ste za pravočasno plačilo. 
+      Če plačilo ne gre skozi, vas obvestimo. Če plačilo ne bo uspešno po dveh poskusih, 
+      lahko suspenziramo vašo storitev.
+    </div>
+
+    <h2>5. Uporaba storitve</h2>
+    
+    <h3>5.1. Dovoljena uporaba</h3>
+    <p>Storitev lahko uporabljate samo za:</p>
+    <ul>
+      <li>Upravljanje rezervacij v vašem salonu</li>
+      <li>Komuniciranje z strankami</li>
+      <li>Analizo poslovnih podatkov</li>
+    </ul>
+
+    <h3>5.2. Prepovedana uporaba</h3>
+    <p>
+      Ne smete uporabljati storitve za:
+    </p>
+    <ul>
+      <li>Nezakonite, zlorabljavne ali goljufikave dejavnosti</li>
+      <li>Ogoljufovanje ali prevaro strank</li>
+      <li>Pošiljanje spam-a ali neželenih sporočil</li>
+      <li>Dostop do podatkov drugih salonov</li>
+      <li>Razbitje ali preizkušanje varnosti</li>
+      <li>Spletna trgovina brez dovoljenj (npr. prodaja podatkov)</li>
+      <li>Izdelovanje robotov ali avtomatizacije (razen če je dovolj)</li>
+    </ul>
+
+    <h3>5.3. Omejitve storitve</h3>
+    <p>
+      Mesečne omejitve sporočil (500 za Starter, 2.000 za Pro) se ponastavijo vsakega meseca. 
+      Če presežete limit, je storitev izklopljena do naslednjega cikla ali nadgradnje plana.
+    </p>
+
+    <div class="warning">
+      <strong>⚠️ Prepoved ogljufikave uporabe:</strong> Ne smete goljufati stranke z napačnimi informacijami 
+      o terminih ali storitvah. Odgovorni ste za točnost podatkov, ki jih vnese v sistem.
+    </div>
+
+    <h2>6. Intelektualna lastnina</h2>
+    
+    <h3>6.1. Lastništvo BookWell</h3>
+    <p>
+      Ves kod, dizajn, funkcionalnost, podatki in vsebina BookWell.si so naša lastnina. 
+      Zaščiteni so z avtorskimi in blagovnimi pravicami.
+    </p>
+
+    <h3>6.2. Licence</h3>
+    <p>
+      Vam odobrimo omejeno, neekskludzivno, neprenosljivo licenco za uporabo storitve 
+      samo za namene, definirane v teh pogojih.
+    </p>
+
+    <h3>6.3. Vaša vsebina</h3>
+    <p>
+      Podatki, ki jih vneste (ime salona, storitve, delovni čas, pogovori strank) 
+      ostanejo vaša lastnina. Nam dovolite jih uporabljati za delovanje storitve in izboljšave.
+    </p>
+
+    <h2>7. Odgovornost in jamstva</h2>
+    
+    <h3>7.1. Skladnost storitve</h3>
+    <p>
+      Storitev nudimo "kot je" (as-is). Ne jamčimo:
+    </p>
+    <ul>
+      <li>Da bo storitev vedno dostopna (normalno vzdrževanje je dovoljeno)</li>
+      <li>Da bo storitev delovala brez napak</li>
+      <li>Da bo AI asistent vedno dal dobre odgovore</li>
+      <li>Varnost pred vsemi vrstami napadov</li>
+    </ul>
+
+    <h3>7.2. Mehanika napak</h3>
+    <p>
+      Če AI asistent naredi napako (npr. ponudi že zaseden termin), niste odgovorni, 
+      toda salone vas prosimo, da ročno preverite rezervacije.
+    </p>
+
+    <h3>7.3. Omejitev odgovornosti</h3>
+    <p>
+      V nobenih primerih ni BookWell odgovoren za:
+    </p>
+    <ul>
+      <li>Posredno škodo (izgubljen dohodek, ugled, podatki)</li>
+      <li>Direktno škodo, ki presega znesek, plačan za naročnino v zadnjih 3 mesece</li>
+      <li>Nepredvidljive ali posebne škode</li>
+    </ul>
+
+    <h3>7.4. Naš celoten dogovor</h3>
+    <p>
+      Ti Pogoji predstavljajo naš celoten dogovor. Zamenjujejo vse prejšnje dogovore 
+      ali razprave o tej temi.
+    </p>
+
+    <h2>8. Terminacija</h2>
+    
+    <h3>8.1. Prekinitev s strane korisnika</h3>
+    <p>
+      Naročnino lahko odpoveste kadarkoli z obvestilom v admin panelu. 
+      Storitev preneha veljati na zadnji dan vašega plačnega cikla.
+    </p>
+
+    <h3>8.2. Prekinitev s strane BookWell</h3>
+    <p>
+      Pravica je, da prekinemo storitev, če:
+    </p>
+    <ul>
+      <li>Kršite te pogoje ali zakone</li>
+      <li>Skušate napastati ali na nek način poškodovati storitev</li>
+      <li>Uporabjate storitev za nezakonite namene</li>
+      <li>Plačilo je zaustavljeno in ne odplatite duga v 30 dneh</li>
+    </ul>
+    <p>
+      Vam damo 14 dni opomina pred prekinitvo (razen v skrajnih primerih).
+    </p>
+
+    <h2>9. Podatki in varnost</h2>
+    <p>
+      Politika zasebnosti je ločena in je dostopna na <a href="/privacy">/privacy</a>. 
+      Tukaj je povzetek:
+    </p>
+    <ul>
+      <li>Vaši podatki so zaščiteni z HTTPS in enkripcijo</li>
+      <li>Delimo podatke s Stripe (plačila), SendGrid (e-mail) in Antropic (AI)</li>
+      <li>Podatke ne prodajamo tretjim stranem</li>
+      <li>GDPR pravice vas zaščitijo</li>
+    </ul>
+
+    <h2>10. Tehnični pogoji</h2>
+    
+    <h3>10.1. Vzdrževanje</h3>
+    <p>
+      Redno izvajamo vzdrževanje in nadgradnje. Storitev se lahko začasno prekine. 
+      Poskušamo vzdrževati med nižjim prometom (23:00 - 06:00 CET).
+    </p>
+
+    <h3>10.2. Zahteve</h3>
+    <p>
+      Za uporabo storitve potrebujete:
+    </p>
+    <ul>
+      <li>Sodoben brskalnik (Chrome, Firefox, Safari, Edge zadnje 2 verziji)</li>
+      <li>Internetno povezavo</li>
+      <li>E-naslov in osnovno računalniku pismenost</li>
+    </ul>
+
+    <h3>10.3. Dostopnost</h3>
+    <p>
+      Cilj je 99,5% dostopnost (ne broji vzdrževanja). Če je dostopnost nižja, 
+      lahko zahtevate delni refund (specifici se dogovorimo).
+    </p>
+
+    <h2>11. Zakonska pravna področja in urejevanje sporov</h2>
+    
+    <h3>11.1. Pravo, ki velja</h3>
+    <p>
+      Ti Pogoji se urejajo po slovenskim zakonih in EU direktivah 
+      (posebej GDPR in Direktive o E-trgovini).
+    </p>
+
+    <h3>11.2. Pristojni jezik</h3>
+    <p>
+      Primarni jezik je slovenščina. V primeru nesoglasij prevlada slovenski besedilo.
+    </p>
+
+    <h3>11.3. Rešavanje sporov</h3>
+    <p>
+      Če pride do spra, vas najprej poskušimo rešiti s pogajanami. 
+      Če to ne uspe, je pristojno sodišče v Ljubljani, Slovenija.
+    </p>
+
+    <h3>11.4. Arbitraža (opciono)</h3>
+    <p>
+      Za majhne spore (do 5.000 €) se lahko dogovorite za ceneno arbitražo ali mediacije 
+      prek Trgovine in obrti Ljubljana.
+    </p>
+
+    <h2>12. Spremembe pogojev</h2>
+    <p>
+      Te pogoje lahko spremenimo kadarkoli. Vas bomo obvestili po e-pošti 30 dni pred spremembo. 
+      Če se ne strinjate, lahko odpoveste naročnino pred spremembo.
+    </p>
+    <p>
+      Nadaljnja uporaba storitve po spremembi pomeni vašo sprejetost novih pogojev.
+    </p>
+
+    <h2>13. Splošne omejitve</h2>
+    <ul>
+      <li>Ni jamstev za delovanje AI asistenta v vseh primerih</li>
+      <li>Ne odgovarjamo za podatke strank, ki jih vneste ali shranjeni pri vašem salonou</li>
+      <li>Pravica je spremeniti ali prekiniti storitev</li>
+      <li>Ni garancije za dostopnost zunaj EU</li>
+    </ul>
+
+    <h2>14. Kontaktirajte nas</h2>
+    <p>
+      Če imate vprašanja glede teh pogojev:
+    </p>
+    <p>
+      <strong>BookWell.si</strong><br>
+      E-pošta: <a href="mailto:info@bookwell.si">info@bookwell.si</a><br>
+      Naslov: Ljubljana, Slovenija
+    </p>
+
+    <div class="highlight">
+      <strong>✅ Zadnje sprejetje:</strong> S klikanjem "Sprejmem" pri registraciji se strinjate z vsemi pogoji v tej dokumentaciji.
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>&copy; 2026 BookWell.si — Vse pravice pridržane</p>
+  <p style="margin-top: 10px;">
+    <a href="/">Domača stran</a> • 
+    <a href="/terms">Pogoji uporabe</a> • 
+    <a href="/privacy">Politika zasebnosti</a>
+  </p>
+</footer>
+
+</body>
+</html>

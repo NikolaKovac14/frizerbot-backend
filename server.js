@@ -189,6 +189,56 @@ function scheduleToText(schedule) {
     return name + ': ' + d.from + ' - ' + d.to;
   }).join('\n');
 }
+function convertToCSV(data) {
+  const rows = [];
+  
+  // Header
+  if (data.salon) {
+    rows.push('TIP,POLJE,VREDNOST');
+    rows.push(`SALON,ID,${data.salon.id}`);
+    rows.push(`SALON,IME,${data.salon.name}`);
+    rows.push(`SALON,NASLOV,${data.salon.address}`);
+    rows.push(`SALON,TELEFON,${data.salon.phone}`);
+    rows.push(`SALON,USTVARJENO,${data.salon.created_at}`);
+  }
+  
+  // Timeslots
+  if (data.timeslots && data.timeslots.length) {
+    rows.push('\nTERMINI');
+    rows.push('DATUM,ČAS,STRANKA,E-POŠTA,STORITEV');
+    data.timeslots.forEach(ts => {
+      rows.push(`${ts.date},${ts.time},"${ts.customer_name}",${ts.customer_email},"${ts.service}"`);
+    });
+  }
+  
+  return rows.join('\n');
+}
+ 
+async function sendBreachNotificationToAuthority(breachData) {
+  // V praksi: Pošlji na IP-RS obrazec
+  console.log('📧 Obvestilo URADY o kršitvi:', breachData);
+  
+  // Lahko tudi pošlješ e-mail
+  try {
+    await sgMail.send({
+      to: 'gp.ip@ip-rs.si', // URADY email
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
+      subject: `[GDPR BREACH NOTIFICATION] ${breachData.type} - BookWell.si`,
+      html: `
+        <h2>GDPR Breach Notification</h2>
+        <p><strong>Vrsta kršitve:</strong> ${breachData.type}</p>
+        <p><strong>Opis:</strong> ${breachData.description}</p>
+        <p><strong>Število prizadetih oseb:</strong> ${breachData.affectedCount}</p>
+        <p><strong>Vrste podatkov:</strong> ${breachData.affectedTypes}</p>
+        <p><strong>Čas odkritja:</strong> ${new Date().toISOString()}</p>
+        <p>Polna dokumentacija je dostopna na info@bookwell.si</p>
+      `,
+    });
+    console.log('✅ Obvestilo URADY je bilo poslano');
+  } catch (err) {
+    console.error('❌ Napaka pri pošiljanju obvestila URADY:', err);
+  }
+}
 
 async function initDB() {
   await pool.query(`
@@ -247,6 +297,32 @@ async function initDB() {
     )
   `);
   await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS cancel_token TEXT UNIQUE`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS breach_log (
+      id SERIAL PRIMARY KEY,
+      breach_type TEXT NOT NULL,
+      description TEXT,
+      affected_users INTEGER,
+      affected_data_types TEXT,
+      discovered_at TIMESTAMP,
+      reported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      status TEXT DEFAULT 'pending_authority_report',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS gdpr_tokens (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL,
+      token TEXT UNIQUE NOT NULL,
+      action TEXT NOT NULL, -- 'access', 'deletion', 'portability'
+      expires_at TIMESTAMP NOT NULL,
+      used BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
 
   const { rows } = await pool.query('SELECT id FROM salons WHERE id = $1', ['salon_1']);
   if (rows.length === 0) {
@@ -443,6 +519,12 @@ const loginLimiter = rateLimit({
   message: { error: 'Preveč neuspešnih poskusov. Počakajte 15 minut.' },
   standardHeaders: true,
   legacyHeaders: false
+});
+
+const gdprLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: { error: 'Preveč zahtevkov. Poskusite čez uro.' }
 });
 
 app.post('/admin-login/:id', loginLimiter, async (req, res) => {
@@ -1807,6 +1889,316 @@ app.post('/cancel/:token', async (req, res) => {
   }
 
   res.send(`<!DOCTYPE html><html lang="sl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rezervacija odpovedana</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#f7f7f5;min-height:100vh;display:flex;align-items:center;justify-content:center}.card{background:#fff;border:1px solid #e0e0e0;max-width:420px;width:100%;overflow:hidden}.head{background:#0a0a0a;padding:28px 32px}.head h1{font-size:20px;color:#fff;font-weight:700}.body{padding:32px}.icon{font-size:40px;margin-bottom:16px}.title{font-size:18px;font-weight:700;color:#0a0a0a;margin-bottom:10px}.details{background:#f5f0eb;border-left:3px solid #c9984a;padding:14px 18px;margin:18px 0;font-size:13px;color:#444;line-height:2}.msg{font-size:13px;color:#888;line-height:1.6;margin-top:16px}</style></head><body><div class="card"><div class="head"><h1>BookWell</h1></div><div class="body"><div class="icon">✅</div><div class="title">Rezervacija odpovedana</div><div class="details"><div>📅 ${dateFormatted}</div><div>🕐 ${slot.time}</div><div>💇 ${slot.service || '—'}</div></div><p class="msg">Vaša rezervacija je bila uspešno odpovedana. Salon je bil obveščen.</p></div></div></body></html>`);
+});
+
+// ============================================================================
+// GDPR — KORAK 1: Zahteva token (skupna vstopna točka)
+// ============================================================================
+app.post('/api/gdpr/request', gdprLimiter, async (req, res) => {
+  const { email, action } = req.body;
+
+  if (!email || !['access', 'deletion', 'portability', 'rectification'].includes(action)) {
+    return res.status(400).json({ error: 'Neveljaven zahtevek' });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: 'Neveljaven e-poštni naslov' });
+  }
+
+  // Preveri da oseba obstaja
+  const { rows } = await pool.query(
+    'SELECT id FROM salons WHERE notification_email = $1 AND active = true',
+    [email]
+  );
+
+  // Vedno vrni isti odgovor (security: ne razkrijemo ali email obstaja)
+  if (!rows.length) {
+    return res.json({ message: 'Če e-naslov obstaja v sistemu, boste prejeli e-mail.' });
+  }
+
+  // Izbriši stare neuporabljene tokene za ta email + action
+  await pool.query(
+    'DELETE FROM gdpr_tokens WHERE email = $1 AND action = $2 AND used = false',
+    [email, action]
+  );
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await pool.query(
+    'INSERT INTO gdpr_tokens (email, token, action, expires_at) VALUES ($1,$2,$3,$4)',
+    [email, token, action, expiresAt]
+  );
+
+  const verifyUrl = `${process.env.API_URL || 'https://bookwell.si'}/api/gdpr/verify/${token}`;
+  const actionNames = {
+    access: 'dostop do podatkov',
+    deletion: 'brisanje računa',
+    portability: 'izvoz podatkov',
+    rectification: 'popravek podatkov'
+  };
+
+  try {
+    await sgMail.send({
+      to: email,
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
+      subject: `BookWell — Potrdite GDPR zahtevek`,
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:20px;">
+          <div style="background:#0a0a0a;padding:24px;text-align:center;">
+            <h1 style="color:#c9984a;margin:0;font-size:22px;">BookWell</h1>
+          </div>
+          <div style="background:#fff;padding:32px;border:1px solid #e0e0e0;border-top:none;">
+            <p style="font-size:15px;margin:0 0 16px;">Prejeli smo vašo zahtevo za <strong>${actionNames[action]}</strong>.</p>
+            <p style="font-size:13px;color:#666;margin:0 0 24px;line-height:1.6;">Kliknite spodnjo povezavo za potrditev. Velja <strong>24 ur</strong>.</p>
+            <a href="${verifyUrl}" style="display:block;background:#0a0a0a;color:#c9984a;padding:14px 24px;text-decoration:none;font-weight:700;font-size:13px;text-align:center;letter-spacing:.06em;">
+              Potrdi zahtevek →
+            </a>
+            <p style="margin:20px 0 0;font-size:11px;color:#aaa;line-height:1.6;">
+              Če tega niste zahtevali, ignorirajte ta e-mail. Vaši podatki so varni.
+            </p>
+          </div>
+        </div>
+      `
+    });
+  } catch (err) {
+    console.error('❌ GDPR email napaka:', err.message);
+    return res.status(500).json({ error: 'Napaka pri pošiljanju e-maila' });
+  }
+
+  res.json({ message: 'Če e-naslov obstaja v sistemu, boste prejeli e-mail.' });
+});
+
+// ============================================================================
+// GDPR — KORAK 2: Verifikacija in izvedba
+// ============================================================================
+app.get('/api/gdpr/verify/:token', async (req, res) => {
+  const { token } = req.params;
+
+  const { rows } = await pool.query(
+    'SELECT * FROM gdpr_tokens WHERE token = $1 AND used = false AND expires_at > NOW()',
+    [token]
+  );
+
+  if (!rows[0]) {
+    return res.send(buildGdprPage('❌ Napaka', 'Povezava ni veljavna ali je potekla. Zahtevajte novo na info@bookwell.si'));
+  }
+
+  const { email, action, id } = rows[0];
+
+  // Označi kot uporabljen
+  await pool.query('UPDATE gdpr_tokens SET used = true WHERE id = $1', [id]);
+
+  try {
+    if (action === 'access') {
+      await handleGdprAccess(email, res);
+    } else if (action === 'deletion') {
+      await handleGdprDeletion(email, res);
+    } else if (action === 'portability') {
+      await handleGdprPortability(email, res);
+    } else if (action === 'rectification') {
+      res.send(buildGdprPage('✏️ Popravek podatkov',
+        'Za popravek podatkov pišite na <a href="mailto:info@bookwell.si">info@bookwell.si</a> z navedbo katere podatke želite popraviti. Odgovorili vam bomo v 30 dneh.'
+      ));
+    }
+  } catch (err) {
+    console.error('❌ GDPR verify napaka:', err.message);
+    res.send(buildGdprPage('❌ Napaka', 'Prišlo je do tehnične napake. Pišite na info@bookwell.si'));
+  }
+});
+
+async function handleGdprAccess(email, res) {
+  const { rows: salons } = await pool.query(
+    'SELECT id, name, address, phone, notification_email, plan, chat_count, created_at FROM salons WHERE notification_email = $1',
+    [email]
+  );
+
+  if (!salons.length) {
+    return res.send(buildGdprPage('⚠️ Ni podatkov', 'Ni podatkov za ta e-naslov.'));
+  }
+
+  const salon = salons[0];
+  const { rows: timeslots } = await pool.query(
+    'SELECT date, time, customer_name, customer_email, customer_phone, service, created_at FROM timeslots WHERE salon_id = $1 ORDER BY date DESC',
+    [salon.id]
+  );
+  const { rows: subscriptions } = await pool.query(
+    'SELECT plan, amount, customer_email, created_at FROM subscriptions WHERE salon_id = $1',
+    [salon.id]
+  );
+
+  const csvContent = convertToCSV({ salon, timeslots, subscriptions });
+
+  console.log(`✅ GDPR Access: ${email}`);
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="moji-podatki-bookwell.csv"`);
+  res.send(csvContent);
+}
+
+async function handleGdprDeletion(email, res) {
+  const { rows: salons } = await pool.query(
+    'SELECT id, plan FROM salons WHERE notification_email = $1',
+    [email]
+  );
+
+  if (!salons.length) {
+    return res.send(buildGdprPage('⚠️ Ni podatkov', 'Ni podatkov za ta e-naslov.'));
+  }
+
+  const salon = salons[0];
+
+  const { rows: activeSubs } = await pool.query(
+    "SELECT id FROM subscriptions WHERE salon_id = $1 AND status = 'active'",
+    [salon.id]
+  );
+
+  if (activeSubs.length > 0) {
+    return res.send(buildGdprPage(
+      '⚠️ Aktivna naročnina',
+      'Najprej odpovejte naročnino (prek Stripe ali na info@bookwell.si), nato zahtevajte brisanje.'
+    ));
+  }
+
+  // Izbriši termine
+  await pool.query('DELETE FROM timeslots WHERE salon_id = $1', [salon.id]);
+
+  // Anonimiziraj salon (ohrani davčne zapise)
+  await pool.query(`
+    UPDATE salons SET
+      active = false,
+      name = '[Izbrisano]',
+      address = '[Izbrisano]',
+      phone = '[Izbrisano]',
+      notification_email = $1,
+      services = '[Izbrisano]',
+      admin_username = NULL,
+      admin_password = NULL
+    WHERE id = $2
+  `, [`deleted-${Date.now()}@deleted.local`, salon.id]);
+
+  console.log(`✅ GDPR Deletion: ${email} (salon ${salon.id})`);
+
+  res.send(buildGdprPage(
+    '✅ Račun izbrisan',
+    'Vaši osebni podatki so bili izbrisani. Davčni zapisi ostanejo 6 let po zakonu (ZDDV-1).'
+  ));
+}
+
+async function handleGdprPortability(email, res) {
+  const { rows: salons } = await pool.query(
+    'SELECT id, name, address, phone, created_at FROM salons WHERE notification_email = $1',
+    [email]
+  );
+
+  if (!salons.length) {
+    return res.send(buildGdprPage('⚠️ Ni podatkov', 'Ni podatkov za ta e-naslov.'));
+  }
+
+  const salon = salons[0];
+  const { rows: timeslots } = await pool.query(
+    'SELECT date, time, customer_name, customer_email, service FROM timeslots WHERE salon_id = $1 ORDER BY date DESC',
+    [salon.id]
+  );
+
+  const exportData = {
+    exportDate: new Date().toISOString(),
+    exportedBy: 'BookWell.si — GDPR čl. 20',
+    salon: {
+      id: salon.id,
+      name: salon.name,
+      address: salon.address,
+      phone: salon.phone,
+      createdAt: salon.created_at
+    },
+    timeslots: timeslots.map(ts => ({
+      date: ts.date,
+      time: ts.time,
+      customerName: ts.customer_name,
+      customerEmail: ts.customer_email,
+      service: ts.service
+    }))
+  };
+
+  console.log(`✅ GDPR Portability: ${email}`);
+
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="podatki-bookwell.json"`);
+  res.json(exportData);
+}
+
+// ─── GDPR STRAN HELPER ────────────────────────────────────────────────────────
+function buildGdprPage(title, message) {
+  return `<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${title} — BookWell</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:system-ui,sans-serif;background:#f7f7f5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+    .card{background:#fff;border:1px solid #e0e0e0;max-width:460px;width:100%;overflow:hidden}
+    .head{background:#0a0a0a;padding:24px 32px}
+    .head h1{font-size:18px;color:#fff;font-weight:700}
+    .body{padding:32px}
+    .icon{font-size:36px;margin-bottom:14px}
+    .title{font-size:18px;font-weight:700;color:#0a0a0a;margin-bottom:12px}
+    .msg{font-size:14px;color:#555;line-height:1.7}
+    .msg a{color:#c9984a}
+    .back{display:inline-block;margin-top:24px;font-size:12px;color:#888;text-decoration:none;border-bottom:1px solid #ddd}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="head"><h1>BookWell — GDPR</h1></div>
+    <div class="body">
+      <div class="title">${title}</div>
+      <div class="msg">${message}</div>
+      <a href="/" class="back">← Nazaj na domačo stran</a>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+ 
+// ============================================================================
+// 6. BREACH NOTIFICATION (Čl. 33 GDPR)
+// ============================================================================
+/*
+Logiranje kršitve podatkov (dostopa, goljufije, itd.).
+Mora biti sporočeno URADY v 72 urah.
+*/
+ 
+app.post('/api/gdpr/report-breach', gdprLimiter, async (req, res) => {
+  try {
+    const { breachType, description, affectedUsers, affectedDataTypes, discoveredDate } = req.body;
+
+    if (!breachType || !description) {
+      return res.status(400).json({ error: 'Podatki so obvezni' });
+    }
+
+    await pool.query(`
+      INSERT INTO breach_log (breach_type, description, affected_users, affected_data_types, discovered_at, status)
+      VALUES ($1, $2, $3, $4, $5, 'pending_authority_report')
+    `, [breachType, description, affectedUsers, affectedDataTypes, discoveredDate]);
+
+    await sendBreachNotificationToAuthority({
+      type: breachType,
+      description,
+      affectedCount: affectedUsers,
+      affectedTypes: affectedDataTypes,
+    });
+
+    console.log(`🚨 GDPR Breach: ${breachType}`);
+    res.json({ success: true, message: 'Kršitev poročana. URADY bo obveščena v 72 urah.' });
+
+  } catch (err) {
+    console.error('❌ GDPR Breach napaka:', err.message);
+    res.status(500).json({ error: 'Napaka pri poročanju' });
+  }
 });
 
 app.get('/', (req, res) => {

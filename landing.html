@@ -345,6 +345,46 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.06);padding:
   .live-widget{height:400px;}
   .asep{display:none;}
 }
+.cookie-banner { position:fixed; bottom:0; left:0; right:0; z-index:999; background:var(--ink); border-top:1px solid rgba(255,255,255,.1); padding:24px 6vw; display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; box-shadow:0 -4px 16px rgba(0,0,0,.2); animation:slideUp 0.4s ease-out; }
+@keyframes slideUp { from { transform:translateY(100%); opacity:0; } to { transform:translateY(0); opacity:1; } }
+.cookie-banner.hidden { display:none; }
+.cookie-text { flex:1; min-width:280px; }
+.cookie-text p { font-size:13px; color:rgba(255,255,255,.65); line-height:1.6; margin:0; }
+.cookie-text strong { color:rgba(255,255,255,.85); }
+.cookie-text a { color:var(--gold); text-decoration:none; }
+.cookie-actions { display:flex; gap:12px; flex-shrink:0; flex-wrap:wrap; }
+.cookie-btn { padding:10px 24px; border:none; font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; font-family:inherit; white-space:nowrap; border-radius:3px; }
+.cookie-btn-accept { background:var(--gold); color:var(--black); }
+.cookie-btn-accept:hover { background:var(--gold-lt); }
+.cookie-btn-decline { background:rgba(255,255,255,.1); color:rgba(255,255,255,.7); border:1px solid rgba(255,255,255,.15); }
+.cookie-btn-decline:hover { background:rgba(255,255,255,.15); color:rgba(255,255,255,.9); }
+.cookie-categories {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  flex-shrink: 0;
+}
+.cookie-cat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255,255,255,.65);
+  cursor: pointer;
+  user-select: none;
+}
+.cookie-cat em {
+  font-size: 10px;
+  color: rgba(255,255,255,.3);
+  font-style: normal;
+}
+.cookie-cat input[type=checkbox] {
+  accent-color: #c9984a;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
 </style>
 </head>
 <body>
@@ -633,9 +673,53 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.06);padding:
   <div class="foot-logo">Book<span>Well</span></div>
   <div class="foot-copy">© 2026 BookWell.si — Vse pravice pridržane</div>
   <div class="foot-email">info@bookwell.si</div>
-  <div class="foot-links"><a href="#">Pogoji</a><a href="#">Zasebnost</a><a href="#">Kontakt</a></div>
+  <div class="foot-links">
+    <a href="/terms">Pogoji</a>
+    <a href="/privacy">Zasebnost</a>
+    <a href="/kontakt">Kontakt</a>
+  </div>
 </footer>
+<div class="cookie-banner" id="cookieBanner">
+  <div class="cookie-text">
+    <p><strong>Piškotki</strong> — izberite katere dovolite:</p>
+  </div>
+  <div class="cookie-categories">
+    <label class="cookie-cat">
+      <input type="checkbox" checked disabled />
+      <span>Nujni <em>(obvezni)</em></span>
+    </label>
+    <label class="cookie-cat">
+      <input type="checkbox" id="consent-analytics" />
+      <span>Analitični</span>
+    </label>
+    <label class="cookie-cat">
+      <input type="checkbox" id="consent-marketing" />
+      <span>Marketinški</span>
+    </label>
+  </div>
+  <div class="cookie-actions">
+    <button class="cookie-btn cookie-btn-accept" id="acceptAll">Sprejmem vse</button>
+    <button class="cookie-btn cookie-btn-accept" id="acceptSelected"
+      style="background:rgba(201,152,74,.2);color:var(--gold);">Sprejmem izbrane</button>
+    <button class="cookie-btn cookie-btn-decline" id="declineCookies">Samo nujni</button>
+  </div>
+</div>
 
+<div id="policyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;padding:40px;border-radius:8px;">
+    <button onclick="closePolicyModal()" style="float:right;background:none;border:none;font-size:24px;cursor:pointer;color:#aaa;">&times;</button>
+    <h2 style="font-family:'Playfair Display',serif;font-size:28px;font-weight:700;margin-bottom:20px;">Politika piškotkov</h2>
+    <div style="font-size:14px;line-height:1.8;color:#444;">
+      <p><strong>1. Kaj so piškotki?</strong></p>
+      <p>Piškotki so majhne datoteke, ki jih vaš brskalnik shranjuje. Uporabljamo jih za tehnično delovanje strani.</p>
+      <p style="margin-top:16px;"><strong>2. Kako jih počistite?</strong></p>
+      <p>V nastavitvah vašega brskalnika (Chrome, Firefox, Safari, Edge).</p>
+      <p style="margin-top:16px;"><strong>3. Kontakt</strong></p>
+      <p>Vprašanja? Pišite na <strong>info@bookwell.si</strong></p>
+    </div>
+    <button onclick="closePolicyModal()" style="margin-top:24px;background:#0a0a0a;color:#c9984a;padding:12px 28px;border:none;font-weight:700;font-size:12px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;width:100%;">Razumem</button>
+  </div>
+</div>
 <script>
 /* ── SCROLL ANIMATIONS ── */
 const obs = new IntersectionObserver(entries => {
@@ -817,6 +901,70 @@ setTimeout(() => {
 
 lwSend.addEventListener('click', lwSendMsg);
 lwInput.addEventListener('keydown', e => { if(e.key==='Enter') lwSendMsg(); });
+function setCookie(name, value, days) {
+  const date = new Date();
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+  document.cookie = name + '=' + value + ';expires=' + date.toUTCString() + ';path=/;SameSite=Lax';
+}
+function getCookie(name) {
+  const nameEQ = name + '=';
+  const cookies = document.cookie.split(';');
+  for (let i = 0; i < cookies.length; i++) {
+    let c = cookies[i].trim();
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length);
+  }
+  return null;
+}
+function getConsent() {
+  try { return JSON.parse(getCookie('bw_consent') || 'null'); }
+  catch { return null; }
+}
+function saveConsent(analytics, marketing) {
+  const consent = {
+    necessary: true,
+    analytics,
+    marketing,
+    timestamp: new Date().toISOString(),
+    version: '1.0'
+  };
+  setCookie('bw_consent', JSON.stringify(consent), 365);
+  document.getElementById('cookieBanner').classList.add('hidden');
+  applyConsent(consent);
+}
+function applyConsent(consent) {
+  if (consent.analytics) {
+    // Tukaj vklopite analytics (npr. Google Analytics)
+    console.log('Analytics: ON');
+  }
+  if (consent.marketing) {
+    console.log('Marketing: ON');
+  }
+}
+function showCookiePolicy(e) {
+  e.preventDefault();
+  document.getElementById('policyModal').style.display = 'flex';
+}
+function closePolicyModal() {
+  document.getElementById('policyModal').style.display = 'none';
+}
+document.getElementById('acceptAll').addEventListener('click', () => saveConsent(true, true));
+document.getElementById('acceptSelected').addEventListener('click', () => {
+  saveConsent(
+    document.getElementById('consent-analytics').checked,
+    document.getElementById('consent-marketing').checked
+  );
+});
+document.getElementById('declineCookies').addEventListener('click', () => saveConsent(false, false));
+document.getElementById('policyModal').addEventListener('click', e => {
+  if (e.target.id === 'policyModal') closePolicyModal();
+});
+window.addEventListener('load', () => {
+  const consent = getConsent();
+  if (consent) {
+    document.getElementById('cookieBanner').classList.add('hidden');
+    applyConsent(consent);
+  }
+});
 </script>
 </body>
 </html>

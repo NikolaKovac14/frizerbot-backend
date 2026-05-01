@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Politika zasebnosti — BookWell</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black: #0a0a08;
+      --white: #ffffff;
+      --paper: #faf7f2;
+      --text: #1e1c18;
+      --text-2: #5a5448;
+      --gold: #c9984a;
+      --muted: #8a8070;
+      --border: rgba(0,0,0,0.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--paper);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+      background: rgba(250,247,242,0.94);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(18px);
+      height: 64px;
+      display: flex; align-items: center;
+      padding: 0 6vw;
+      justify-content: space-between;
+    }
+    .logo { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 900; color: var(--black); }
+    .logo span { color: var(--gold); }
+    .nav-link { font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.2s; }
+    .nav-link:hover { color: var(--black); }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 120px 6vw 80px;
+    }
+    .page-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+    .page-header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(32px, 5vw, 56px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--black);
+      margin-bottom: 12px;
+    }
+    .page-header p {
+      font-size: 14px;
+      color: var(--text-2);
+    }
+    
+    .toc {
+      background: var(--white);
+      border: 1px solid var(--border);
+      padding: 28px;
+      margin-bottom: 48px;
+      border-radius: 8px;
+    }
+    .toc h2 {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--black);
+      margin-bottom: 16px;
+    }
+    .toc ol {
+      list-style: decimal inside;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toc li {
+      font-size: 13px;
+      color: var(--text-2);
+    }
+    .toc a {
+      color: var(--gold);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .toc a:hover {
+      text-decoration: underline;
+    }
+    
+    .content h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--black);
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+    .content h2:first-of-type {
+      border-top: none;
+      padding-top: 0;
+      margin-top: 0;
+    }
+    .content h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--black);
+      margin-top: 24px;
+      margin-bottom: 12px;
+    }
+    .content p {
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--text-2);
+      margin-bottom: 14px;
+    }
+    .content ul, .content ol {
+      margin-left: 24px;
+      margin-bottom: 16px;
+    }
+    .content li {
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--text-2);
+      margin-bottom: 8px;
+    }
+    .highlight {
+      background: rgba(201, 152, 74, 0.08);
+      border-left: 3px solid var(--gold);
+      padding: 16px 20px;
+      margin: 20px 0;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+    
+    footer {
+      background: var(--text);
+      color: var(--white);
+      padding: 40px 6vw;
+      margin-top: 80px;
+      text-align: center;
+      font-size: 12px;
+    }
+    footer a {
+      color: var(--gold);
+      text-decoration: none;
+    }
+    
+    @media (max-width: 600px) {
+      .container { padding: 80px 5vw 60px; }
+      .page-header h1 { font-size: 28px; }
+      .content h2 { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="logo">Book<span>Well</span></a>
+  <a href="/" class="nav-link">← Nazaj na domačo stran</a>
+</nav>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Politika zasebnosti</h1>
+    <p>Veljavna od 1. maja 2026 • Zadnja posodobitev: 1. maj 2026</p>
+  </div>
+
+  <div class="toc">
+    <h2>Kazalo</h2>
+    <ol>
+      <li><a href="#intro">Uvod</a></li>
+      <li><a href="#odgovorni">Odgovorni za podatke</a></li>
+      <li><a href="#katere">Katere podatke zbiramo</a></li>
+      <li><a href="#kako">Kako uporabljamo podatke</a></li>
+      <li><a href="#pravna">Pravna osnova obdelave</a></li>
+      <li><a href="#delitev">Deljenje podatkov</a></li>
+      <li><a href="#varnost">Varnost podatkov</a></li>
+      <li><a href="#hranitev">Čas hranjenja podatkov</a></li>
+      <li><a href="#pravice">Vaše pravice</a></li>
+      <li><a href="#piskotki">Piškotki in sledilci</a></li>
+      <li><a href="#spremembe">Spremembe politike</a></li>
+      <li><a href="#kontakt">Kontakt</a></li>
+    </ol>
+  </div>
+
+  <div class="content">
+    <h2 id="intro">1. Uvod</h2>
+    <p>
+      BookWell.si (v nadaljevanju: "podjetje", "mi", "naš") je zavezana k zaščiti vaše zasebnosti. 
+      Ta Politika zasebnosti pojasnjuje, kako zbiramo, uporabljamo, delimo in varujemo vaše osebne podatke 
+      v skladu z Uredbo (EU) 2016/679 (Splošna uredba o varstvu podatkov - GDPR) in slovenskim Zakonom o varstvu osebnih podatkov.
+    </p>
+    <p>
+      Prosimo, da to politiko natančno preberete. Če se ne strinjate s kako in v katere namene uporabljamo vaše podatke, 
+      vas prosimo, da ne uporabljate naših storitev.
+    </p>
+
+    <h2 id="odgovorni">2. Odgovorni za podatke</h2>
+    <p><strong>Upravljavec osebnih podatkov:</strong></p>
+    <p>
+      BookWell.si<br>
+      E-pošta: <a href="mailto:info@bookwell.si">info@bookwell.si</a><br>
+      Naslov: Ljubljana, Slovenija
+    </p>
+    <p>
+      Podjetje je edino odgovorno za obdelavo osebnih podatkov, ki jih zbiramo prek te storitve.
+    </p>
+
+    <h2 id="katere">3. Katere podatke zbiramo</h2>
+    <p>Zbiramo in obdelujemo naslednje vrste osebnih podatkov:</p>
+    
+    <h3>3.1. Podatki ob registraciji (za lastnike salonov)</h3>
+    <ul>
+      <li>Ime in priimek</li>
+      <li>Elektronski naslov (e-pošta)</li>
+      <li>Telefonska številka (opciono)</li>
+      <li>Ime in naslov salona</li>
+      <li>Podatki o storitev (cene, opis)</li>
+      <li>Delovni čas salona</li>
+      <li>Podatki o računu/plačilu (prek Stripe)</li>
+    </ul>
+
+    <h3>3.2. Podatki strank pri rezervaciji</h3>
+    <ul>
+      <li>Ime in priimek stranke</li>
+      <li>Elektronski naslov stranke</li>
+      <li>Telefonska številka stranke</li>
+      <li>Vrsta in čas želene storitve</li>
+      <li>Podatki o rezervaciji (datum, ura, storitev)</li>
+    </ul>
+
+    <h3>3.3. Tehnični podatki</h3>
+    <ul>
+      <li>IP naslov</li>
+      <li>Tip brskalnika in operacijski sistem</li>
+      <li>Časovni žig obiska</li>
+      <li>Piškotki</li>
+      <li>Podatki o uporabi spletne strani</li>
+    </ul>
+
+    <h3>3.4. Podatki o komunikaciji</h3>
+    <ul>
+      <li>Vsebina pogovorov prek AI asistenta</li>
+      <li>E-mailska sporočila in poizvedbe</li>
+    </ul>
+
+    <h2 id="kako">4. Kako uporabljamo podatke</h2>
+    <p>Vaše osebne podatke uporabljamo v naslednjih namene:</p>
+    
+    <h3>4.1. Za lastnike salonov</h3>
+    <ul>
+      <li>Zagotavljanje dostopa do AI asistenta in admin panela</li>
+      <li>Upravljanje računa in naročnine</li>
+      <li>Obdelava plačil prek Stripe</li>
+      <li>Pošiljanje obvestil o rezervacijah</li>
+      <li>Tehnična podpora in vzdrževanje storitve</li>
+      <li>Analiza uporabe storitve</li>
+      <li>Sporočanje o spremembah politike ali storitve</li>
+    </ul>
+
+    <h3>4.2. Za stranke salonov</h3>
+    <ul>
+      <li>Izvajanje in upravljanje rezervacij</li>
+      <li>Pošiljanje potrditev rezervacij po e-pošti</li>
+      <li>Omogočanje odpovedi rezervacije</li>
+      <li>Obvestilo salona o rezervaciji</li>
+    </ul>
+
+    <h3>4.3. Splošno</h3>
+    <ul>
+      <li>Analiza podatkov za izboljšanje storitve</li>
+      <li>Skladnost s pravnimi obveznostmi</li>
+      <li>Preprečevanje zlorab in varnost</li>
+      <li>Marketing (le z vašim soglasjem)</li>
+    </ul>
+
+    <h2 id="pravna">5. Pravna osnova za obdelavo podatkov</h2>
+    <p>Obdelujemo vaše podatke na podlagi naslednjih pravnih osnov:</p>
+    
+    <h3>5.1. Pogodba (GDPR čl. 6 (1) (b))</h3>
+    <p>
+      Podatke obdelujemo za izvajanje naše pogodbe z vami — npr. za upravljanje naročnine, 
+      zagotavljanje storitve, obdelavo plačil in upravljanje rezervacij.
+    </p>
+
+    <h3>5.2. Pravna obveza (GDPR čl. 6 (1) (c))</h3>
+    <p>
+      Obdelujemo podatke, ko je to zahtevano s slovenskim ali evropskim pravom 
+      (npr. davčni podatki, skladnost s predpisi o pranju denarja).
+    </p>
+
+    <h3>5.3. Zakoniti interesi (GDPR čl. 6 (1) (f))</h3>
+    <p>
+      Obdelujemo podatke za varnost, preprečevanje zlorab, analizo storitve in izboljšave. 
+      Vaši interesi zasebnosti se ne prevešejo čez naše zakonite interese.
+    </p>
+
+    <h3>5.4. Soglasje (GDPR čl. 6 (1) (a))</h3>
+    <p>
+      Za marketing sporočila in nebistvene piškotke zbieramo le z vašim izrecnim soglasjem, 
+      ki ga lahko kadar koli preklicete.
+    </p>
+
+    <h2 id="delitev">6. Deljenje podatkov s tretjimi strankami</h2>
+    <p>
+      Vaše podatke delimo le v naslednjih primerih in samo v obsegu, ki je potreben:
+    </p>
+
+    <h3>6.1. Stripe (plačilni procesor)</h3>
+    <p>
+      Podatke o plačilu (e-naslov, ime, znesek) delimo z <strong>Stripe</strong> za obdelavo plačil. 
+      Stripe je certificiran za standarde EU-US Privacy Shield. 
+      <a href="https://stripe.com/privacy" target="_blank">Politika Stripe</a>.
+    </p>
+
+    <h3>6.2. SendGrid (e-mail storitev)</h3>
+    <p>
+      E-naslove in vsebino e-mailov delimo s <strong>SendGrid</strong> za pošiljanje potrditev in obvestil. 
+      <a href="https://sendgrid.com/policies/privacy/" target="_blank">Politika SendGrid</a>.
+    </p>
+
+    <h3>6.3. PostgreSQL baza podatkov</h3>
+    <p>
+      Vaši podatki so shranjeni v varni bazi podatkov. Dostop ima le tehnično osebje BookWell.
+    </p>
+
+    <h3>6.4. Antropic (AI asistent)</h3>
+    <p>
+      Besedila pogovorov prek AI asistenta se pošiljajo Antropic za obdelavo. 
+      Antropic je zavezana k zaščiti podatkov. 
+      <a href="https://www.anthropic.com/legal/privacy" target="_blank">Politika Antropic</a>.
+    </p>
+
+    <h3>6.5. Pravne obveze in varnost</h3>
+    <p>
+      Podatke lahko razkrijem, če je to zahtevano s sodbo, nalogom ali drugimi pravnimi sredstvi, 
+      ali če je potrebno za zaščito zdravja, varnosti ali pravic.
+    </p>
+
+    <div class="highlight">
+      <strong>⚠️ Pomembno:</strong> Nikoli ne prodajamo niti ne najemamo podatkov tretjim stranem v komercialnih namene.
+    </div>
+
+    <h2 id="varnost">7. Varnost podatkov</h2>
+    <p>
+      Uporabljamo industrijske standarde zaščite podatkov:
+    </p>
+    <ul>
+      <li><strong>HTTPS enkripcija:</strong> Vsi podatki v prehodu so enkripirani</li>
+      <li><strong>Enkripirana baza podatkov:</strong> Podatki mirujejo zaščiteni</li>
+      <li><strong>Dostopne kontrole:</strong> Dostop ima le pooblaščeno osebje</li>
+      <li><strong>Redne varnostne revizije:</strong> Preverjamo ranljivosti</li>
+      <li><strong>Gesla:</strong> Shranjujemo z bcrypt algoritmom</li>
+    </ul>
+    <p>
+      Vendar pa nobena metoda prenosa čez internet ni 100% varna. Čeprav se trudimo zaščititi vaše podatke, 
+      ne moramo jamčiti absolutne varnosti. Ste sami odgovorni za varnost svojega gesla.
+    </p>
+
+    <h2 id="hranitev">8. Kako dolgo hranimo podatke</h2>
+    
+    <h3>8.1. Podatki lastnike salonov</h3>
+    <ul>
+      <li><strong>Aktivni račun:</strong> Torej kot ste naročeni</li>
+      <li><strong>Po brisanju računa:</strong> Podatki se izbrišejo v 30 dneh (razen davčnih zapisov)</li>
+      <li><strong>Davčni podatki:</strong> Hranjeni 6 let (po slovenski zakonodaji)</li>
+    </ul>
+
+    <h3>8.2. Podatki strank</h3>
+    <ul>
+      <li><strong>Rezervacija:</strong> Hranjeni do datuma rezervacije + 1 leto</li>
+      <li><strong>Potrditveni e-mail:</strong> Izbrisan po izpolnitvi rezervacije (razen za arhiv)</li>
+    </ul>
+
+    <h3>8.3. Tehnični podatki (piškotki, IP naslovi)</h3>
+    <ul>
+      <li><strong>Piškotki:</strong> 365 dni ali do preklica soglasja</li>
+      <li><strong>IP naslovi v logih:</strong> 90 dni</li>
+    </ul>
+
+    <h2 id="pravice">9. Vaše pravice po GDPR</h2>
+    <p>
+      Glede na GDPR imate naslednje pravice:
+    </p>
+
+    <h3>9.1. Pravica do dostopa (GDPR čl. 15)</h3>
+    <p>
+      Lahko zahtevate dostop do vseh osebnih podatkov, ki jih imamo o vas. 
+      Odgovorimo v 30 dneh.
+    </p>
+
+    <h3>9.2. Pravica do popravka (GDPR čl. 16)</h3>
+    <p>
+      Lahko zahtevate popravek netočnih podatkov brez nepotrebnega odloga.
+    </p>
+
+    <h3>9.3. Pravica do briščanja (GDPR čl. 17 - "Pravica biti pozabljen")</h3>
+    <p>
+      V določenih primerih lahko zahtevate izbris podatkov. Ta pravica ne velja, 
+      če so podatki potrebni za izpolnitev pogodbe ali skladnost s pravom.
+    </p>
+
+    <h3>9.4. Pravica do omejevanja obdelave (GDPR čl. 18)</h3>
+    <p>
+      Lahko zahtevate, da omejimo obdelavo podatkov, medtem ko preverjamo njihovo pravilnost.
+    </p>
+
+    <h3>9.5. Pravica do prenosljivosti podatkov (GDPR čl. 20)</h3>
+    <p>
+      Lahko zahtevate, da vam posredujemo podatke v strukturirani, 
+      pogosto uporabljani in strojno berljivi obliki (npr. CSV).
+    </p>
+
+    <h3>9.6. Pravica do ugovora (GDPR čl. 21)</h3>
+    <p>
+      Lahko ugovarjate obdelavi podatkov na podlagi zakonitih interesov. 
+      Obdelavo takoj prekinemo.
+    </p>
+
+    <h3>9.7. Pravice glede avtomatiziranega odločanja</h3>
+    <p>
+      Ne sprejemamo avtomatiziranih odločitev, ki bi vam škodile. 
+      AI asistent le priporoča termine, končno odločitev sprejema salon.
+    </p>
+
+    <div class="highlight">
+      <strong>💡 Kako uresničiti pravice:</strong> Pošljite zahtevo na <a href="mailto:info@bookwell.si">info@bookwell.si</a> 
+      s podatki, ki vam omogočajo identifikacijo (ime, e-naslov, naslov salona). 
+      Priložite fotokopijo osebnega dokumenta. Odgovorili vam bomo v 30 dneh.
+    </div>
+
+    <h2 id="piskotki">10. Piškotki in sledilci</h2>
+    
+    <h3>10.1. Kaj so piškotki?</h3>
+    <p>
+      Piškotki so majhne datoteke, ki jih vaš brskalnik shranjuje na vaš računalnik. 
+      Uporabljamo jih za:
+    </p>
+    <ul>
+      <li><strong>Tehnični piškotki:</strong> Prijava, varnost, funkcionalnost (nujni)</li>
+      <li><strong>Analitični piškotki:</strong> Razumevanje kako uporabljate storitev</li>
+      <li><strong>Marketinški piškotki:</strong> Le z vašim soglasjem</li>
+    </ul>
+
+    <h3>10.2. Kako upravljati piškotke</h3>
+    <p>
+      V nastavitvah brskalnika lahko spremenite nastavitve piškotkov:
+    </p>
+    <ul>
+      <li><strong>Chrome:</strong> Nastavitve → Zasebnost in varnost → Piškotki in druga spletna mesta</li>
+      <li><strong>Firefox:</strong> Nastavitve → Zasebnost in varnost → Piškotki</li>
+      <li><strong>Safari:</strong> Nastavitve → Zasebnost → Upravljati piškotke</li>
+      <li><strong>Edge:</strong> Nastavitve → Zasebnost → Piškotki</li>
+    </ul>
+
+    <h3>10.3. Analitika</h3>
+    <p>
+      Nemo podatke o uporabi (ne- osebne) za analitiko, da izboljšamo storitev. 
+      Podatki se ne povezujejo z vašo identiteto.
+    </p>
+
+    <h2 id="spremembe">11. Spremembe te politike</h2>
+    <p>
+      To politiko lahko spremenimo kadarkoli. O večjih spremembah vas bomo obvestili po e-pošti 
+      ali s poudarkom na spletni strani. Redno predlagamo, da si politiko preberete.
+    </p>
+    <p>
+      Zadnja posodobitev: <strong>1. maj 2026</strong>
+    </p>
+
+    <h2 id="kontakt">12. Kontaktirajte nas</h2>
+    <p>
+      Če imate vprašanja glede te politike ali vaših osebnih podatkov:
+    </p>
+    <p>
+      <strong>BookWell.si</strong><br>
+      E-pošta: <a href="mailto:info@bookwell.si">info@bookwell.si</a><br>
+      Naslov: Ljubljana, Slovenija
+    </p>
+    <p>
+      Če niste zadovoljni s kako ravnamo s podatki, imate pravico vložiti pritožbo pri 
+      <strong>Pooblaščencu za varstvo podatkov RS</strong>:<br>
+      <a href="https://www.ip-rs.si" target="_blank">www.ip-rs.si</a><br>
+      E-pošta: <a href="mailto:gp.ip@ip-rs.si">gp.ip@ip-rs.si</a>
+    </p>
+  </div>
+</div>
+
+<footer>
+  <p>&copy; 2026 BookWell.si — Vse pravice pridržane</p>
+  <p style="margin-top: 10px;">
+    <a href="/">Domača stran</a> • 
+    <a href="/terms">Pogoji uporabe</a> • 
+    <a href="/privacy">Politika zasebnosti</a>
+  </p>
+</footer>
+
+</body>
+</html>
