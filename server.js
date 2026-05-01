@@ -2201,6 +2201,14 @@ app.post('/api/gdpr/report-breach', gdprLimiter, async (req, res) => {
   }
 });
 
+app.get('/privacy', (req, res) => {
+  res.sendFile(__dirname + '/privacy-policiy.html');
+});
+
+app.get('/terms', (req, res) => {
+  res.sendFile(__dirname + '/terms-of-service.html');
+});
+
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/landing.html');
 });
