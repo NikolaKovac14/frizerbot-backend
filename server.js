@@ -2202,7 +2202,7 @@ app.post('/api/gdpr/report-breach', gdprLimiter, async (req, res) => {
 });
 
 app.get('/privacy', (req, res) => {
-  res.sendFile(__dirname + '/privacy-policiy.html');
+  res.sendFile(__dirname + '/privacy-policy.html');
 });
 
 app.get('/terms', (req, res) => {
