@@ -2209,6 +2209,10 @@ app.get('/terms', (req, res) => {
   res.sendFile(__dirname + '/terms-of-service.html');
 });
 
+app.get('/dpa', (req, res) => {
+  res.sendFile(__dirname + '/dpa.html');
+});
+
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/landing.html');
 });

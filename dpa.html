@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pogodba o obdelavi podatkov (DPA) — BookWell</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black: #0a0a08;
+      --white: #ffffff;
+      --paper: #faf7f2;
+      --text: #1e1c18;
+      --text-2: #5a5448;
+      --gold: #c9984a;
+      --gold-dk: #8c6830;
+      --muted: #8a8070;
+      --border: rgba(0,0,0,0.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--paper);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+      background: rgba(250,247,242,0.94);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(18px);
+      height: 64px;
+      display: flex; align-items: center;
+      padding: 0 6vw;
+      justify-content: space-between;
+    }
+    .logo { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 900; color: var(--black); text-decoration: none; }
+    .logo span { color: var(--gold); }
+    .nav-link { font-size: 12px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.2s; }
+    .nav-link:hover { color: var(--black); }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 120px 6vw 80px;
+    }
+
+    .page-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+    .page-header .eyebrow {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--gold-dk); margin-bottom: 16px; display: block;
+    }
+    .page-header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--black);
+      margin-bottom: 12px;
+      line-height: 1.1;
+    }
+    .page-header p {
+      font-size: 14px;
+      color: var(--text-2);
+      margin-bottom: 6px;
+    }
+
+    .acceptance-box {
+      background: var(--black);
+      color: rgba(255,255,255,0.8);
+      padding: 20px 28px;
+      margin-bottom: 48px;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .acceptance-box .icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .acceptance-box p { font-size: 13px; line-height: 1.7; }
+    .acceptance-box strong { color: var(--gold); }
+
+    .toc {
+      background: var(--white);
+      border: 1px solid var(--border);
+      padding: 28px;
+      margin-bottom: 48px;
+    }
+    .toc h2 {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 16px;
+    }
+    .toc ol {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 32px;
+      counter-reset: toc;
+    }
+    .toc li {
+      font-size: 13px;
+      color: var(--text-2);
+      counter-increment: toc;
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+    }
+    .toc li::before {
+      content: counter(toc, decimal-leading-zero);
+      font-family: 'Playfair Display', serif;
+      font-size: 11px;
+      color: var(--gold-dk);
+      flex-shrink: 0;
+    }
+    .toc a { color: var(--text-2); text-decoration: none; transition: color 0.15s; }
+    .toc a:hover { color: var(--gold); }
+
+    .content h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--black);
+      margin-top: 52px;
+      margin-bottom: 16px;
+      padding-top: 28px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+    }
+    .content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+    .content h2 .num {
+      font-size: 13px;
+      color: var(--gold-dk);
+      font-weight: 400;
+      letter-spacing: 0.08em;
+      flex-shrink: 0;
+    }
+    .content h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--black);
+      margin-top: 24px;
+      margin-bottom: 10px;
+    }
+    .content p {
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--text-2);
+      margin-bottom: 14px;
+    }
+    .content ul {
+      margin-left: 0;
+      margin-bottom: 16px;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .content ul li {
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text-2);
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .content ul li::before {
+      content: '';
+      flex-shrink: 0;
+      width: 16px;
+      height: 1px;
+      background: var(--gold-dk);
+      margin-top: 12px;
+    }
+    .content a { color: var(--gold); text-decoration: none; }
+    .content a:hover { text-decoration: underline; }
+
+    .highlight {
+      background: rgba(201,152,74,0.08);
+      border-left: 3px solid var(--gold);
+      padding: 16px 20px;
+      margin: 20px 0;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+    .highlight strong { color: var(--black); }
+
+    .parties-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin: 20px 0;
+    }
+    .party-card {
+      background: var(--white);
+      padding: 24px;
+    }
+    .party-card .party-role {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--gold-dk); margin-bottom: 10px; display: block;
+    }
+    .party-card h4 {
+      font-family: 'Playfair Display', serif;
+      font-size: 16px; font-weight: 700; color: var(--black);
+      margin-bottom: 10px;
+    }
+    .party-card p { font-size: 13px; color: var(--text-2); line-height: 1.7; margin: 0; }
+
+    .subprocessors-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 13px;
+    }
+    .subprocessors-table th {
+      background: var(--black);
+      color: rgba(255,255,255,0.6);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+    }
+    .subprocessors-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-2);
+      vertical-align: top;
+      line-height: 1.6;
+    }
+    .subprocessors-table tr:last-child td { border-bottom: none; }
+    .subprocessors-table tr:nth-child(even) td { background: rgba(0,0,0,0.02); }
+    .subprocessors-table td:first-child { font-weight: 600; color: var(--black); }
+    .subprocessors-table td a { color: var(--gold); }
+
+    .signature-block {
+      background: var(--white);
+      border: 1px solid var(--border);
+      padding: 32px;
+      margin-top: 48px;
+      text-align: center;
+    }
+    .signature-block p {
+      font-size: 13px;
+      color: var(--text-2);
+      margin-bottom: 8px;
+    }
+    .signature-block .sig-date {
+      font-family: 'Playfair Display', serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--black);
+      margin: 16px 0;
+    }
+    .signature-block .sig-note {
+      font-size: 11px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    footer {
+      background: var(--text);
+      color: var(--white);
+      padding: 40px 6vw;
+      margin-top: 80px;
+      text-align: center;
+      font-size: 12px;
+    }
+    footer a { color: var(--gold); text-decoration: none; }
+
+    @media (max-width: 600px) {
+      .container { padding: 80px 5vw 60px; }
+      .toc ol { grid-template-columns: 1fr; }
+      .parties-grid { grid-template-columns: 1fr; }
+      .subprocessors-table { font-size: 12px; }
+      .subprocessors-table th, .subprocessors-table td { padding: 8px 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="logo">Book<span>Well</span></a>
+  <a href="/" class="nav-link">← Nazaj na domačo stran</a>
+</nav>
+
+<div class="container">
+
+  <div class="page-header">
+    <span class="eyebrow">GDPR čl. 28</span>
+    <h1>Pogodba o obdelavi<br>osebnih podatkov</h1>
+    <p>Data Processing Agreement (DPA)</p>
+    <p>Veljavna od 1. maja 2026 · Zadnja posodobitev: 1. maj 2026</p>
+  </div>
+
+  <div class="acceptance-box">
+    <div class="icon">📋</div>
+    <p>
+      Ta pogodba se <strong>samodejno sklene</strong> med BookWell.si (obdelovalec) in lastnikom salona (upravljavec)
+      ob začetku uporabe storitve — s plačilom naročnine ali z aktivacijo brezplačnega preizkusnega obdobja.
+      Nadaljnja uporaba storitve pomeni vašo sprejetost vseh določil te pogodbe.
+    </p>
+  </div>
+
+  <div class="toc">
+    <h2>Vsebina</h2>
+    <ol>
+      <li><a href="#stranki">Stranki pogodbe</a></li>
+      <li><a href="#predmet">Predmet in trajanje</a></li>
+      <li><a href="#podatki">Vrsta in namen obdelave</a></li>
+      <li><a href="#obveznosti-obdelovalca">Obveznosti obdelovalca</a></li>
+      <li><a href="#obveznosti-upravljavca">Obveznosti upravljavca</a></li>
+      <li><a href="#podobdelovalci">Podobdelovalci</a></li>
+      <li><a href="#prenos">Prenos podatkov izven EU</a></li>
+      <li><a href="#varnost">Varnostni ukrepi</a></li>
+      <li><a href="#pravice">Pravice posameznikov</a></li>
+      <li><a href="#krsitve">Kršitve varnosti</a></li>
+      <li><a href="#revizije">Revizije in pregledi</a></li>
+      <li><a href="#prenehanje">Prenehanje pogodbe</a></li>
+      <li><a href="#kontakt">Kontakt in DPO</a></li>
+    </ol>
+  </div>
+
+  <div class="content">
+
+    <h2 id="stranki"><span class="num">01</span> Stranki pogodbe</h2>
+    <div class="parties-grid">
+      <div class="party-card">
+        <span class="party-role">Obdelovalec podatkov</span>
+        <h4>BookWell.si</h4>
+        <p>
+          Ljubljana, Slovenija<br>
+          E-pošta: <a href="mailto:info@bookwell.si">info@bookwell.si</a><br><br>
+          BookWell zagotavlja AI rezervacijski sistem in obdeluje osebne podatke
+          izključno po navodilih upravljavca.
+        </p>
+      </div>
+      <div class="party-card">
+        <span class="party-role">Upravljavec podatkov</span>
+        <h4>Lastnik salona</h4>
+        <p>
+          Fizična ali pravna oseba, ki uporablja BookWell storitev za upravljanje rezervacij
+          svojega salona ali studija. Podatki upravljavca so navedeni v naročniškem računu.
+        </p>
+      </div>
+    </div>
+
+    <h2 id="predmet"><span class="num">02</span> Predmet in trajanje</h2>
+    <p>
+      BookWell (obdelovalec) obdeluje osebne podatke strank salona v imenu in po navodilih
+      lastnika salona (upravljavca) za namen delovanja rezervacijskega sistema.
+    </p>
+    <p>
+      Pogodba velja za čas trajanja naročnine na storitev BookWell. Po prenehanju naročnine
+      se podatki izbrišejo v skladu z določili 12. člena te pogodbe.
+    </p>
+
+    <h2 id="podatki"><span class="num">03</span> Vrsta in namen obdelave</h2>
+    <h3>Vrste osebnih podatkov</h3>
+    <ul>
+      <li>Identifikacijski podatki strank: ime in priimek</li>
+      <li>Kontaktni podatki: elektronski naslov, telefonska številka</li>
+      <li>Podatki o rezervacijah: datum, čas, vrsta storitve</li>
+      <li>Vsebina pogovorov z AI asistentom (v obsegu, potrebnem za izvajanje storitve)</li>
+    </ul>
+
+    <h3>Namen obdelave</h3>
+    <ul>
+      <li>Upravljanje in potrjevanje rezervacij strank salona</li>
+      <li>Pošiljanje potrditvenih in obvestilnih e-poštnih sporočil</li>
+      <li>Prikaz terminov v skrbniškem panelu upravljavca</li>
+      <li>Zagotavljanje delovanja AI asistenta za rezervacije</li>
+    </ul>
+
+    <h3>Kategorije posameznikov</h3>
+    <p>
+      Stranke salona, ki opravljajo rezervacije prek BookWell AI asistenta ali skrbniškega panela.
+    </p>
+
+    <div class="highlight">
+      <strong>Pomembno:</strong> BookWell ne obdeluje podatkov za lastne tržne namene.
+      Vsi podatki se obdelujejo izključno za zagotavljanje rezervacijske storitve upravljavcu.
+    </div>
+
+    <h2 id="obveznosti-obdelovalca"><span class="num">04</span> Obveznosti obdelovalca (BookWell)</h2>
+    <p>BookWell se zavezuje, da bo:</p>
+    <ul>
+      <li>Osebne podatke obdeloval izključno po dokumentiranih navodilih upravljavca in za namene iz 3. člena</li>
+      <li>Zagotovil, da so osebe, pooblaščene za obdelavo podatkov, zavezane k zaupnosti</li>
+      <li>Sprejel in vzdrževal ustrezne tehnične in organizacijske varnostne ukrepe (8. člen)</li>
+      <li>Upravljavca takoj obvestil, če meni, da navodilo krši GDPR ali drugo pravo EU</li>
+      <li>Upravljavcu pomagal pri izpolnjevanju obveznosti glede pravic posameznikov (9. člen)</li>
+      <li>Po prenehanju storitve podatke izbrisal ali vrnil po izbiri upravljavca (12. člen)</li>
+      <li>Upravljavcu dal na voljo vse informacije, potrebne za dokazovanje skladnosti</li>
+      <li>Omogočil revizije in preglede v razumnem obsegu (11. člen)</li>
+    </ul>
+
+    <h2 id="obveznosti-upravljavca"><span class="num">05</span> Obveznosti upravljavca</h2>
+    <p>Lastnik salona (upravljavec) se zavezuje, da bo:</p>
+    <ul>
+      <li>Strankam zagotovil ustrezne informacije o obdelavi podatkov (zasebnostna politika salona)</li>
+      <li>Imel veljavno pravno osnovo za zbiranje in posredovanje osebnih podatkov strank BookWell</li>
+      <li>BookWell takoj obvestil o kakršnih koli zahtevah strank glede uveljavljanja GDPR pravic</li>
+      <li>Zagotovil točnost in ažurnost podatkov, ki jih vnese v sistem</li>
+      <li>Upošteval omejitve namena obdelave, določene v tej pogodbi</li>
+      <li>BookWell obvestil o vseh okoliščinah, ki bi lahko vplivale na obdelavo podatkov</li>
+    </ul>
+
+    <h2 id="podobdelovalci"><span class="num">06</span> Podobdelovalci</h2>
+    <p>
+      Upravljavec z podpisom te pogodbe (oz. začetkom uporabe storitve) dovoljuje BookWell
+      uporabo naslednjih podobdelovalcev. BookWell zagotavlja, da so vsi podobdelovalci
+      zavezani z enakovrednimi obveznostmi varstva podatkov.
+    </p>
+
+    <table class="subprocessors-table">
+      <thead>
+        <tr>
+          <th>Podobdelovalec</th>
+          <th>Namen</th>
+          <th>Lokacija</th>
+          <th>Politika</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Anthropic, PBC</td>
+          <td>Obdelava besedil AI asistenta (Claude)</td>
+          <td>ZDA (SCC)</td>
+          <td><a href="https://www.anthropic.com/legal/privacy" target="_blank">anthropic.com/legal/privacy</a></td>
+        </tr>
+        <tr>
+          <td>Twilio SendGrid</td>
+          <td>Pošiljanje potrditvenih in obvestilnih e-poštnih sporočil</td>
+          <td>ZDA (SCC)</td>
+          <td><a href="https://www.twilio.com/legal/privacy" target="_blank">twilio.com/legal/privacy</a></td>
+        </tr>
+        <tr>
+          <td>Stripe, Inc.</td>
+          <td>Obdelava plačil naročnin</td>
+          <td>ZDA (SCC)</td>
+          <td><a href="https://stripe.com/privacy" target="_blank">stripe.com/privacy</a></td>
+        </tr>
+        <tr>
+          <td>PostgreSQL gostovanje</td>
+          <td>Shramba podatkov o terminih in salonih</td>
+          <td>EU</td>
+          <td>Dostopno na zahtevo</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      BookWell bo upravljavca obvestil o vsakem načrtovanem dodajanju ali zamenjavi podobdelovalca
+      vsaj 14 dni vnaprej. Upravljavec ima pravico ugovarjati spremembi v tem roku.
+    </p>
+
+    <h2 id="prenos"><span class="num">07</span> Prenos podatkov izven EU</h2>
+    <p>
+      Nekateri podobdelovalci (Anthropic, SendGrid, Stripe) imajo sedež v Združenih državah Amerike.
+      Prenosi podatkov v te države temeljijo na:
+    </p>
+    <ul>
+      <li><strong>Standardnih pogodbenih klavzulah EU (SCC)</strong> — skladno z Izvedbenim sklepom Komisije (EU) 2021/914</li>
+      <li><strong>EU–US Data Privacy Framework</strong> — za podobdelovalce, ki so certificirani po tem okviru</li>
+    </ul>
+    <p>
+      BookWell zagotavlja, da so vsi prenosi podatkov v tretje države ustrezno zavarovani in
+      skladni z zahtevami GDPR (poglavje V).
+    </p>
+
+    <h2 id="varnost"><span class="num">08</span> Varnostni ukrepi</h2>
+    <p>
+      BookWell skladno z GDPR čl. 32 zagotavlja naslednje tehnične in organizacijske ukrepe:
+    </p>
+    <ul>
+      <li><strong>Šifriranje v prenosu:</strong> Vsi podatki se prenašajo prek HTTPS/TLS</li>
+      <li><strong>Šifriranje v mirovanju:</strong> Podatkovna baza je šifrirana</li>
+      <li><strong>Nadzor dostopa:</strong> Dostop do podatkov je omejen na pooblaščeno osebje po principu najmanjših privilegijev</li>
+      <li><strong>Gesla:</strong> Shranjena z bcrypt algoritmom (delovni faktor ≥ 10)</li>
+      <li><strong>Seje:</strong> Zaščitene z varnimi sesjami in samodejno potečejo po 24 urah</li>
+      <li><strong>Rate limiting:</strong> Zaščita pred bruteforce in DOS napadi</li>
+      <li><strong>Beleženje:</strong> Dostopi in spremembe podatkov se beležijo</li>
+      <li><strong>Varnostne posodobitve:</strong> Redno posodabljanje odvisnosti in sistemskih komponent</li>
+    </ul>
+
+    <h2 id="pravice"><span class="num">09</span> Pravice posameznikov</h2>
+    <p>
+      Ko stranka salona uveljavlja pravice po GDPR (dostop, popravek, izbris, prenosljivost, ugovor),
+      upravljavec obvesti BookWell. BookWell se zavezuje, da bo:
+    </p>
+    <ul>
+      <li>Upravljavcu pomagal pri odgovoru na zahtevo v razumnem roku (najkasneje v 72 urah)</li>
+      <li>Zagotovil tehnična orodja za izvoz, popravek ali izbris podatkov posameznika</li>
+      <li>V primeru zahteve za izbris podatke dejansko izbrisal iz vseh sistemov v 30 dneh</li>
+    </ul>
+    <p>
+      Lastniki salonov (upravljavci) lahko svoje GDPR pravice uveljavljajo neposredno prek
+      obrazca na <a href="/privacy#pravice">/privacy</a> ali z zahtevo na <a href="mailto:info@bookwell.si">info@bookwell.si</a>.
+    </p>
+
+    <h2 id="krsitve"><span class="num">10</span> Kršitve varnosti podatkov</h2>
+    <p>
+      V primeru ugotovljene kršitve varnosti osebnih podatkov bo BookWell:
+    </p>
+    <ul>
+      <li>Upravljavca obvestil <strong>v 24 urah</strong> po ugotovitvi kršitve (upravljavec ima nato 72 ur za obvestitev URADY)</li>
+      <li>Posredoval vse razpoložljive informacije o naravi kršitve, vrstah in okvirnem številu prizadetih podatkov ter posameznikov</li>
+      <li>Opisal verjetne posledice kršitve in ukrepe za njeno odpravo</li>
+      <li>Kršitev evidentiral v notranjem registru (tabela breach_log)</li>
+    </ul>
+
+    <div class="highlight">
+      <strong>Stik za varnostne incidente:</strong> <a href="mailto:info@bookwell.si">info@bookwell.si</a> —
+      odgovorimo v roku 2 ur ob delovnih dneh, v roku 8 ur ob vikendih.
+    </div>
+
+    <h2 id="revizije"><span class="num">11</span> Revizije in pregledi</h2>
+    <p>
+      Upravljavec ima pravico do revizije skladnosti BookWell z obveznostmi iz te pogodbe.
+      Revizija se izvede:
+    </p>
+    <ul>
+      <li>Na pisno zahtevo upravljavca z vsaj 30-dnevnim odpovednim rokom</li>
+      <li>Na stroške upravljavca, razen kadar revizija razkrije kršitve s strani BookWell</li>
+      <li>Z minimalnim vplivom na delovanje BookWell storitve</li>
+    </ul>
+    <p>
+      Kot alternativo reviziji na kraju samem lahko BookWell predloži veljavno potrdilo o
+      neodvisni varnostni reviziji (npr. ISO 27001, SOC 2) ali izpolnjen vprašalnik o varnosti.
+    </p>
+
+    <h2 id="prenehanje"><span class="num">12</span> Prenehanje pogodbe</h2>
+    <p>
+      Po prenehanju naročnine (odpoved, neplačilo ali druga prekinitev) BookWell:
+    </p>
+    <ul>
+      <li>V roku <strong>30 dni</strong> izbriše ali anonimizira vse osebne podatke strank salona</li>
+      <li>Na zahtevo upravljavca podatke pred brisanjem izvozi v CSV ali JSON formatu</li>
+      <li>Ohrani davčne in finančne zapise za obdobje, ki ga zahteva slovenska zakonodaja (6 let)</li>
+      <li>Upravljavcu pisno potrdi dokončno brisanje podatkov</li>
+    </ul>
+    <p>
+      Podatki, ki jih je upravljavec sam prenesel ali shranil drugje, niso predmet te obveznosti.
+    </p>
+
+    <h2 id="kontakt"><span class="num">13</span> Kontakt in DPO</h2>
+    <p>
+      Za vsa vprašanja v zvezi s to pogodbo, obdelavo podatkov ali uveljavljanjem pravic:
+    </p>
+    <p>
+      <strong>BookWell.si</strong><br>
+      E-pošta: <a href="mailto:info@bookwell.si">info@bookwell.si</a><br>
+      Naslov: Ljubljana, Slovenija
+    </p>
+    <p>
+      Upravljavec ima pravico vložiti pritožbo pri <strong>Informacijskem pooblaščencu RS</strong>:<br>
+      <a href="https://www.ip-rs.si" target="_blank">www.ip-rs.si</a> ·
+      <a href="mailto:gp.ip@ip-rs.si">gp.ip@ip-rs.si</a>
+    </p>
+
+    <div class="signature-block">
+      <p>Ta pogodba je sklenjena in veljavna</p>
+      <div class="sig-date">od 1. maja 2026</div>
+      <p>med BookWell.si in vsakim lastnikom salona, ki uporablja storitev.</p>
+      <p class="sig-note">
+        Sprejetje pogodbe se evidentira ob začetku naročnine. Veljavna je brez pisnega podpisa,
+        skladno z GDPR čl. 28(3), ki dovoljuje pogodbo v elektronski obliki.
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  <p>&copy; 2026 BookWell.si — Vse pravice pridržane</p>
+  <p style="margin-top:10px;">
+    <a href="/">Domača stran</a> ·
+    <a href="/terms">Pogoji uporabe</a> ·
+    <a href="/privacy">Politika zasebnosti</a> ·
+    <a href="/dpa">DPA</a>
+  </p>
+</footer>
+
+</body>
+</html>
