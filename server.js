@@ -352,6 +352,7 @@ async function initDB() {
     )
   `);
   await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS cancel_token TEXT UNIQUE`);
+  await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS booked_by TEXT DEFAULT 'manual'`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS breach_log (
@@ -963,8 +964,8 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
       }
 
       await pool.query(`
-        INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, customer_phone, service)
-        VALUES ($1,$2,$3,'busy',$4,$5,$6,$7)
+        INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, customer_phone, service, booked_by)
+        VALUES ($1,$2,$3,'busy',$4,$5,$6,$7,'bot')
         ON CONFLICT (salon_id, date, time) DO UPDATE
         SET status='busy', customer_name=$4, customer_email=$5, customer_phone=$6, service=$7
       `, [actualSalonId, booking.date, booking.time, finalName, finalEmail, finalPhone, finalService]);
@@ -1585,13 +1586,19 @@ function buildAdminPage(salon) {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; }
     body { font-family: system-ui, -apple-system, sans-serif; background: var(--off-white); color: var(--black); font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
-    .masthead { background: var(--white); border-bottom: 2px solid var(--black); padding: 0 40px; display: flex; align-items: stretch; height: 60px; }
-    .masthead-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: var(--black); display: flex; align-items: center; padding-right: 32px; border-right: 1px solid var(--rule); white-space: nowrap; }
-    .masthead-label { display: flex; align-items: center; padding: 0 24px; font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); border-right: 1px solid var(--rule); }
+    .masthead { background: var(--white); border-bottom: 2px solid var(--black); padding: 0 16px; display: flex; align-items: center; height: auto; min-height: 52px; flex-wrap: wrap; gap: 0; }
+    .masthead-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: var(--black); padding: 12px 16px 12px 0; border-right: 1px solid var(--rule); white-space: nowrap; }
+    .masthead-label { display: none; }
     .masthead-spacer { flex: 1; }
-    .masthead-link { display: flex; align-items: center; gap: 6px; padding: 0 20px; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-decoration: none; border-left: 1px solid var(--rule); transition: color 0.15s; }
+    .masthead-link { display: flex; align-items: center; gap: 5px; padding: 0 10px; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-decoration: none; border-left: 1px solid var(--rule); white-space: nowrap; height: 52px; }
     .masthead-link:hover { color: var(--black); }
-    .masthead-link svg { width: 10px; height: 10px; }
+    @media (max-width: 480px) {
+      .masthead { padding: 0 12px; }
+      .masthead-title { font-size: 16px; padding-right: 12px; }
+      .masthead-link { padding: 0 8px; font-size: 9px; }
+      .masthead-link--desktop { display: none; }
+      .masthead-link svg { display: none; }
+    }
     .nav { background: var(--white); border-bottom: 1px solid var(--rule); padding: 0 40px; display: flex; gap: 0; }
     .nav-tab { display: flex; align-items: center; gap: 8px; padding: 14px 24px 12px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s; user-select: none; }
     .nav-tab:hover { color: var(--black); }
@@ -1684,26 +1691,16 @@ function buildAdminPage(salon) {
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--rule); }
-    @media (max-width: 600px) {
-      .masthead { padding: 0 20px; } .nav { padding: 0 20px; } .page { padding: 24px 20px; }
-      .date-heading { font-size: 24px; } .slots-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
-      .day-row { padding: 12px 20px; gap: 12px; } .day-name { width: 90px; }
-      .schedule-head, .schedule-footer { padding: 16px 20px; } .modal-body { padding: 18px 22px; }
-    }
   </style>
 </head>
 <body>
   <div class="masthead">
     <div class="masthead-title">${salon.name}</div>
-    <div class="masthead-label">Admin Panel</div>
     <div class="masthead-spacer"></div>
-    <a href="https://bookwell.si" target="_blank" class="masthead-link">
-      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.5 1.5H2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h8a.5.5 0 0 0 .5-.5V7.5M7 1.5h3.5m0 0v3.5m0-3.5L5 7"/></svg>
-      BookWell.si
-    </a>
+    <a href="/admin/${salon.id}" class="masthead-link">Admin</a>
+    <a href="https://bookwell.si" target="_blank" class="masthead-link masthead-link--desktop">BookWell.si</a>
     <a href="${salon.plan === 'trial' ? 'https://bookwell.si/#pricing' : '/' + (salon.type || 'salon') + '/' + (salon.slug || salon.id)}" class="masthead-link">
-      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.5 1.5H2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h8a.5.5 0 0 0 .5-.5V7.5M7 1.5h3.5m0 0v3.5m0-3.5L5 7"/></svg>
-      ${salon.plan === 'trial' ? 'Nadgradi plan →' : 'Javna stran'}
+      ${salon.plan === 'trial' ? 'Nadgradi →' : 'Javna stran'}
     </a>
   </div>
   <nav class="nav">
@@ -1996,7 +1993,7 @@ function buildAdminPage(salon) {
       hours.forEach(hour => {
         const slot = slotsData[hour];
         const isBusy = slot && slot.status === 'busy';
-        const isBot = isBusy && slot.customer_email;
+        const isBot = isBusy && slot.booked_by === 'bot';
         const cls = isBusy ? (isBot ? 'bot' : 'busy') : '';
         const card = document.createElement('div');
         card.className = 'slot-card ' + cls;
