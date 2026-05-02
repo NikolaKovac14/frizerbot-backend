@@ -281,10 +281,8 @@ function parseServices(servicesText) {
       minPrice,
       maxPrice,
       duration,
-      displayPrice: minPrice === maxPrice 
-        ? `${maxPrice.toFixed(2)}€`
-        : `${minPrice.toFixed(2)}-${maxPrice.toFixed(2)}€`,
-      displayName: `${name} — ${minPrice === maxPrice ? maxPrice.toFixed(2) : minPrice + '-' + maxPrice}€ [${duration}min]`
+      displayPrice: `${maxPrice.toFixed(2)}€`,
+      displayName: `${name} — ${maxPrice.toFixed(2)}€ [${duration}min]`
     });
   });
   
@@ -1092,10 +1090,8 @@ app.get('/api/book/:slug/services', async (req, res) => {
     minPrice: parseFloat(s.min_price),
     maxPrice: parseFloat(s.max_price),
     duration: s.duration,
-    displayPrice: parseFloat(s.min_price) === parseFloat(s.max_price)
-      ? `${parseFloat(s.max_price).toFixed(2)}€`
-      : `${parseFloat(s.min_price).toFixed(2)}-${parseFloat(s.max_price).toFixed(2)}€`,
-    displayName: `${s.name} — ${parseFloat(s.min_price) === parseFloat(s.max_price) ? parseFloat(s.max_price).toFixed(2) : parseFloat(s.min_price).toFixed(2) + '-' + parseFloat(s.max_price).toFixed(2)}€ [${s.duration}min]`
+    displayPrice: `${parseFloat(s.max_price).toFixed(2)}€`,
+    displayName: `${s.name} — ${parseFloat(s.max_price).toFixed(2)}€ [${s.duration}min]`
   }));
   
   res.json({ services });
@@ -2277,18 +2273,14 @@ function buildAdminPage(salon) {
         </div>
         <div style="padding:24px 28px;border-bottom:1px solid #e0e0e0;">
           <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:14px;">Dodaj novo storitev</div>
-          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end;">
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end;">
             <div>
               <div class="modal-field-label">Ime storitve</div>
               <input class="modal-input" type="text" id="svc-name" placeholder="npr. Ženski haircut" />
             </div>
             <div>
-              <div class="modal-field-label">Cena min (€)</div>
-              <input class="modal-input" type="number" id="svc-min" placeholder="25" min="0" step="0.5" />
-            </div>
-            <div>
-              <div class="modal-field-label">Cena max (€)</div>
-              <input class="modal-input" type="number" id="svc-max" placeholder="45" min="0" step="0.5" />
+              <div class="modal-field-label">Cena (€)</div>
+              <input class="modal-input" type="number" id="svc-price" placeholder="35" min="0" step="0.5" />
             </div>
             <div>
               <div class="modal-field-label">Trajanje (min)</div>
@@ -2704,22 +2696,19 @@ function buildAdminPage(salon) {
         el.innerHTML = '<div style="padding:28px;font-size:13px;color:#aaa;font-style:italic;text-align:center;">Ni storitev. Dodajte prvo storitev zgoraj.</div>';
         return;
       }
-      el.innerHTML = '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:1px;background:#e0e0e0;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;">'
+      el.innerHTML = '<div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:1px;background:#e0e0e0;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;">'
         + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Storitev</div>'
-        + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Cena min</div>'
-        + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Cena max</div>'
+        + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Cena</div>'
         + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Trajanje</div>'
         + '<div style="background:#f7f7f5;padding:8px 18px;"></div>'
         + svcList.map(s => {
-          const isEditing = document.getElementById('svc-edit-' + s.id);
           return \`
-            <div style="background:#fff;padding:12px 18px;font-size:13px;font-weight:500;color:#0a0a0a;display:flex;align-items:center;">\${s.name}</div>
-            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${parseFloat(s.min_price).toFixed(2)} €</div>
-            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${parseFloat(s.max_price).toFixed(2)} €</div>
-            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${s.duration} min</div>
+            <div style="background:#fff;padding:12px 18px;font-size:13px;font-weight:500;color:#0a0a0a;display:flex;align-items:center;">${s.name}</div>
+            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">${parseFloat(s.max_price).toFixed(2)} €</div>
+            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">${s.duration} min</div>
             <div style="background:#fff;padding:8px 12px;display:flex;align-items:center;gap:6px;">
-              <button onclick="editService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#f7f7f5;border:1px solid #e0e0e0;cursor:pointer;color:#444;font-family:system-ui,sans-serif;">Uredi</button>
-              <button onclick="deleteService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#fff;border:1px solid #fca5a5;cursor:pointer;color:#dc2626;font-family:system-ui,sans-serif;">Briši</button>
+              <button onclick="editService(${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#f7f7f5;border:1px solid #e0e0e0;cursor:pointer;color:#444;font-family:system-ui,sans-serif;">Uredi</button>
+              <button onclick="deleteService(${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#fff;border:1px solid #fca5a5;cursor:pointer;color:#dc2626;font-family:system-ui,sans-serif;">Briši</button>
             </div>
           \`;
         }).join('')
@@ -2728,23 +2717,21 @@ function buildAdminPage(salon) {
 
     async function addService() {
       const name = document.getElementById('svc-name').value.trim();
-      const min = document.getElementById('svc-min').value;
-      const max = document.getElementById('svc-max').value;
+      const price = document.getElementById('svc-price').value;
+
       const dur = document.getElementById('svc-dur').value;
       const err = document.getElementById('svc-err');
       err.style.display = 'none';
-      if (!name || !min || !max || !dur) { err.textContent = 'Izpolnite vsa polja.'; err.style.display = 'block'; return; }
-      if (parseFloat(min) > parseFloat(max)) { err.textContent = 'Min cena ne sme biti večja od max cene.'; err.style.display = 'block'; return; }
+      if (!name || !price || !dur) { err.textContent = 'Izpolnite vsa polja.'; err.style.display = 'block'; return; }
       const res = await fetch(API_URL + '/admin/' + SALON_ID + '/services', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ name, minPrice: min, maxPrice: max, duration: dur })
+        body: JSON.stringify({ name, minPrice: price, maxPrice: price, duration: dur })
       });
       const data = await res.json();
       if (data.success) {
         document.getElementById('svc-name').value = '';
-        document.getElementById('svc-min').value = '';
-        document.getElementById('svc-max').value = '';
+        document.getElementById('svc-price').value = '';
         document.getElementById('svc-dur').value = '30';
         showSvcMsg();
         loadServices();
@@ -2759,16 +2746,14 @@ function buildAdminPage(salon) {
       if (!s) return;
       const name = prompt('Ime storitve:', s.name);
       if (name === null) return;
-      const min = prompt('Min cena (€):', parseFloat(s.min_price).toFixed(2));
-      if (min === null) return;
-      const max = prompt('Max cena (€):', parseFloat(s.max_price).toFixed(2));
-      if (max === null) return;
+      const price = prompt('Cena (€):', parseFloat(s.max_price).toFixed(2));
+      if (price === null) return;
       const dur = prompt('Trajanje (min) — npr. 15, 30, 45, 60, 90, 120:', s.duration);
       if (dur === null) return;
       fetch(API_URL + '/admin/' + SALON_ID + '/services/' + id, {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ name, minPrice: min, maxPrice: max, duration: dur })
+        body: JSON.stringify({ name, minPrice: price, maxPrice: price, duration: dur })
       }).then(r => r.json()).then(data => {
         if (data.success) { showSvcMsg(); loadServices(); }
         else alert(data.error || 'Napaka pri urejanju.');
