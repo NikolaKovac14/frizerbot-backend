@@ -218,6 +218,23 @@ function generateHalfHourSlots(from, to) {
   return slots;
 }
 
+function parseServiceDuration(serviceName, servicesText) {
+  if (!serviceName || !servicesText) return 30;
+  for (const line of (servicesText || '').split('\n')) {
+    if (line.toLowerCase().includes((serviceName || '').toLowerCase())) {
+      const match = line.match(/\[(\d+)min\]/i);
+      if (match) return parseInt(match[1]);
+    }
+  }
+  return 30;
+}
+
+function addMinutesToTime(timeStr, minutes) {
+  const [h, m] = timeStr.split(':').map(Number);
+  const total = h * 60 + m + minutes;
+  return String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
+}
+
 function scheduleToText(schedule) {
   const s = schedule || DEFAULT_SCHEDULE;
   const dayNames = { mon: 'Ponedeljek', tue: 'Torek', wed: 'Sreda', thu: 'Četrtek', fri: 'Petek', sat: 'Sobota', sun: 'Nedelja' };
@@ -739,11 +756,23 @@ app.post('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
       await pool.query('UPDATE timeslots SET cancel_token = $1 WHERE salon_id = $2 AND date = $3 AND time = $4', [cancelToken, salonId, date, time]);
       await sendConfirmationEmail(cleanEmail, customerName || 'Stranka', salon, date, time, service || '', cancelToken);
     }
+    // Blokiraj extra termine
+    const duration = parseServiceDuration(service, salon.services);
+    const slotsNeeded = Math.ceil(duration / 30);
+    for (let i = 1; i < slotsNeeded; i++) {
+      const extraTime = addMinutesToTime(time, i * 30);
+      await pool.query(`INSERT INTO timeslots (salon_id,date,time,status,customer_name,customer_email,service) VALUES ($1,$2,$3,'busy',$4,$5,$6) ON CONFLICT (salon_id,date,time) DO NOTHING`,
+        [salonId, date, extraTime, customerName, cleanEmail, '(' + (service || '') + ')']);
+    }
   } else {
+    const { rows: slotToDelete } = await pool.query('SELECT customer_email FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3', [salonId, date, time]);
     await pool.query('DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3', [salonId, date, time]);
+    if (slotToDelete[0]?.customer_email) {
+      await pool.query(`DELETE FROM timeslots WHERE salon_id=$1 AND date=$2 AND customer_email=$3 AND time>$4 AND service LIKE '(%'`,
+        [salonId, date, slotToDelete[0].customer_email, time]);
+    }
   }
   res.json({ success: true });
-});
 
 // ─── SCHEDULE ─────────────────────────────────────────────────────────────────
 app.get('/admin/:id/schedule', requireAdminAuth, async (req, res) => {
@@ -782,6 +811,14 @@ app.post('/booking', async (req, res) => {
     const cancelToken = crypto.randomBytes(20).toString('hex');
     await pool.query('UPDATE timeslots SET cancel_token = $1 WHERE salon_id = $2 AND date = $3 AND time = $4', [cancelToken, salon.id, date, time]);
     await sendConfirmationEmail(customerEmail, customerName, salon, date, time, service, cancelToken);
+  }
+// Blokiraj extra termine za daljše storitve
+  const duration = parseServiceDuration(service, salon.services);
+  const slotsNeeded = Math.ceil(duration / 30);
+  for (let i = 1; i < slotsNeeded; i++) {
+    const extraTime = addMinutesToTime(time, i * 30);
+    await pool.query(`INSERT INTO timeslots (salon_id,date,time,status,customer_name,customer_email,customer_phone,service) VALUES ($1,$2,$3,'busy',$4,$5,$6,$7) ON CONFLICT (salon_id,date,time) DO NOTHING`,
+      [salon.id, date, extraTime, customerName, customerEmail || '', customerPhone || '', '(' + service + ')']);
   }
   if (salon.notification_email) await sendNotificationToSalon(salon, customerName, customerEmail || '', customerPhone || '', date, service, time);
   res.json({ success: true });
@@ -881,7 +918,12 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
       try {
         const [date, time] = deleteMatch[1].trim().split('T');
         if (date && time) {
+          const { rows: delSlot } = await pool.query('SELECT customer_email FROM timeslots WHERE salon_id=$1 AND date=$2 AND time=$3', [actualSalonId, date, time]);
           const result = await pool.query('DELETE FROM timeslots WHERE salon_id=$1 AND date=$2 AND time=$3', [actualSalonId, date, time]);
+          if (delSlot[0]?.customer_email) {
+            await pool.query(`DELETE FROM timeslots WHERE salon_id=$1 AND date=$2 AND customer_email=$3 AND time>$4 AND service LIKE '(%'`,
+              [actualSalonId, date, delSlot[0].customer_email, time]);
+          }
           console.log('✅ Termin izbrisan - rows:', result.rowCount);
         }
       } catch (e) {
@@ -931,9 +973,17 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
         await pool.query('UPDATE timeslots SET cancel_token = $1 WHERE salon_id = $2 AND date = $3 AND time = $4', [cancelToken, actualSalonId, booking.date, booking.time]);
         await sendConfirmationEmail(finalEmail, finalName, salon, booking.date, booking.time, finalService, cancelToken);
       }
+      // Blokiraj extra termine
+      const duration = parseServiceDuration(finalService, salon.services);
+      const slotsNeeded = Math.ceil(duration / 30);
+      for (let i = 1; i < slotsNeeded; i++) {
+        const extraTime = addMinutesToTime(booking.time, i * 30);
+        await pool.query(`INSERT INTO timeslots (salon_id,date,time,status,customer_name,customer_email,customer_phone,service) VALUES ($1,$2,$3,'busy',$4,$5,$6,$7) ON CONFLICT (salon_id,date,time) DO NOTHING`,
+          [actualSalonId, booking.date, extraTime, finalName, finalEmail, finalPhone, '(' + finalService + ')']);
+      }
       if (salon.notification_email) await sendNotificationToSalon(salon, finalName, finalEmail, finalPhone, booking.date, finalService, booking.time);
 
-      const reply = raw.replace(/\[\[DELETE:[^\]]*\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
+      const reply = raw.replace (/\[\[DELETE:[^\]]*\]\]/g, '').replace(/\[\[BOOKING:[\s\S]*?\]\]/g, '').trim();
       return res.json({
         reply,
         bookingDetected: { date: booking.date, time: booking.time, customerName: finalName, service: finalService, email: finalEmail, phone: finalPhone }
@@ -1050,6 +1100,11 @@ ${scheduleToText(schedule)}
 STORITVE IN CENIK:
 ${salon.services}
 
+TRAJANJE STORITEV:
+Če storitev ima oznako [45min] — rezerviraj samo en termin, strežnik bo samodejno blokiral tudi naslednji.
+Če storitev ima [60min] — strežnik bo blokiral 2 zaporedna termina.
+POMEMBNO: Pred rezervacijo preveri da sta oba zaporedna termina prosta v seznamu prostih terminov!
+
 PROSTI TERMINI (oblika YYYY-MM-DD) - samo termini od zdaj naprej:
 ${slotsText}
 
@@ -1125,6 +1180,11 @@ ${scheduleToText(schedule)}
 
 STORITVE IN CENIK:
 ${salon.services}
+
+TRAJANJE STORITEV:
+Če storitev ima oznako [45min] — rezerviraj samo en termin, strežnik bo samodejno blokiral tudi naslednji.
+Če storitev ima [60min] — strežnik bo blokiral 2 zaporedna termina.
+POMEMBNO: Pred rezervacijo preveri da sta oba zaporedna termina prosta v seznamu prostih terminov!
 
 PROSTI TERMINI (oblika YYYY-MM-DD) - samo termini od zdaj naprej:
 ${slotsText}
@@ -1722,7 +1782,7 @@ function buildAdminPage(salon) {
         <input class="modal-input" type="email" id="s-email" style="margin-bottom:14px;" />
         <div class="modal-field-label">Storitve in cenik</div>
         <textarea class="modal-input" id="s-services" rows="10" style="resize:vertical;font-family:system-ui,sans-serif;line-height:1.6;margin-bottom:14px;"></textarea>
-        <div style="font-size:11px;color:#aaa;margin-bottom:20px;">Vsaka storitev v svoji vrstici, npr: - Ženski haircut: 25-45 EUR</div>
+        <div style="font-size:11px;color:#aaa;margin-bottom:20px;">Vsaka storitev v svoji vrstici. Za trajanje dodajte [30min], [45min], [60min] itd.<br>Npr: - Ženski haircut: 25-45 EUR [30min]<br>- Barvanje (celo): 60-120 EUR [60min]</div>
       </div>
       <div class="schedule-footer">
         <div></div>
@@ -2137,6 +2197,11 @@ app.post('/cancel/:token', async (req, res) => {
   const dateFormatted = new Date(slot.date).toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   await pool.query('DELETE FROM timeslots WHERE cancel_token = $1', [token]);
+  // Briši extra termine (nadaljevanje)
+  if (slot.customer_email) {
+    await pool.query(`DELETE FROM timeslots WHERE salon_id=$1 AND date=$2 AND customer_email=$3 AND time>$4 AND service LIKE '(%'`,
+      [slot.salon_id, slot.date, slot.customer_email, slot.time]);
+  }
 
   if (slot.notification_email) {
     try {
@@ -2597,6 +2662,14 @@ app.post('/api/book/:slug/reserve', async (req, res) => {
   await pool.query(`INSERT INTO timeslots (salon_id,date,time,status,customer_name,customer_email,customer_phone,service,cancel_token) VALUES ($1,$2,$3,'busy',$4,$5,$6,$7,$8) ON CONFLICT (salon_id,date,time) DO UPDATE SET status='busy',customer_name=$4,customer_email=$5,customer_phone=$6,service=$7,cancel_token=$8`,
     [salon.id, date, time, name, req.session.customerEmail, phone || '', service, cancelToken]);
   await sendConfirmationEmail(req.session.customerEmail, name, salon, date, time, service, cancelToken);
+    // Blokiraj extra termine
+    const duration = parseServiceDuration(service, salon.services);
+    const slotsNeeded = Math.ceil(duration / 30);
+    for (let i = 1; i < slotsNeeded; i++) {
+      const extraTime = addMinutesToTime(time, i * 30);
+      await pool.query(`INSERT INTO timeslots (salon_id,date,time,status,customer_name,customer_email,customer_phone,service) VALUES ($1,$2,$3,'busy',$4,$5,$6,$7) ON CONFLICT (salon_id,date,time) DO NOTHING`,
+        [salon.id, date, extraTime, name, req.session.customerEmail, phone || '', '(' + service + ')']);
+    }
   if (salon.notification_email) await sendNotificationToSalon(salon, name, req.session.customerEmail, phone || '', date, service, time);
   res.json({ success: true });
 });
