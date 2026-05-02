@@ -137,9 +137,9 @@ const pool = new Pool({
 
 // ─── PLAN CONFIG ──────────────────────────────────────────────────────────────
 const PLANS = {
-  starter: { name: 'Starter', price: 29.99, chatLimit: 500 },
-  pro:     { name: 'Pro',     price: 49.99, chatLimit: 2000 },
-  agency:  { name: 'Agency',  price: 99.99, chatLimit: 999999 }
+  starter: { name: 'Starter', price: 29.99, chatLimit: 1000 },
+  pro:     { name: 'Pro',     price: 49.99, chatLimit: 3000 },
+  agency:  { name: 'Agency',  price: 99.99, chatLimit: 10000 }
 };
 
 // Zamenjaj z resničnimi Stripe Payment Linki ko jih kreiraš v dashboardu
@@ -1600,8 +1600,8 @@ function buildAdminPage(salon) {
       document.getElementById('s-phone').value = data.phone || '';
       document.getElementById('s-email').value = data.notification_email || '';
       document.getElementById('s-services').value = data.services || '';
-      const planLimits = { starter: 500, pro: 2000, agency: 'Neomejeno' };
-      const limit = planLimits[data.plan] || 2000;
+      const planLimits = { starter: 1000, pro: 3000, agency: '10000' };
+      const limit = planLimits[data.plan] || 3000;
       document.getElementById('s-chat-count').textContent = (data.chat_count || 0) + ' sporočil';
       document.getElementById('s-chat-limit').textContent = 'Plan: ' + (data.plan || 'pro') + ' · Limit: ' + limit;
     }
