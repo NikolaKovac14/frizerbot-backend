@@ -702,6 +702,146 @@ app.post('/admin-login/:id', loginLimiter, async (req, res) => {
   res.json({ success: true, redirect: `/admin/${req.params.id}` });
 });
 
+// RATE LIMITER ZA RESET
+const resetPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { error: 'Preveč zahtevkov za reset. Poskusite čez uro.' }
+});
+ 
+// ENDPOINT: Zahtevaj reset gesla
+app.post('/admin-forgot/:id', resetPasswordLimiter, async (req, res) => {
+  const { email } = req.body;
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Vpišite veljaven e-poštni naslov.' });
+  }
+ 
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salon = rows[0];
+  if (!salon) return res.status(404).json({ error: 'Salon not found' });
+ 
+  // Vedno vrni isti odgovor (security - ne razkrijemo ali email obstaja)
+  if (salon.notification_email !== email) {
+    return res.json({ success: true, message: 'Če e-naslov obstaja, boste prejeli e-mail s povezavo za reset.' });
+  }
+ 
+  // Izbriši stare neuporabljene tokene
+  await pool.query(
+    'DELETE FROM gdpr_tokens WHERE email = $1 AND action = $2 AND used = false',
+    [email, 'password_reset']
+  );
+ 
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 ura
+ 
+  await pool.query(
+    'INSERT INTO gdpr_tokens (email, token, action, expires_at) VALUES ($1,$2,$3,$4)',
+    [email, token, 'password_reset', expiresAt]
+  );
+ 
+  const resetUrl = `${process.env.API_URL || 'https://bookwell.si'}/admin-reset/${salon.id}/${token}`;
+ 
+  try {
+    await sgMail.send({
+      to: email,
+      from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
+      subject: 'BookWell — Reset gesla',
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:20px;">
+          <div style="background:#0a0a0a;padding:24px;text-align:center;">
+            <h1 style="color:#c9984a;margin:0;font-size:22px;">BookWell</h1>
+          </div>
+          <div style="background:#fff;padding:32px;border:1px solid #e0e0e0;border-top:none;">
+            <p style="font-size:15px;margin:0 0 16px;">Zahtevali ste reset gesla za salon <strong>${salon.name}</strong>.</p>
+            <p style="font-size:13px;color:#666;margin:0 0 24px;line-height:1.6;">Kliknite spodnjo povezavo za nastavitev novega gesla. Velja <strong>1 uro</strong>.</p>
+            <a href="${resetUrl}" style="display:block;background:#0a0a0a;color:#c9984a;padding:14px 24px;text-decoration:none;font-weight:700;font-size:13px;text-align:center;letter-spacing:.06em;margin-bottom:16px;">
+              Nastavi novo geslo →
+            </a>
+            <p style="font-size:11px;color:#aaa;line-height:1.6;">
+              Če tega niste zahtevali, ignorirajte ta e-mail in vaše geslo ostane nespremenjeno. Povezava je aktivna samo 1 uro.
+            </p>
+          </div>
+        </div>
+      `
+    });
+    console.log('✅ Reset password email poslan:', email);
+  } catch (err) {
+    console.error('❌ Reset password email napaka:', err.message);
+  }
+ 
+  res.json({ success: true, message: 'Če e-naslov obstaja, boste prejeli e-mail s povezavo za reset.' });
+});
+ 
+// ENDPOINT: Prikaži reset stran (GET)
+app.get('/admin-reset/:id/:token', async (req, res) => {
+  const { id, token } = req.params;
+  const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [id]);
+  const salon = salonRows[0];
+  if (!salon) return res.status(404).send('<h1>Salon not found</h1>');
+ 
+  const { rows: tokenRows } = await pool.query(
+    'SELECT * FROM gdpr_tokens WHERE token = $1 AND action = $2 AND used = false AND expires_at > NOW()',
+    [token, 'password_reset']
+  );
+ 
+  if (!tokenRows[0]) {
+    return res.send(buildResetPage(salon.id, null, '❌ Povezava ni veljavna ali je potekla. Zahtevajte novo na prijavi.'));
+  }
+ 
+  res.send(buildResetPage(salon.id, token));
+});
+ 
+// ENDPOINT: Potrdi novo geslo (POST)
+app.post('/admin-reset/:id/:token', async (req, res) => {
+  const { id, token } = req.params;
+  const { newPassword, newPassword2 } = req.body;
+ 
+  if (!newPassword || !newPassword2) {
+    return res.status(400).json({ error: 'Obe polji sta obvezni.' });
+  }
+ 
+  if (newPassword !== newPassword2) {
+    return res.status(400).json({ error: 'Gesli se ne ujemata.' });
+  }
+ 
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'Geslo mora biti vsaj 6 znakov.' });
+  }
+ 
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [id]);
+  const salon = salonRows[0];
+  if (!salon) return res.status(404).json({ error: 'Salon not found' });
+ 
+  const { rows: tokenRows } = await pool.query(
+    'SELECT * FROM gdpr_tokens WHERE token = $1 AND action = $2 AND used = false AND expires_at > NOW()',
+    [token, 'password_reset']
+  );
+ 
+  if (!tokenRows[0]) {
+    return res.status(401).json({ error: 'Povezava ni veljavna ali je potekla.' });
+  }
+ 
+  const tokenRecord = tokenRows[0];
+ 
+  try {
+    // Označi token kot uporabljen
+    await pool.query('UPDATE gdpr_tokens SET used = true WHERE id = $1', [tokenRecord.id]);
+ 
+    // Hashiraj novo geslo
+    const hashed = await bcrypt.hash(newPassword, 10);
+ 
+    // Posodobi geslo
+    await pool.query('UPDATE salons SET admin_password = $1 WHERE id = $2', [hashed, salon.id]);
+ 
+    console.log('✅ Geslo uspešno resetirano za salon:', salon.id);
+ 
+    res.json({ success: true, message: 'Geslo je bilo uspešno spremenjeno.' });
+  } catch (err) {
+    console.error('❌ Reset password napaka:', err.message);
+    res.status(500).json({ error: 'Napaka pri spremembi gesla.' });
+  }
+});
+
 app.post('/admin-setup/:id', async (req, res) => {
   const { username, password } = req.body;
   const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
@@ -1234,6 +1374,14 @@ function buildLoginPage(salon) {
     .btn { width: 100%; padding: 12px; background: #c9984a; border: none; color: #fff; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; font-family: inherit; cursor: pointer; transition: opacity 0.15s; }
     .btn:hover { opacity: 0.85; }
     .err { background: #fee2e2; border-left: 3px solid #ef4444; padding: 10px 14px; font-size: 13px; color: #991b1b; margin-bottom: 18px; display: none; }
+    .forgot-link { display: block; text-align: right; margin-top: 12px; }
+    .forgot-link a { font-size: 11px; color: #888; text-decoration: none; border-bottom: 1px solid #ddd; transition: color 0.15s; }
+    .forgot-link a:hover { color: #c9984a; }
+    .tab-container { display: flex; margin-bottom: 24px; gap: 4px; }
+    .tab { flex: 1; padding: 10px; text-align: center; background: #f7f7f5; border: 1px solid #e0e0e0; cursor: pointer; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; transition: all 0.15s; }
+    .tab.active { background: #0a0a0a; color: #fff; border-color: #0a0a0a; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
   </style>
 </head>
 <body>
@@ -1243,20 +1391,51 @@ function buildLoginPage(salon) {
       <p>Admin Panel · Prijava</p>
     </div>
     <div class="card-body">
-      <div class="err" id="err"></div>
-      <div class="field">
-        <label>Uporabniško ime</label>
-        <input type="text" id="username" autocomplete="username" />
+      <div class="tab-container">
+        <div class="tab active" onclick="switchTab('login')">Prijava</div>
+        <div class="tab" onclick="switchTab('forgot')">Pozabljeno geslo</div>
       </div>
-      <div class="field">
-        <label>Geslo</label>
-        <input type="password" id="password" autocomplete="current-password" />
+ 
+      <!-- TAB: PRIJAVA -->
+      <div class="tab-content active" id="tab-login">
+        <div class="err" id="err"></div>
+        <div class="field">
+          <label>Uporabniško ime</label>
+          <input type="text" id="username" autocomplete="username" />
+        </div>
+        <div class="field">
+          <label>Geslo</label>
+          <input type="password" id="password" autocomplete="current-password" />
+        </div>
+        <button class="btn" onclick="doLogin()">Prijava</button>
       </div>
-      <button class="btn" onclick="doLogin()">Prijava</button>
+ 
+      <!-- TAB: RESET GESLA -->
+      <div class="tab-content" id="tab-forgot">
+        <div class="err" id="err-forgot"></div>
+        <div id="forgot-status"></div>
+        <div id="forgot-form">
+          <p style="font-size:12px;color:#666;margin-bottom:16px;line-height:1.5;">Vnesite e-poštni naslov, povezan s pravo računo. Poslali vam bomo povezavo za reset gesla.</p>
+          <div class="field">
+            <label>E-poštni naslov</label>
+            <input type="email" id="forgot-email" placeholder="salon@example.com" autocomplete="email" />
+          </div>
+          <button class="btn" onclick="doForgot()">Pošlji povezavo</button>
+        </div>
+      </div>
     </div>
   </div>
+ 
   <script>
-    document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+    function switchTab(name) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('tab-' + name).classList.add('active');
+    }
+ 
+    document.addEventListener('keydown', e => { if (e.key === 'Enter' && document.getElementById('tab-login').className.includes('active')) doLogin(); });
+    
     async function doLogin() {
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value;
@@ -1271,6 +1450,155 @@ function buildLoginPage(salon) {
       const data = await res.json();
       if (data.success) { window.location.href = data.redirect; }
       else { err.textContent = data.error || 'Napaka pri prijavi.'; err.style.display = 'block'; }
+    }
+ 
+    async function doForgot() {
+      const email = document.getElementById('forgot-email').value.trim();
+      const err = document.getElementById('err-forgot');
+      const status = document.getElementById('forgot-status');
+      err.style.display = 'none';
+      status.innerHTML = '';
+ 
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        err.textContent = 'Vpišite veljaven e-poštni naslov.';
+        err.style.display = 'block';
+        return;
+      }
+ 
+      const res = await fetch('/admin-forgot/${salon.id}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+ 
+      if (data.success || data.message) {
+        document.getElementById('forgot-form').style.display = 'none';
+        status.innerHTML = \`
+          <div style="background:#dcfce7;border:1px solid #4ade80;border-radius:6px;padding:14px;text-align:center;color:#16a34a;">
+            <div style="font-weight:700;margin-bottom:6px;">✓ Povezava je bila poslana</div>
+            <div style="font-size:12px;">Preverite svojo e-pošto (tudi spam mapo). Povezava velja 1 uro.</div>
+          </div>
+        \`;
+      } else {
+        err.textContent = data.error || 'Napaka.';
+        err.style.display = 'block';
+      }
+    }
+  </script>
+</body>
+</html>`;
+}
+
+function buildResetPage(salonId, token, errorMsg = null) {
+  if (errorMsg) {
+    return `<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset gesla</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: system-ui, sans-serif; background: #f7f7f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { background: #fff; border: 1px solid #e0e0e0; width: 100%; max-width: 400px; overflow: hidden; }
+    .head { background: #0a0a0a; padding: 28px 32px; }
+    .head h1 { font-family: 'Playfair Display', serif; font-size: 20px; color: #fff; font-weight: 700; }
+    .body { padding: 32px; text-align: center; }
+    .icon { font-size: 40px; margin-bottom: 16px; }
+    .msg { font-size: 14px; color: #666; line-height: 1.6; }
+    .link { display: inline-block; margin-top: 20px; }
+    .link a { color: #c9984a; text-decoration: none; font-size: 13px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="head"><h1>BookWell</h1></div>
+    <div class="body">
+      <div class="icon">⚠️</div>
+      <p class="msg">${errorMsg}</p>
+      <div class="link"><a href="/admin-login/${salonId}">← Nazaj na prijavo</a></div>
+    </div>
+  </div>
+</body>
+</html>`;
+  }
+ 
+  return `<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset gesla</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: system-ui, sans-serif; background: #f7f7f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { background: #fff; border: 1px solid #e0e0e0; width: 100%; max-width: 380px; overflow: hidden; }
+    .card-head { background: #0a0a0a; padding: 32px 36px; }
+    .card-head h1 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .card-head p { font-size: 12px; color: rgba(255,255,255,0.4); letter-spacing: 0.08em; text-transform: uppercase; }
+    .card-body { padding: 32px 36px; }
+    .field { margin-bottom: 20px; }
+    .field label { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #888; margin-bottom: 6px; }
+    .field input { width: 100%; padding: 10px 14px; border: 1px solid #e0e0e0; font-size: 14px; font-family: inherit; background: #f7f7f5; outline: none; transition: border 0.15s; }
+    .field input:focus { border-color: #0a0a0a; background: #fff; }
+    .btn { width: 100%; padding: 12px; background: #c9984a; border: none; color: #fff; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; font-family: inherit; cursor: pointer; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.85; }
+    .err { background: #fee2e2; border-left: 3px solid #ef4444; padding: 10px 14px; font-size: 13px; color: #991b1b; margin-bottom: 18px; display: none; }
+    .ok { background: #dcfce7; border-left: 3px solid #4ade80; padding: 10px 14px; font-size: 13px; color: #16a34a; margin-bottom: 18px; display: none; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="card-head">
+      <h1>BookWell</h1>
+      <p>Nastavitev novega gesla</p>
+    </div>
+    <div class="card-body">
+      <div class="err" id="err"></div>
+      <div class="ok" id="ok"></div>
+      <div class="field">
+        <label>Novo geslo (min. 6 znakov)</label>
+        <input type="password" id="new-pw" autocomplete="new-password" />
+      </div>
+      <div class="field">
+        <label>Potrdite geslo</label>
+        <input type="password" id="new-pw2" autocomplete="new-password" />
+      </div>
+      <button class="btn" onclick="doResetPassword()">Nastavi novo geslo</button>
+    </div>
+  </div>
+ 
+  <script>
+    async function doResetPassword() {
+      const pw1 = document.getElementById('new-pw').value;
+      const pw2 = document.getElementById('new-pw2').value;
+      const err = document.getElementById('err');
+      const ok = document.getElementById('ok');
+      err.style.display = 'none';
+      ok.style.display = 'none';
+ 
+      if (!pw1 || !pw2) { err.textContent = 'Izpolnite obe polji.'; err.style.display = 'block'; return; }
+      if (pw1 !== pw2) { err.textContent = 'Gesli se ne ujemata.'; err.style.display = 'block'; return; }
+      if (pw1.length < 6) { err.textContent = 'Geslo mora biti vsaj 6 znakov.'; err.style.display = 'block'; return; }
+ 
+      const res = await fetch(window.location.pathname, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword: pw1, newPassword2: pw2 })
+      });
+      const data = await res.json();
+ 
+      if (data.success) {
+        ok.textContent = '✓ Geslo je uspešno spremenjeno. Napareja se boste prijavili.';
+        ok.style.display = 'block';
+        setTimeout(() => { window.location.href = '/admin-login/${salonId}'; }, 2000);
+      } else {
+        err.textContent = data.error || 'Napaka.';
+        err.style.display = 'block';
+      }
     }
   </script>
 </body>
