@@ -2705,13 +2705,12 @@ function buildAdminPage(salon) {
       return;
     }
     
-    // Mobile: card layout namesto grid
     const isMobile = window.innerWidth < 600;
     
     if (isMobile) {
       el.innerHTML = '<div style="display:flex;flex-direction:column;gap:1px;background:#e0e0e0;">'
         + svcList.map(s => \`
-          <div style="background:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div class="svc-row-\${s.id}" style="background:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <div style="flex:1;min-width:0;">
               <div style="font-size:13px;font-weight:600;color:#0a0a0a;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\${s.name}</div>
               <div style="font-size:12px;color:#888;">\${parseFloat(s.max_price).toFixed(2)}€ · \${s.duration} min</div>
@@ -2730,10 +2729,10 @@ function buildAdminPage(salon) {
         + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Trajanje</div>'
         + '<div style="background:#f7f7f5;padding:8px 18px;"></div>'
         + svcList.map(s => \`
-          <div style="background:#fff;padding:12px 18px;font-size:13px;font-weight:500;color:#0a0a0a;display:flex;align-items:center;">\${s.name}</div>
-          <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${parseFloat(s.max_price).toFixed(2)} €</div>
-          <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${s.duration} min</div>
-          <div style="background:#fff;padding:8px 12px;display:flex;align-items:center;gap:6px;">
+          <div class="svc-row-\${s.id}" style="background:#fff;padding:12px 18px;font-size:13px;font-weight:500;color:#0a0a0a;display:flex;align-items:center;">\${s.name}</div>
+          <div class="svc-row-\${s.id}" style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${parseFloat(s.max_price).toFixed(2)} €</div>
+          <div class="svc-row-\${s.id}" style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${s.duration} min</div>
+          <div class="svc-row-\${s.id}" style="background:#fff;padding:8px 12px;display:flex;align-items:center;gap:6px;">
             <button onclick="editService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#f7f7f5;border:1px solid #e0e0e0;cursor:pointer;color:#444;font-family:system-ui,sans-serif;">Uredi</button>
             <button onclick="deleteService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#fff;border:1px solid #fca5a5;cursor:pointer;color:#dc2626;font-family:system-ui,sans-serif;">Briši</button>
           </div>
@@ -2769,23 +2768,71 @@ function buildAdminPage(salon) {
     }
 
     function editService(id) {
-      const s = svcList.find(x => x.id === id);
-      if (!s) return;
-      const name = prompt('Ime storitve:', s.name);
-      if (name === null) return;
-      const price = prompt('Cena (€):', parseFloat(s.max_price).toFixed(2));
-      if (price === null) return;
-      const dur = prompt('Trajanje (min) — npr. 15, 30, 45, 60, 90, 120:', s.duration);
-      if (dur === null) return;
-      fetch(API_URL + '/admin/' + SALON_ID + '/services/' + id, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ name, minPrice: price, maxPrice: price, duration: dur })
-      }).then(r => r.json()).then(data => {
-        if (data.success) { showSvcMsg(); loadServices(); }
-        else alert(data.error || 'Napaka pri urejanju.');
-      });
+    const s = svcList.find(x => x.id === id);
+    if (!s) return;
+    
+    // Zapri morebitni drug edit
+    document.querySelectorAll('.svc-edit-row').forEach(el => el.remove());
+    document.querySelectorAll('.svc-row-' + id).forEach(el => el.style.display = '');
+    
+    const isMobile = window.innerWidth < 600;
+    const rowEls = document.querySelectorAll('.svc-row-' + id);
+    
+    const editHtml = \`
+      <div class="svc-edit-row" style="background:#f7f7f5;padding:16px 18px;border-bottom:1px solid #e0e0e0;display:grid;grid-template-columns:\${window.innerWidth < 600 ? '1fr' : '2fr 1fr 1fr auto'};gap:10px;align-items:end;">
+        <div>
+          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:4px;">Ime storitve</div>
+          <input class="modal-input" type="text" id="edit-name-\${id}" value="\${s.name}" style="margin:0;" />
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:4px;">Cena (€)</div>
+          <input class="modal-input" type="number" id="edit-price-\${id}" value="\${parseFloat(s.max_price).toFixed(2)}" step="0.5" min="0" style="margin:0;" />
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:4px;">Trajanje</div>
+          <select class="modal-input" id="edit-dur-\${id}" style="margin:0;">
+            \${[15,30,45,60,90,120].map(v => \`<option value="\${v}" \${s.duration == v ? 'selected' : ''}>\${v} min</option>\`).join('')}
+          </select>
+        </div>
+        <div style="display:flex;gap:6px;\${window.innerWidth < 600 ? 'margin-top:4px;' : ''}">
+          <button onclick="saveEditService(\${id})" class="save-btn" style="padding:9px 16px;white-space:nowrap;">Shrani</button>
+          <button onclick="cancelEdit(\${id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:9px 12px;background:#fff;border:1px solid #e0e0e0;cursor:pointer;color:#666;font-family:system-ui,sans-serif;">✕</button>
+        </div>
+      </div>
+    \`;
+    
+    // Skrij originalne vrstice in vstavi edit formo
+    rowEls.forEach(el => el.style.display = 'none');
+    
+    const container = document.getElementById('svc-list').querySelector('div');
+    const firstRow = document.querySelector('.svc-row-' + id);
+    if (firstRow) {
+      firstRow.insertAdjacentHTML('afterend', editHtml);
     }
+    
+    setTimeout(() => document.getElementById('edit-name-' + id)?.focus(), 50);
+  }
+
+  function cancelEdit(id) {
+    document.querySelectorAll('.svc-edit-row').forEach(el => el.remove());
+    document.querySelectorAll('.svc-row-' + id).forEach(el => el.style.display = '');
+  }
+
+  async function saveEditService(id) {
+    const name = document.getElementById('edit-name-' + id)?.value.trim();
+    const price = document.getElementById('edit-price-' + id)?.value;
+    const dur = document.getElementById('edit-dur-' + id)?.value;
+    if (!name || !price || !dur) return;
+    
+    const res = await fetch(API_URL + '/admin/' + SALON_ID + '/services/' + id, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, minPrice: price, maxPrice: price, duration: dur })
+    });
+    const data = await res.json();
+    if (data.success) { showSvcMsg(); loadServices(); }
+    else alert(data.error || 'Napaka pri urejanju.');
+  }
 
     async function deleteService(id) {
       const s = svcList.find(x => x.id === id);
