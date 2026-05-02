@@ -157,9 +157,7 @@
       </div>
       <div class="modal-field">
         <label class="field-label">Storitev</label>
-        <select class="field-input" id="modalService" style="cursor:pointer;">
-          <option value="">-- Izberite storitev --</option>
-        </select>
+        <input class="field-input" type="text" id="modalService" placeholder="npr. Ženski haircut" />
       </div>
       <div class="modal-err" id="modalErr"></div>
       <div class="modal-actions">
@@ -197,33 +195,7 @@
       document.getElementById('loginWrap').style.display = 'none';
       document.getElementById('portalWrap').style.display = 'block';
       loadSlots();
-      populateServices();
     }
-  }
-
-  // Populate services dropdown
-  function populateServices() {
-    const serviceSelect = document.getElementById('modalService');
-    if (!salonData?.salon?.services) return;
-
-    const services = [];
-    const lines = salonData.salon.services.split('\n');
-    lines.forEach(line => {
-      // Preberi samo linijo z naslovjenim storitve (npr "- Ženski haircut: 25-45 EUR")
-      const match = line.trim().match(/^-\s*([^:]+):/);
-      if (match) {
-        const serviceName = match[1].trim();
-        if (serviceName) services.push(serviceName);
-      }
-    });
-
-    // Dodaj v dropdown
-    services.forEach(service => {
-      const option = document.createElement('option');
-      option.value = service;
-      option.textContent = service;
-      serviceSelect.appendChild(option);
-    });
   }
 
   // Login
@@ -314,7 +286,7 @@
     const service = document.getElementById('modalService').value.trim();
     const err = document.getElementById('modalErr');
     err.style.display = 'none';
-    if (!name || !service) { err.textContent = 'Vpišite ime in izberite storitev.'; err.style.display = 'block'; return; }
+    if (!name || !service) { err.textContent = 'Vpišite ime in storitev.'; err.style.display = 'block'; return; }
 
     const res = await fetch(`/api/book/${slug}/reserve`, {
       method: 'POST', headers: {'Content-Type':'application/json'},

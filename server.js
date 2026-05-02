@@ -720,8 +720,12 @@ app.post('/admin-forgot/:id', resetPasswordLimiter, async (req, res) => {
   const salon = rows[0];
   if (!salon) return res.status(404).json({ error: 'Salon not found' });
  
+  // ✅ POPRAVKA: Preveri ali je email enak notification_email (edini email na računu)
+  const emailMatches = salon.notification_email && 
+                       salon.notification_email.toLowerCase() === email.toLowerCase();
+  
   // Vedno vrni isti odgovor (security - ne razkrijemo ali email obstaja)
-  if (salon.notification_email !== email) {
+  if (!emailMatches) {
     return res.json({ success: true, message: 'Če e-naslov obstaja, boste prejeli e-mail s povezavo za reset.' });
   }
  
@@ -831,7 +835,11 @@ app.post('/admin-reset/:id/:token', async (req, res) => {
     const hashed = await bcrypt.hash(newPassword, 10);
  
     // Posodobi geslo
-    await pool.query('UPDATE salons SET admin_password = $1 WHERE id = $2', [hashed, salon.id]);
+    // ✅ POPRAVKA: Nastavi tudi admin_username če še ni nastavljen
+    await pool.query(
+      'UPDATE salons SET admin_password = $1, admin_username = COALESCE(admin_username, $2) WHERE id = $3',
+      [hashed, 'admin', salon.id]
+    );
  
     console.log('✅ Geslo uspešno resetirano za salon:', salon.id);
  
