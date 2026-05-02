@@ -215,6 +215,27 @@
     }
   }
 
+ async function saveSlug() {
+    const newSlug = document.getElementById('s-slug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const msg = document.getElementById('slug-msg');
+    const err = document.getElementById('slug-err');
+    msg.style.display = 'none'; err.style.display = 'none';
+    if (!newSlug || newSlug.length < 3) { err.textContent = 'Slug mora biti vsaj 3 znake.'; err.style.display = 'block'; return; }
+    const res = await fetch(API_URL + '/admin/' + SALON_ID + '/slug', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ slug: newSlug })
+    });
+    const data = await res.json();
+    if (data.success) {
+    msg.textContent = '✓ Slug posodobljen. Novi linki so aktivni takoj.';
+    msg.style.display = 'block';
+    loadSettings();
+    } else {
+    err.textContent = data.error || 'Napaka.';
+    err.style.display = 'block';
+    }
+ }
+
   // Load slots
   async function loadSlots() {
     const res = await fetch(`/api/book/${slug}/slots`);
