@@ -992,7 +992,7 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
   });
 
   const days = [];
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 60; i++) {
     const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
     d.setDate(d.getDate() + i);
     const dateStr = d.toISOString().split('T')[0];
@@ -2566,7 +2566,7 @@ app.get('/api/book/:slug/slots', async (req, res) => {
 
   const schedule = salon.schedule || DEFAULT_SCHEDULE;
   const days = [];
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 60; i++) {
     const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
     d.setDate(d.getDate() + i);
     const dateStr = d.toISOString().split('T')[0];
