@@ -2431,6 +2431,134 @@ app.post('/api/gdpr/report-breach', gdprLimiter, async (req, res) => {
   }
 });
 
+// ─── CUSTOMER BOOKING PORTAL ──────────────────────────────────────────────────
+
+app.get('/book/:slug', async (req, res) => {
+  const { rows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [req.params.slug]);
+  if (!rows[0]) return res.status(404).send('<h1>Salon not found</h1>');
+  res.sendFile(__dirname + '/booking-portal.html');
+});
+
+app.post('/book/:slug/login', async (req, res) => {
+  const { email } = req.body;
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [req.params.slug]);
+  const salon = rows[0];
+  if (!salon) return res.status(404).json({ error: 'Salon not found' });
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Neveljaven e-poštni naslov' });
+
+  await pool.query('DELETE FROM gdpr_tokens WHERE email = $1 AND action = $2 AND used = false', [email, 'book_login']);
+  const token = crypto.randomBytes(32).toString('hex');
+  await pool.query('INSERT INTO gdpr_tokens (email, token, action, expires_at) VALUES ($1,$2,$3,$4)', [email, token, 'book_login', new Date(Date.now() + 24*60*60*1000)]);
+
+  const verifyUrl = `${process.env.API_URL || 'https://bookwell.si'}/book/${req.params.slug}/verify/${token}`;
+  await sgMail.send({
+    to: email,
+    from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
+    subject: `Prijava v ${salon.name} — Rezervacijski portal`,
+    html: `
+      <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:20px;">
+        <div style="background:#0a0a0a;padding:24px;text-align:center;">
+          <h1 style="color:#c9984a;margin:0;font-size:22px;">${salon.name}</h1>
+          <p style="color:rgba(255,255,255,.35);margin:8px 0 0;font-size:11px;letter-spacing:.1em;text-transform:uppercase;">Rezervacijski portal</p>
+        </div>
+        <div style="background:#fff;padding:32px;border:1px solid #e0e0e0;border-top:none;">
+          <p style="font-size:15px;margin:0 0 12px;">Kliknite spodnji gumb za prijavo.</p>
+          <p style="font-size:13px;color:#666;margin:0 0 24px;line-height:1.6;">Povezava velja <strong>24 ur</strong> in deluje samo enkrat.</p>
+          <a href="${verifyUrl}" style="display:block;background:#0a0a0a;color:#c9984a;padding:14px 24px;text-decoration:none;font-weight:700;font-size:13px;text-align:center;letter-spacing:.06em;">Prijavi se →</a>
+          <p style="margin:20px 0 0;font-size:11px;color:#aaa;">Če tega niste zahtevali, ignorirajte ta e-mail.</p>
+        </div>
+      </div>
+    `
+  });
+  res.json({ success: true });
+});
+
+app.get('/book/:slug/verify/:token', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM gdpr_tokens WHERE token = $1 AND action = $2 AND used = false AND expires_at > NOW()', [req.params.token, 'book_login']);
+  if (!rows[0]) return res.redirect(`/book/${req.params.slug}?error=expired`);
+  await pool.query('UPDATE gdpr_tokens SET used = true WHERE id = $1', [rows[0].id]);
+  req.session.customerEmail = rows[0].email;
+  req.session.customerSlug = req.params.slug;
+  res.redirect(`/book/${req.params.slug}`);
+});
+
+app.get('/api/book/:slug/info', async (req, res) => {
+  const { rows } = await pool.query('SELECT id, name, address, phone, schedule, services FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [req.params.slug]);
+  const salon = rows[0];
+  if (!salon) return res.status(404).json({ error: 'Not found' });
+  const isLoggedIn = !!(req.session.customerEmail && req.session.customerSlug === req.params.slug);
+  res.json({ salon: { name: salon.name, address: salon.address, phone: salon.phone }, isLoggedIn, email: isLoggedIn ? req.session.customerEmail : null });
+});
+
+app.get('/api/book/:slug/slots', async (req, res) => {
+  if (!req.session.customerEmail || req.session.customerSlug !== req.params.slug) return res.status(401).json({ error: 'Niste prijavljeni' });
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [req.params.slug]);
+  const salon = rows[0];
+  if (!salon) return res.status(404).json({ error: 'Not found' });
+
+  const todayLj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
+  const nextWeek = new Date(todayLj.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const todayDateStr = todayLj.toISOString().split('T')[0];
+  const currentHour = todayLj.getHours();
+  const currentMinute = todayLj.getMinutes();
+
+  const { rows: busySlots } = await pool.query(
+    "SELECT date, time, customer_email, cancel_token, service FROM timeslots WHERE salon_id=$1 AND date>=$2 AND date<=$3 AND status='busy' ORDER BY date, time",
+    [salon.id, todayDateStr, nextWeek.toISOString().split('T')[0]]
+  );
+
+  const busyByDate = {}, mySlots = [];
+  busySlots.forEach(s => {
+    const d = typeof s.date === 'string' ? s.date.split('T')[0] : s.date.toISOString().split('T')[0];
+    if (!busyByDate[d]) busyByDate[d] = new Set();
+    busyByDate[d].add(s.time);
+    if (s.customer_email === req.session.customerEmail) mySlots.push({ date: d, time: s.time, service: s.service, cancelToken: s.cancel_token });
+  });
+
+  const schedule = salon.schedule || DEFAULT_SCHEDULE;
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
+    d.setDate(d.getDate() + i);
+    const dateStr = d.toISOString().split('T')[0];
+    const allHours = getHoursForDate(schedule, dateStr);
+    if (!allHours.length) continue;
+    const slots = allHours.map(time => {
+      const [hh, mm] = time.split(':').map(Number);
+      const isPast = dateStr === todayDateStr && (hh < currentHour || (hh === currentHour && mm <= currentMinute));
+      const isBusy = busyByDate[dateStr]?.has(time) || false;
+      const isMine = mySlots.some(s => s.date === dateStr && s.time === time);
+      return { time, isPast, isBusy, isMine };
+    }).filter(s => !s.isPast);
+    if (slots.length) days.push({ date: dateStr, dayName: d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long' }), slots });
+  }
+  res.json({ days, mySlots });
+});
+
+app.post('/api/book/:slug/reserve', async (req, res) => {
+  if (!req.session.customerEmail || req.session.customerSlug !== req.params.slug) return res.status(401).json({ error: 'Niste prijavljeni' });
+  const { date, time, service, phone, name } = req.body;
+  if (!date || !time || !service || !name) return res.status(400).json({ error: 'Manjkajo podatki' });
+  const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1) AND active = true', [req.params.slug]);
+  const salon = rows[0];
+  if (!salon) return res.status(404).json({ error: 'Not found' });
+  const { rows: existing } = await pool.query("SELECT id FROM timeslots WHERE salon_id=$1 AND date=$2 AND time=$3 AND status='busy'", [salon.id, date, time]);
+  if (existing.length) return res.status(409).json({ error: 'Ta termin je ravnokar zaseden. Izberite drug termin.' });
+  const cancelToken = crypto.randomBytes(20).toString('hex');
+  await pool.query(`INSERT INTO timeslots (salon_id,date,time,status,customer_name,customer_email,customer_phone,service,cancel_token) VALUES ($1,$2,$3,'busy',$4,$5,$6,$7,$8) ON CONFLICT (salon_id,date,time) DO UPDATE SET status='busy',customer_name=$4,customer_email=$5,customer_phone=$6,service=$7,cancel_token=$8`,
+    [salon.id, date, time, name, req.session.customerEmail, phone || '', service, cancelToken]);
+  await sendConfirmationEmail(req.session.customerEmail, name, salon, date, time, service, cancelToken);
+  if (salon.notification_email) await sendNotificationToSalon(salon, name, req.session.customerEmail, phone || '', date, service, time);
+  res.json({ success: true });
+});
+
+app.get('/book/:slug/logout', (req, res) => {
+  req.session.customerEmail = null;
+  req.session.customerSlug = null;
+  res.redirect(`/book/${req.params.slug}`);
+});
+
+
 app.get('/privacy', (req, res) => {
   res.sendFile(__dirname + '/privacy-policy.html');
 });

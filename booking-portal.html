@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rezervacijski portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black: #0a0a0a; --white: #fff; --off: #f7f7f5; --rule: #e0e0e0;
+      --muted: #888; --gold: #c9984a; --gold-h: #b8863a;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: system-ui, sans-serif; background: var(--off); color: var(--black); font-size:13px; line-height:1.5; -webkit-font-smoothing:antialiased; min-height:100vh; }
+
+    /* HEADER */
+    .header { background: var(--black); padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+    .header-logo { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: var(--white); }
+    .header-salon { font-size: 11px; color: rgba(255,255,255,.35); letter-spacing: .08em; text-transform: uppercase; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .header-email { font-size: 11px; color: rgba(255,255,255,.4); }
+    .logout-btn { font-size: 11px; color: var(--gold); text-decoration: none; letter-spacing: .06em; text-transform: uppercase; }
+
+    /* LOGIN */
+    .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .login-card { background: var(--white); border: 1px solid var(--rule); width: 100%; max-width: 400px; overflow: hidden; }
+    .login-head { background: var(--black); padding: 32px 36px; }
+    .login-head h1 { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+    .login-head p { font-size: 12px; color: rgba(255,255,255,.35); letter-spacing: .08em; text-transform: uppercase; }
+    .login-body { padding: 32px 36px; }
+    .login-desc { font-size: 14px; color: #555; line-height: 1.7; margin-bottom: 24px; }
+    .field-label { font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; display: block; }
+    .field-input { width: 100%; padding: 10px 14px; border: 1px solid var(--rule); font-size: 14px; font-family: inherit; background: var(--off); outline: none; transition: border .15s; }
+    .field-input:focus { border-color: var(--black); background: var(--white); }
+    .submit-btn { width: 100%; padding: 12px; background: var(--gold); border: none; color: var(--white); font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-family: inherit; cursor: pointer; transition: background .15s; margin-top: 16px; }
+    .submit-btn:hover { background: var(--gold-h); }
+    .submit-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .msg-ok { background: #dcfce7; border-left: 3px solid #4ade80; padding: 10px 14px; font-size: 13px; color: #16a34a; margin-top: 16px; display: none; }
+    .msg-err { background: #fee2e2; border-left: 3px solid #ef4444; padding: 10px 14px; font-size: 13px; color: #991b1b; margin-top: 16px; display: none; }
+
+    /* PORTAL */
+    .portal { display: none; }
+    .page { max-width: 860px; margin: 0 auto; padding: 36px 24px; }
+    .page-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; letter-spacing: -.02em; color: var(--black); margin-bottom: 4px; }
+    .page-sub { font-size: 12px; color: var(--muted); margin-bottom: 32px; }
+
+    /* MY BOOKINGS */
+    .section-label { font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); margin-bottom: 14px; }
+    .my-bookings { display: flex; flex-direction: column; gap: 8px; margin-bottom: 40px; }
+    .my-booking-card { background: var(--white); border: 1px solid var(--rule); padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .my-booking-info { font-size: 13px; color: var(--black); }
+    .my-booking-info span { color: var(--muted); font-size: 12px; }
+    .cancel-link { font-size: 11px; color: #dc2626; text-decoration: none; letter-spacing: .06em; text-transform: uppercase; border: 1px solid #fca5a5; padding: 5px 12px; white-space: nowrap; }
+    .cancel-link:hover { background: #fee2e2; }
+    .no-bookings { font-size: 13px; color: var(--muted); font-style: italic; margin-bottom: 40px; }
+
+    /* SLOT GRID */
+    .day-block { margin-bottom: 28px; }
+    .day-name { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 700; color: var(--black); margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
+    .slots-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .slot { padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--rule); background: var(--white); color: var(--black); transition: all .12s; letter-spacing: .02em; }
+    .slot:hover { border-color: var(--black); background: var(--off); }
+    .slot.busy { background: var(--rule); color: #bbb; cursor: not-allowed; border-color: var(--rule); }
+    .slot.mine { background: var(--black); color: var(--gold); border-color: var(--black); cursor: default; font-style: italic; }
+    .slot.mine::after { content: ' ✓'; }
+
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--white); width: 100%; max-width: 360px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.25); }
+    .modal-head { background: var(--black); padding: 20px 24px; }
+    .modal-time { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 700; color: var(--white); line-height: 1; }
+    .modal-date { font-size: 11px; color: rgba(255,255,255,.35); margin-top: 4px; letter-spacing: .06em; text-transform: uppercase; }
+    .modal-body { padding: 20px 24px; }
+    .modal-field { margin-bottom: 14px; }
+    .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--rule); }
+    .modal-btn { padding: 10px; border: 1px solid var(--rule); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; font-family: inherit; cursor: pointer; background: var(--white); color: var(--black); transition: all .12s; }
+    .modal-btn:hover { background: var(--off); }
+    .modal-btn.primary { background: var(--black); color: var(--white); border-color: var(--black); }
+    .modal-btn.primary:hover { background: #222; }
+    .modal-err { font-size: 12px; color: #dc2626; margin-top: 8px; display: none; }
+
+    .loading { text-align: center; padding: 60px; color: var(--muted); font-size: 13px; }
+
+    @media (max-width: 600px) {
+      .header { padding: 0 20px; }
+      .login-head, .login-body { padding: 24px; }
+      .page { padding: 24px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <div class="login-head">
+      <h1 id="loginSalonName">Rezervacijski portal</h1>
+      <p>Prijava za stranke</p>
+    </div>
+    <div class="login-body">
+      <p class="login-desc">Vnesite vaš e-poštni naslov. Poslali vam bomo varno prijavo brez gesla.</p>
+      <label class="field-label">E-poštni naslov</label>
+      <input class="field-input" type="email" id="loginEmail" placeholder="vas@email.com" />
+      <button class="submit-btn" id="loginBtn" onclick="doLogin()">Pošlji prijavo →</button>
+      <div class="msg-ok" id="loginOk">✅ Preverite e-pošto — poslali smo vam prijavno povezavo.</div>
+      <div class="msg-err" id="loginErr"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PORTAL -->
+<div class="portal" id="portalWrap">
+  <div class="header">
+    <div>
+      <div class="header-logo" id="headerSalonName"></div>
+      <div class="header-salon">Rezervacijski portal</div>
+    </div>
+    <div class="header-right">
+      <div class="header-email" id="headerEmail"></div>
+      <a class="logout-btn" id="logoutLink" href="#">Odjava</a>
+    </div>
+  </div>
+
+  <div class="page">
+    <div class="page-title">Rezervirajte termin</div>
+    <div class="page-sub" id="salonInfo"></div>
+
+    <div class="section-label">Moje rezervacije</div>
+    <div id="myBookings"><div class="loading">Nalagam...</div></div>
+
+    <div class="section-label">Prosti termini</div>
+    <div id="slotsContainer"><div class="loading">Nalagam...</div></div>
+  </div>
+</div>
+
+<!-- BOOKING MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-time" id="modalTime"></div>
+      <div class="modal-date" id="modalDate"></div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label class="field-label">Ime in priimek</label>
+        <input class="field-input" type="text" id="modalName" placeholder="Ana Novak" />
+      </div>
+      <div class="modal-field">
+        <label class="field-label">Telefon</label>
+        <input class="field-input" type="tel" id="modalPhone" placeholder="041 123 456" />
+      </div>
+      <div class="modal-field">
+        <label class="field-label">Storitev</label>
+        <input class="field-input" type="text" id="modalService" placeholder="npr. Ženski haircut" />
+      </div>
+      <div class="modal-err" id="modalErr"></div>
+      <div class="modal-actions">
+        <button class="modal-btn" onclick="closeModal()">Preklic</button>
+        <button class="modal-btn primary" onclick="doReserve()">Rezerviraj →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const slug = location.pathname.split('/book/')[1]?.split('/')[0];
+  let selectedDate = null, selectedTime = null;
+
+  // Init
+  async function init() {
+    const res = await fetch(`/api/book/${slug}/info`);
+    const data = await res.json();
+
+    document.getElementById('loginSalonName').textContent = data.salon.name;
+    document.getElementById('headerSalonName').textContent = data.salon.name;
+    document.getElementById('headerEmail').textContent = data.email || '';
+    document.getElementById('salonInfo').textContent = '📍 ' + data.salon.address + '  ·  📞 ' + data.salon.phone;
+    document.getElementById('logoutLink').href = `/book/${slug}/logout`;
+
+    // Check for expired link error
+    if (location.search.includes('error=expired')) {
+      document.getElementById('loginErr').textContent = 'Prijavna povezava je potekla. Zahtevajte novo.';
+      document.getElementById('loginErr').style.display = 'block';
+    }
+
+    if (data.isLoggedIn) {
+      document.getElementById('loginWrap').style.display = 'none';
+      document.getElementById('portalWrap').style.display = 'block';
+      loadSlots();
+    }
+  }
+
+  // Login
+  async function doLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const btn = document.getElementById('loginBtn');
+    const ok = document.getElementById('loginOk');
+    const err = document.getElementById('loginErr');
+    ok.style.display = 'none'; err.style.display = 'none';
+    if (!email) return;
+    btn.disabled = true; btn.textContent = 'Pošiljam...';
+    const res = await fetch(`/book/${slug}/login`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    btn.disabled = false; btn.textContent = 'Pošlji prijavo →';
+    if (data.success) {
+      ok.style.display = 'block';
+      document.getElementById('loginEmail').value = '';
+    } else {
+      err.textContent = data.error || 'Napaka. Poskusite znova.';
+      err.style.display = 'block';
+    }
+  }
+
+  // Load slots
+  async function loadSlots() {
+    const res = await fetch(`/api/book/${slug}/slots`);
+    if (res.status === 401) { location.reload(); return; }
+    const data = await res.json();
+
+    // My bookings
+    const myEl = document.getElementById('myBookings');
+    if (!data.mySlots.length) {
+      myEl.innerHTML = '<p class="no-bookings">Nimate aktivnih rezervacij.</p>';
+    } else {
+      myEl.innerHTML = '<div class="my-bookings">' + data.mySlots.map(s => `
+        <div class="my-booking-card">
+          <div class="my-booking-info">
+            <strong>${s.date} ob ${s.time}</strong><br>
+            <span>${s.service}</span>
+          </div>
+          ${s.cancelToken ? `<a class="cancel-link" href="/cancel/${s.cancelToken}">Odpovej</a>` : ''}
+        </div>
+      `).join('') + '</div>';
+    }
+
+    // Slot grid
+    const slotsEl = document.getElementById('slotsContainer');
+    if (!data.days.length) {
+      slotsEl.innerHTML = '<p class="no-bookings">Ni prostih terminov v naslednjih 7 dneh.</p>';
+      return;
+    }
+    slotsEl.innerHTML = data.days.map(day => `
+      <div class="day-block">
+        <div class="day-name">${day.dayName}</div>
+        <div class="slots-row">
+          ${day.slots.map(s => {
+            if (s.isMine) return `<div class="slot mine">${s.time}</div>`;
+            if (s.isBusy) return `<div class="slot busy">${s.time}</div>`;
+            return `<div class="slot" onclick="openModal('${day.date}','${day.dayName}','${s.time}')">${s.time}</div>`;
+          }).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Modal
+  function openModal(date, dayName, time) {
+    selectedDate = date; selectedTime = time;
+    document.getElementById('modalTime').textContent = time;
+    document.getElementById('modalDate').textContent = dayName.toUpperCase();
+    document.getElementById('modalErr').style.display = 'none';
+    document.getElementById('modalName').value = '';
+    document.getElementById('modalPhone').value = '';
+    document.getElementById('modalService').value = '';
+    document.getElementById('modalOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('modalName').focus(), 100);
+  }
+  function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+
+  async function doReserve() {
+    const name = document.getElementById('modalName').value.trim();
+    const phone = document.getElementById('modalPhone').value.trim();
+    const service = document.getElementById('modalService').value.trim();
+    const err = document.getElementById('modalErr');
+    err.style.display = 'none';
+    if (!name || !service) { err.textContent = 'Vpišite ime in storitev.'; err.style.display = 'block'; return; }
+
+    const res = await fetch(`/api/book/${slug}/reserve`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ date: selectedDate, time: selectedTime, name, phone, service })
+    });
+    const data = await res.json();
+    if (data.success) {
+      closeModal();
+      loadSlots();
+    } else {
+      err.textContent = data.error || 'Napaka. Poskusite znova.';
+      err.style.display = 'block';
+    }
+  }
+
+  // Keyboard
+  document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('modalOverlay').addEventListener('click', e => { if (e.target === document.getElementById('modalOverlay')) closeModal(); });
+
+  init();
+</script>
+</body>
+</html>
