@@ -1607,9 +1607,9 @@ function buildAdminPage(salon) {
     <div class="masthead-title">${salon.name}</div>
     <div class="masthead-label">Admin Panel</div>
     <div class="masthead-spacer"></div>
-    <a href="/${salon.type || 'salon'}/${salon.slug || salon.id}" class="masthead-link">
+    <a href="${salon.plan === 'trial' ? 'https://bookwell.si/#pricing' : '/' + (salon.type || 'salon') + '/' + (salon.slug || salon.id)}" class="masthead-link">
       <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.5 1.5H2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h8a.5.5 0 0 0 .5-.5V7.5M7 1.5h3.5m0 0v3.5m0-3.5L5 7"/></svg>
-      Javna stran
+      ${salon.plan === 'trial' ? 'Nadgradi plan →' : 'Javna stran'}
     </a>
   </div>
   <nav class="nav">
