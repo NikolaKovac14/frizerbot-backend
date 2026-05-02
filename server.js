@@ -13,6 +13,7 @@ const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(cors());
 
 // ─── STRIPE WEBHOOK (mora biti PRED express.json!) ────────────────────────────
@@ -631,15 +632,13 @@ const chatLimiter = rateLimit({
 
 // NOVO — mesečni IP limiter
 const monthlyIpLimiter = rateLimit({
-  windowMs: 30 * 24 * 60 * 60 * 1000, // 30 dni
+  windowMs: 7 * 24 * 60 * 60 * 1000, // 7 dni (ok za MemoryStore)
   max: 1000,
-  keyGenerator: (req) => req.ip,
-  message: { reply: 'Mesečna omejitev demo chata je dosežena.', bookingDetected: null },
   skip: (req) => {
-    // Preskoči limiter za prave salone (ne za salon_1 demo)
     const { salonId } = req.body || {};
     return salonId && salonId !== 'salon_1';
-  }
+  },
+  message: { reply: 'Mesečna omejitev demo chata je dosežena.', bookingDetected: null }
 });
 
 const loginLimiter = rateLimit({
@@ -658,9 +657,8 @@ const gdprLimiter = rateLimit({
 
 // ─── TRIAL ENDPOINT ───────────────────────────────────────────────────────────
 const trialLimiter = rateLimit({
-  windowMs: 24 * 60 * 60 * 1000, // 24h
+  windowMs: 24 * 60 * 60 * 1000,
   max: 3,
-  keyGenerator: (req) => req.ip,
   message: { error: 'Preveč trial zahtevkov. Poskusite jutri.' }
 });
 
@@ -2126,6 +2124,14 @@ function buildAdminPage(salon) {
       .masthead-link--desktop { display: none; }
       .masthead-link svg { display: none; }
     }
+      @media (max-width: 600px) {
+      .page { padding: 20px 12px; }
+      .nav { padding: 0 8px; }
+      .nav-tab { padding: 10px 12px; font-size: 10px; letter-spacing: 0.06em; }
+      .schedule-head { padding: 16px 16px; }
+      .day-row { padding: 12px 16px; gap: 10px; }
+      .schedule-footer { padding: 14px 16px; }
+    }
     .nav { background: var(--white); border-bottom: 1px solid var(--rule); padding: 0 40px; display: flex; gap: 0; }
     .nav-tab { display: flex; align-items: center; gap: 8px; padding: 14px 24px 12px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s; user-select: none; }
     .nav-tab:hover { color: var(--black); }
@@ -2273,8 +2279,8 @@ function buildAdminPage(salon) {
         </div>
         <div style="padding:24px 28px;border-bottom:1px solid #e0e0e0;">
           <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:14px;">Dodaj novo storitev</div>
-          <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end;">
-            <div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;">
+            <div style="grid-column:1/-1;">
               <div class="modal-field-label">Ime storitve</div>
               <input class="modal-input" type="text" id="svc-name" placeholder="npr. Ženski haircut" />
             </div>
@@ -2293,7 +2299,9 @@ function buildAdminPage(salon) {
                 <option value="120">120 min</option>
               </select>
             </div>
-            <button class="save-btn" style="padding:9px 20px;white-space:nowrap;" onclick="addService()">+ Dodaj</button>
+            <div style="grid-column:1/-1;">
+              <button class="save-btn" style="width:100%;padding:10px;" onclick="addService()">+ Dodaj storitev</button>
+            </div>
           </div>
           <div id="svc-err" style="display:none;font-size:12px;color:#dc2626;margin-top:8px;"></div>
         </div>
@@ -2690,30 +2698,49 @@ function buildAdminPage(salon) {
       renderServices();
     }
 
-    function renderServices() {
-      const el = document.getElementById('svc-list');
-      if (!svcList.length) {
-        el.innerHTML = '<div style="padding:28px;font-size:13px;color:#aaa;font-style:italic;text-align:center;">Ni storitev. Dodajte prvo storitev zgoraj.</div>';
-        return;
-      }
+  function renderServices() {
+    const el = document.getElementById('svc-list');
+    if (!svcList.length) {
+      el.innerHTML = '<div style="padding:28px;font-size:13px;color:#aaa;font-style:italic;text-align:center;">Ni storitev. Dodajte prvo storitev zgoraj.</div>';
+      return;
+    }
+    
+    // Mobile: card layout namesto grid
+    const isMobile = window.innerWidth < 600;
+    
+    if (isMobile) {
+      el.innerHTML = '<div style="display:flex;flex-direction:column;gap:1px;background:#e0e0e0;">'
+        + svcList.map(s => \`
+          <div style="background:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:600;color:#0a0a0a;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\${s.name}</div>
+              <div style="font-size:12px;color:#888;">\${parseFloat(s.max_price).toFixed(2)}€ · \${s.duration} min</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+              <button onclick="editService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 10px;background:#f7f7f5;border:1px solid #e0e0e0;cursor:pointer;color:#444;font-family:system-ui,sans-serif;">Uredi</button>
+              <button onclick="deleteService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 10px;background:#fff;border:1px solid #fca5a5;cursor:pointer;color:#dc2626;font-family:system-ui,sans-serif;">Briši</button>
+            </div>
+          </div>
+        \`).join('')
+        + '</div>';
+    } else {
       el.innerHTML = '<div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:1px;background:#e0e0e0;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;">'
         + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Storitev</div>'
         + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Cena</div>'
         + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Trajanje</div>'
         + '<div style="background:#f7f7f5;padding:8px 18px;"></div>'
-        + svcList.map(s => {
-          return \`
-            <div style="background:#fff;padding:12px 18px;font-size:13px;font-weight:500;color:#0a0a0a;display:flex;align-items:center;">\${s.name}</div>
-            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${parseFloat(s.max_price).toFixed(2)} €</div>
-            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${s.duration} min</div>
-            <div style="background:#fff;padding:8px 12px;display:flex;align-items:center;gap:6px;">
-              <button onclick="editService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#f7f7f5;border:1px solid #e0e0e0;cursor:pointer;color:#444;font-family:system-ui,sans-serif;">Uredi</button>
-              <button onclick="deleteService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#fff;border:1px solid #fca5a5;cursor:pointer;color:#dc2626;font-family:system-ui,sans-serif;">Briši</button>
-            </div>
-          \`;
-        }).join('')
+        + svcList.map(s => \`
+          <div style="background:#fff;padding:12px 18px;font-size:13px;font-weight:500;color:#0a0a0a;display:flex;align-items:center;">\${s.name}</div>
+          <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${parseFloat(s.max_price).toFixed(2)} €</div>
+          <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${s.duration} min</div>
+          <div style="background:#fff;padding:8px 12px;display:flex;align-items:center;gap:6px;">
+            <button onclick="editService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#f7f7f5;border:1px solid #e0e0e0;cursor:pointer;color:#444;font-family:system-ui,sans-serif;">Uredi</button>
+            <button onclick="deleteService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#fff;border:1px solid #fca5a5;cursor:pointer;color:#dc2626;font-family:system-ui,sans-serif;">Briši</button>
+          </div>
+        \`).join('')
         + '</div>';
     }
+  }
 
     async function addService() {
       const name = document.getElementById('svc-name').value.trim();
