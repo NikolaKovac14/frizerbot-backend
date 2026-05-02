@@ -1164,12 +1164,19 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
   const actualSalonId = salon.id;
 
   const { rows: svcRows } = await pool.query(
-    'SELECT name, duration FROM services WHERE salon_id = $1 AND active = true',
+    'SELECT name, min_price, max_price, duration FROM services WHERE salon_id = $1 AND active = true ORDER BY position, created_at',
     [salon.id]
   );
   const servicesDurationMap = {};
   svcRows.forEach(s => { servicesDurationMap[s.name.toLowerCase()] = s.duration; });
   salon._servicesDurationMap = servicesDurationMap;
+  
+  // Če ima salon storitve v services tabeli, prepiši salon.services
+  if (svcRows.length > 0) {
+    salon.services = svcRows.map(s => 
+      `- ${s.name}: ${parseFloat(s.min_price).toFixed(0)}-${parseFloat(s.max_price).toFixed(0)} EUR [${s.duration}min]`
+    ).join('\n');
+  }
 
   // ─── PLAN LIMIT CHECK ────────────────────────────────────────────────────────
   const plan = PLANS[salon.plan] || PLANS.pro;
