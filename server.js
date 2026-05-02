@@ -826,7 +826,7 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
     const isT = salon.plan === 'trial';
     return res.status(429).json({
       reply: isT
-        ? 'Vaš brezplačni preizkus je končan (20 sporočil). Všeč vam je? Nadaljujte na bookwell.si'
+        ? 'Vaš brezplačni preizkus je končan (20 sporočil). Vam je všeč? Nadaljujte na bookwell.si'
         : 'Salon je dosegel mesečni limit sporočil. Kontaktirajte lastnika salona.',
       bookingDetected: null,
       trialEnded: isT
@@ -1019,7 +1019,22 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
     return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjaš VEDNO in SAMO v slovenščini.
 NIKOLI ne uporabi markdown formatiranja - piši navadno besedilo.
 Si prijazen, profesionalen in jedrnat.
-Piši brezhibno in slovnično pravilno slovensko. ABSOLUTNO PREPOVEDANO je pisanje v kateremkoli drugem jeziku — niti ene besede hrvaško, angleško ali v kateremkoli drugem jeziku. Če ne znaš odgovoriti v slovenščini, raje ne odgovori kot da bi uporabil tuj jezik. Primeri napak ki se jim izogni: "razumijem" → "razumem", "potvrjena" → "potrjena", "kakršnahkoli" → "kakršnih koli". In tako dalje - vedno preveri slovnico pred odgovorom.
+Piši brezhibno in slovnično pravilno slovensko. ABSOLUTNO PREPOVEDANO je pisanje v kateremkoli drugem jeziku — niti ene besede hrvaško, angleško ali v kateremkoli drugem jeziku.
+
+PREPOVEDANE FRAZE (nikoli ne uporabi):
+- "do viđenja" → VEDNO "nasvidenje"
+- "svidenja" / "viđenja" → "nasvidenje"
+- "razumijem" → "razumem"
+- "potvrjena" → "potrjena"
+- "hvala na" → "hvala za"
+- "naravno" (kot seveda) → "seveda" ali "gotovo"
+
+DOVOLJENI POZDRAVI: "Nasvidenje!", "Lep pozdrav!", "Se vidimo!", "Hvala in nasvidenje!"
+
+ČE STRANKA POŠLJE SAMO "ok", "v redu" ali podobno brez vsebine:
+- 1. krat: kratko povzemi kaj lahko narediš
+- 2. krat: povabi naj se oglasite ko bodo pripravljeni
+- 3. krat in naprej: odgovori samo z "👍" ali sploh ne odgovarjaj z novo vsebino
 
 Današnji datum: ${todayStr}
 DATUM ZA TAGE: ${todayDateStr}
@@ -1081,8 +1096,22 @@ KRITIČNO:
     return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjaš VEDNO in SAMO v slovenščini.
 NIKOLI ne uporabi markdown formatiranja - piši navadno besedilo.
 Si prijazen, profesionalen in jedrnat.
-Piši brezhibno in slovnično pravilno slovensko. ABSOLUTNO PREPOVEDANO je pisanje v kateremkoli drugem jeziku — niti ene besede hrvaško, angleško ali v kateremkoli drugem jeziku. Če ne znaš odgovoriti v slovenščini, raje ne odgovori kot da bi uporabil tuj jezik. Primeri napak ki se jim izogni: "razumijem" → "razumem", "potvrjena" → "potrjena", "kakršnahkoli" → "kakršnih koli". In tako dalje - vedno preveri slovnico pred odgovorom.
+Piši brezhibno in slovnično pravilno slovensko. ABSOLUTNO PREPOVEDANO je pisanje v kateremkoli drugem jeziku — niti ene besede hrvaško, angleško ali v kateremkoli drugem jeziku.
 
+PREPOVEDANE FRAZE (nikoli ne uporabi):
+- "do viđenja" → VEDNO "nasvidenje"
+- "svidenja" / "viđenja" → "nasvidenje"
+- "razumijem" → "razumem"
+- "potvrjena" → "potrjena"
+- "hvala na" → "hvala za"
+- "naravno" (kot seveda) → "seveda" ali "gotovo"
+
+DOVOLJENI POZDRAVI: "Nasvidenje!", "Lep pozdrav!", "Se vidimo!", "Hvala in nasvidenje!"
+
+ČE STRANKA POŠLJE SAMO "ok", "v redu" ali podobno brez vsebine:
+- 1. krat: kratko povzemi kaj lahko narediš
+- 2. krat: povabi naj se oglasite ko bodo pripravljeni
+- 3. krat in naprej: odgovori samo z "👍" ali sploh ne odgovarjaj z novo vsebino
 Današnji datum: ${todayStr}
 DATUM ZA TAGE: ${todayDateStr}
 
@@ -1607,6 +1636,10 @@ function buildAdminPage(salon) {
     <div class="masthead-title">${salon.name}</div>
     <div class="masthead-label">Admin Panel</div>
     <div class="masthead-spacer"></div>
+    <a href="https://bookwell.si" target="_blank" class="masthead-link">
+      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.5 1.5H2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h8a.5.5 0 0 0 .5-.5V7.5M7 1.5h3.5m0 0v3.5m0-3.5L5 7"/></svg>
+      BookWell.si
+    </a>
     <a href="${salon.plan === 'trial' ? 'https://bookwell.si/#pricing' : '/' + (salon.type || 'salon') + '/' + (salon.slug || salon.id)}" class="masthead-link">
       <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.5 1.5H2a.5.5 0 0 0-.5.5v8c0 .28.22.5.5.5h8a.5.5 0 0 0 .5-.5V7.5M7 1.5h3.5m0 0v3.5m0-3.5L5 7"/></svg>
       ${salon.plan === 'trial' ? 'Nadgradi plan →' : 'Javna stran'}
