@@ -74,7 +74,7 @@ app.post('/stripe-webhook',
         `, [salonId, session.id, session.customer || '', plan, amount, customerEmail, customerName]);
 
         const salonUrl = `${process.env.API_URL || 'https://bookwell.si'}/salon/${slug}`;
-        const adminUrl = `${process.env.API_URL || 'https://bookwell.si'}/admin/${salonId}`;
+        const adminUrl = `${process.env.API_URL || 'https://bookwell.si'}/admin/${slug}`;
         const planNames = { starter: 'Starter', pro: 'Pro', agency: 'Agency' };
         const chatLimits = { starter: '1.000', pro: '3.000', agency: '10.000' };
 
@@ -628,7 +628,7 @@ app.post('/trial', trialLimiter, async (req, res) => {
     ]);
 
     const chatUrl = `${process.env.API_URL || 'https://bookwell.si'}/salon/${slug}`;
-    const adminUrl = `${process.env.API_URL || 'https://bookwell.si'}/admin/${salonId}`;
+    const adminUrl = `${process.env.API_URL || 'https://bookwell.si'}/admin/${slug}`;
 
     await sgMail.send({
       to: email,
