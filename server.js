@@ -2156,7 +2156,32 @@ function buildAdminPage(salon) {
       .day-row { padding: 12px 16px; gap: 10px; }
       .schedule-footer { padding: 14px 16px; }
     }
-    .nav { background: var(--white); border-bottom: 1px solid var(--rule); padding: 0 40px; display: flex; gap: 0; }
+    .nav {
+      background: var(--white);
+      border-bottom: 1px solid var(--rule);
+      padding: 0 40px;
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    @media (max-width: 480px) {
+      .nav {
+        padding: 0;
+        border-bottom: none;
+        flex-wrap: wrap;
+      }
+      .nav-tab {
+        flex: 1;
+        min-width: 0;
+        padding: 12px 6px;
+        font-size: 9px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
     .nav-tab { display: flex; align-items: center; gap: 8px; padding: 14px 24px 12px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s; user-select: none; }
     .nav-tab:hover { color: var(--black); }
     .nav-tab.active { color: var(--black); border-bottom-color: var(--gold); }
