@@ -2703,12 +2703,12 @@ function buildAdminPage(salon) {
         + '<div style="background:#f7f7f5;padding:8px 18px;"></div>'
         + svcList.map(s => {
           return \`
-            <div style="background:#fff;padding:12px 18px;font-size:13px;font-weight:500;color:#0a0a0a;display:flex;align-items:center;">${s.name}</div>
-            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">${parseFloat(s.max_price).toFixed(2)} €</div>
-            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">${s.duration} min</div>
+            <div style="background:#fff;padding:12px 18px;font-size:13px;font-weight:500;color:#0a0a0a;display:flex;align-items:center;">\${s.name}</div>
+            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${parseFloat(s.max_price).toFixed(2)} €</div>
+            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${s.duration} min</div>
             <div style="background:#fff;padding:8px 12px;display:flex;align-items:center;gap:6px;">
-              <button onclick="editService(${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#f7f7f5;border:1px solid #e0e0e0;cursor:pointer;color:#444;font-family:system-ui,sans-serif;">Uredi</button>
-              <button onclick="deleteService(${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#fff;border:1px solid #fca5a5;cursor:pointer;color:#dc2626;font-family:system-ui,sans-serif;">Briši</button>
+              <button onclick="editService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#f7f7f5;border:1px solid #e0e0e0;cursor:pointer;color:#444;font-family:system-ui,sans-serif;">Uredi</button>
+              <button onclick="deleteService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#fff;border:1px solid #fca5a5;cursor:pointer;color:#dc2626;font-family:system-ui,sans-serif;">Briši</button>
             </div>
           \`;
         }).join('')
