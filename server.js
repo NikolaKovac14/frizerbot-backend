@@ -76,11 +76,11 @@ app.post('/stripe-webhook',
         const salonUrl = `${process.env.API_URL || 'https://bookwell.si'}/salon/${slug}`;
         const adminUrl = `${process.env.API_URL || 'https://bookwell.si'}/admin/${salonId}`;
         const planNames = { starter: 'Starter', pro: 'Pro', agency: 'Agency' };
-        const chatLimits = { starter: '500', pro: '2.000', agency: 'Neomejeno' };
+        const chatLimits = { starter: '1.000', pro: '3.000', agency: '10.000' };
 
         await sgMail.send({
           to: customerEmail,
-          from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
+          from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
           subject: `🎉 Dobrodošli v BookWell — Vaš AI asistent je pripravljen`,
           html: `
             <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
@@ -113,6 +113,43 @@ app.post('/stripe-webhook',
       }
     }
 
+    if (event.type === 'invoice.payment_succeeded') {
+      const invoice = event.data.object;
+      const customerEmail = invoice.customer_email;
+      
+      if (customerEmail) {
+        await pool.query(`
+          UPDATE salons 
+          SET billing_period_start = CURRENT_DATE, chat_count = 0
+          WHERE notification_email = $1
+        `, [customerEmail]);
+        
+        console.log(`✅ Obnovitev plačila: ${customerEmail}`);
+      }
+    }
+
+    if (event.type === 'invoice.payment_failed') {
+      const invoice = event.data.object;
+      const customerEmail = invoice.customer_email;
+      
+      if (customerEmail) {  // ← preveri da email obstaja
+        await pool.query(`
+          UPDATE salons SET plan = 'suspended' WHERE notification_email = $1
+        `, [customerEmail]);
+        
+        try {
+          await sgMail.send({
+            to: customerEmail,
+            from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',  // ← manjkalo!
+            subject: 'BookWell — Plačilo ni uspelo',
+            html: `...`
+          });
+        } catch(e) {
+          console.error('❌ Payment failed email napaka:', e.message);
+        }
+      }
+    }
+
     res.json({ received: true });
   }
 );
@@ -137,6 +174,7 @@ const pool = new Pool({
 
 // ─── PLAN CONFIG ──────────────────────────────────────────────────────────────
 const PLANS = {
+  trial:   { name: 'Trial',   price: 0,     chatLimit: 20 },
   starter: { name: 'Starter', price: 29.99, chatLimit: 1000 },
   pro:     { name: 'Pro',     price: 49.99, chatLimit: 3000 },
   agency:  { name: 'Agency',  price: 99.99, chatLimit: 10000 }
@@ -222,7 +260,7 @@ async function sendBreachNotificationToAuthority(breachData) {
   try {
     await sgMail.send({
       to: 'gp.ip@ip-rs.si', // URADY email
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
+      from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
       subject: `[GDPR BREACH NOTIFICATION] ${breachData.type} - BookWell.si`,
       html: `
         <h2>GDPR Breach Notification</h2>
@@ -362,7 +400,7 @@ async function sendConfirmationEmail(customerEmail, customerName, salon, date, t
 
     await sgMail.send({
       to: customerEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
+      from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
       subject: `✅ Rezervacija potrjena - ${salon.name}`,
       html: `
         <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#2d2520;">
@@ -404,7 +442,7 @@ async function sendNotificationToSalon(salon, customerName, customerEmail, custo
     const dateFormatted = dateLj.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     await sgMail.send({
       to: salon.notification_email,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
+      from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
       subject: `🔔 Nova Rezervacija - ${salon.name} (${dateFormatted} ${time})`,
       html: `
         <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#2d2520;">
@@ -541,6 +579,98 @@ const gdprLimiter = rateLimit({
   message: { error: 'Preveč zahtevkov. Poskusite čez uro.' }
 });
 
+// ─── TRIAL ENDPOINT ───────────────────────────────────────────────────────────
+const trialLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24h
+  max: 3,
+  keyGenerator: (req) => req.ip,
+  message: { error: 'Preveč trial zahtevkov. Poskusite jutri.' }
+});
+
+app.post('/trial', trialLimiter, async (req, res) => {
+  const { email, salonName } = req.body;
+  
+  if (!email || !salonName) {
+    return res.status(400).json({ error: 'Vpišite email in ime salona.' });
+  }
+  
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: 'Neveljaven e-poštni naslov.' });
+  }
+
+  // Preveri obstoječi račun
+  const { rows: existing } = await pool.query(
+    'SELECT id, plan FROM salons WHERE notification_email = $1', [email]
+  );
+  if (existing.length > 0) {
+    const p = existing[0].plan;
+    if (p === 'trial') return res.status(409).json({ error: 'Ta email že ima aktiven preizkus. Preverite e-pošto.' });
+    return res.status(409).json({ error: 'Ta email je že registriran. Prijavite se v admin panel.' });
+  }
+
+  const salonId = 'trial_' + Date.now();
+  const slug = email.split('@')[0].replace(/[^a-z0-9]/gi,'').toLowerCase() + '_' + Date.now();
+
+  try {
+    await pool.query(`
+      INSERT INTO salons (id, name, address, phone, services, notification_email, schedule, plan, slug, billing_period_start)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,'trial',$8,CURRENT_DATE)
+    `, [
+      salonId,
+      salonName,
+      'Naslov še ni nastavljen',
+      '',
+      '- Dodajte storitve v admin panelu',
+      email,
+      JSON.stringify(DEFAULT_SCHEDULE),
+      slug
+    ]);
+
+    const chatUrl = `${process.env.API_URL || 'https://bookwell.si'}/salon/${slug}`;
+    const adminUrl = `${process.env.API_URL || 'https://bookwell.si'}/admin/${salonId}`;
+
+    await sgMail.send({
+      to: email,
+      from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
+      subject: '🎉 Vaš brezplačni preizkus BookWell je pripravljen',
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+          <div style="background:#0a0a0a;padding:28px;text-align:center;">
+            <h1 style="color:#c9984a;margin:0;font-size:28px;font-family:Georgia,serif;">BookWell</h1>
+            <p style="color:rgba(255,255,255,.35);margin:8px 0 0;font-size:11px;letter-spacing:.12em;text-transform:uppercase;">Brezplačni preizkus · 20 sporočil</p>
+          </div>
+          <div style="background:#fff;padding:36px;border:1px solid #e0e0e0;border-top:none;">
+            <p style="font-size:16px;margin:0 0 12px;">Pozdravljeni!</p>
+            <p style="color:#666;font-size:14px;line-height:1.7;margin:0 0 28px;">
+              Vaš AI asistent za salon <strong>${salonName}</strong> je pripravljen. Na voljo imate <strong>20 brezplačnih sporočil</strong>.
+            </p>
+            <div style="background:#f7f7f5;border-left:3px solid #c9984a;padding:18px 20px;margin-bottom:28px;">
+              <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#0a0a0a;">Naslednji koraki:</p>
+              <p style="margin:0 0 8px;font-size:13px;color:#444;">1. Odprite admin panel in nastavite storitve ter delovni čas</p>
+              <p style="margin:0 0 8px;font-size:13px;color:#444;">2. Preizkusite chat kot bi ga videla vaša stranka</p>
+              <p style="margin:0;font-size:13px;color:#444;">3. Če vam je všeč — nadgradite za 29.99€/mes</p>
+            </div>
+            <a href="${adminUrl}" style="display:block;background:#0a0a0a;color:#c9984a;padding:15px 24px;text-decoration:none;font-weight:700;font-size:13px;text-align:center;letter-spacing:.08em;margin-bottom:10px;">→ Odpri Admin Panel</a>
+            <a href="${chatUrl}" style="display:block;background:#f7f7f5;color:#0a0a0a;padding:14px 24px;text-decoration:none;font-size:13px;text-align:center;border:1px solid #e0e0e0;">→ Preizkusi Chat (kot stranka)</a>
+            <p style="margin:28px 0 0;font-size:11px;color:#aaa;line-height:1.6;">
+              Vprašanja? Pišite na <a href="mailto:info@bookwell.si" style="color:#c9984a;">info@bookwell.si</a> ali nas kontaktirajte na WhatsApp.
+            </p>
+          </div>
+          <div style="text-align:center;padding:16px;font-size:11px;color:#bbb;">BookWell.si · AI Recepcionist za salone</div>
+        </div>
+      `
+    });
+
+    console.log(`✅ Trial ustvarjen: ${email} — ${salonId}`);
+    res.json({ success: true, chatUrl, adminUrl });
+
+  } catch (err) {
+    console.error('❌ Trial napaka:', err.message);
+    res.status(500).json({ error: 'Napaka pri ustvarjanju preizkusa.' });
+  }
+});
+
 app.post('/admin-login/:id', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
   const { rows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
@@ -657,6 +787,8 @@ app.post('/booking', async (req, res) => {
   res.json({ success: true });
 });
 
+
+
 // ─── CHAT ─────────────────────────────────────────────────────────────────────
 
 app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
@@ -672,6 +804,13 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
   // ─── PLAN LIMIT CHECK ────────────────────────────────────────────────────────
   const plan = PLANS[salon.plan] || PLANS.pro;
 
+  if (salon.plan === 'suspended') {
+    return res.status(402).json({
+      reply: 'Salon trenutno nima aktivne naročnine.',
+      bookingDetected: null
+    });
+  }
+
   if (salon.billing_period_start) {
     const billingStart = new Date(salon.billing_period_start);
     const now = new Date();
@@ -684,14 +823,41 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
   }
 
   if ((salon.chat_count || 0) >= plan.chatLimit) {
+    const isT = salon.plan === 'trial';
     return res.status(429).json({
-      reply: `Salon je dosegel mesečni limit sporočil. Za nadaljevanje prosimo kontaktirajte lastnika salona.`,
-      bookingDetected: null
+      reply: isT
+        ? 'Vaš brezplačni preizkus je končan (20 sporočil). Všeč vam je? Nadaljujte na bookwell.si'
+        : 'Salon je dosegel mesečni limit sporočil. Kontaktirajte lastnika salona.',
+      bookingDetected: null,
+      trialEnded: isT
     });
   }
 
   await pool.query('UPDATE salons SET chat_count = chat_count + 1 WHERE id = $1', [actualSalonId]);
 
+  const usage = (salon.chat_count || 0) + 1;
+  const limit = plan.chatLimit;
+
+  if (usage === Math.floor(limit * 0.8)) {
+    await sgMail.send({
+      to: salon.notification_email,
+      from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
+      subject: 'BookWell — 80% mesečnih sporočil porabljenih',
+      html: `
+        <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:20px;">
+          <div style="background:#0a0a0a;padding:24px;text-align:center;">
+            <h1 style="color:#c9984a;margin:0;font-size:22px;">BookWell</h1>
+          </div>
+          <div style="background:#fff;padding:32px;border:1px solid #e0e0e0;border-top:none;">
+            <p style="font-size:15px;margin:0 0 16px;">⚠️ Porabili ste <strong>${usage}/${limit}</strong> sporočil ta mesec.</p>
+            <p style="font-size:13px;color:#666;line-height:1.6;">Pri ${limit} sporočilih bo chat začasno onemogočen do naslednjega obračunskega obdobja.</p>
+            <p style="font-size:13px;color:#666;margin-top:12px;">Razmislite o nadgradnji paketa na <a href="https://bookwell.si/#pricing" style="color:#c9984a;">bookwell.si</a>.</p>
+          </div>
+        </div>
+      `
+    }).catch(e => console.error('❌ 80% email napaka:', e.message));
+  }
+  // ─────────────────────────────────────────────────────────────────────────
   const todayLj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
   const nextWeek = new Date(todayLj.getTime() + 7 * 24 * 60 * 60 * 1000);
   const { rows: busySlots } = await pool.query(
@@ -1275,6 +1441,23 @@ function buildChatPage(salon) {
         } else {
           addBotMsg(data.reply);
           if (data.reply && data.reply.trim()) messages.push({ role: 'assistant', content: data.reply });
+          if (data.trialEnded) {
+            setTimeout(() => {
+              const msgs = document.getElementById('messages');
+              const div = document.createElement('div');
+              div.className = 'msg bot';
+              div.innerHTML = \`
+                <div style="background:#0a0a0a;border-radius:16px;padding:20px;max-width:280px;">
+                  <div style="color:#c9a84c;font-size:13px;font-weight:700;margin-bottom:8px;">Preizkus končan 🎉</div>
+                  <div style="color:rgba(255,255,255,.7);font-size:12px;line-height:1.6;margin-bottom:16px;">Všeč vam je? Začnite za samo 29.99€/mes — brez omejitev.</div>
+                  <a href="https://bookwell.si/#pricing" style="display:block;background:#c9984a;color:#0a0a0a;padding:10px 16px;text-decoration:none;font-size:12px;font-weight:700;text-align:center;border-radius:8px;">Nadgradite zdaj →</a>
+                </div>
+                <div class="msg-time">\` + getTime() + \`</div>
+              \`;
+              msgs.appendChild(div);
+              msgs.scrollTop = msgs.scrollHeight;
+            }, 500);
+          }
         }
       } catch(e) {
         removeTyping();
@@ -1877,7 +2060,7 @@ app.post('/cancel/:token', async (req, res) => {
     try {
       await sgMail.send({
         to: slot.notification_email,
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
+        from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
         subject: `❌ Odpoved rezervacije - ${slot.salon_name} (${dateFormatted} ${slot.time})`,
         html: `
           <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#2d2520;">
@@ -1956,7 +2139,7 @@ app.post('/api/gdpr/request', gdprLimiter, async (req, res) => {
   try {
     await sgMail.send({
       to: email,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@bookwell.si',
+      from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
       subject: `BookWell — Potrdite GDPR zahtevek`,
       html: `
         <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:20px;">
