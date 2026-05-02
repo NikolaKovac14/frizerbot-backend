@@ -2243,6 +2243,10 @@ app.get('/robots.txt', (req, res) => {
   res.sendFile(__dirname + '/robots.txt');
 });
 
+app.get('/google8ff95608da7fc974.html', (req, res) => {
+  res.sendFile(__dirname + '/google8ff95608da7fc974.html');
+});
+
 app.use((req, res) => {
   res.status(404).sendFile(__dirname + '/404.html');
 }); 
