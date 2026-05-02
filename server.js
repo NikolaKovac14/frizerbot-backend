@@ -910,8 +910,12 @@ app.post('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
     const slotsNeeded = Math.ceil(duration / 30);
     for (let i = 1; i < slotsNeeded; i++) {
       const extraTime = addMinutesToTime(time, i * 30);
-      await pool.query(`INSERT INTO timeslots (salon_id,date,time,status,customer_name,customer_email,service) VALUES ($1,$2,$3,'busy',$4,$5,$6) ON CONFLICT (salon_id,date,time) DO NOTHING`,
-        [salonId, date, extraTime, customerName, cleanEmail, '(' + (service || '') + ')']);
+      // ✅ POPRAVKA: Dodaj booked_by='manual' 
+      await pool.query(`
+        INSERT INTO timeslots (salon_id,date,time,status,customer_name,customer_email,service,booked_by) 
+        VALUES ($1,$2,$3,'busy',$4,$5,$6,'manual') 
+        ON CONFLICT (salon_id,date,time) DO NOTHING
+      `, [salonId, date, extraTime, customerName, cleanEmail, '(' + (service || '') + ')']);
     }
   } else {
     const { rows: slotToDelete } = await pool.query('SELECT customer_email FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3', [salonId, date, time]);
@@ -967,8 +971,12 @@ app.post('/booking', async (req, res) => {
   const slotsNeeded = Math.ceil(duration / 30);
   for (let i = 1; i < slotsNeeded; i++) {
     const extraTime = addMinutesToTime(time, i * 30);
-    await pool.query(`INSERT INTO timeslots (salon_id,date,time,status,customer_name,customer_email,customer_phone,service) VALUES ($1,$2,$3,'busy',$4,$5,$6,$7) ON CONFLICT (salon_id,date,time) DO NOTHING`,
-      [salon.id, date, extraTime, customerName, customerEmail || '', customerPhone || '', '(' + service + ')']);
+    // ✅ POPRAVKA: Ne rabis booked_by='bot' (ker je manual), ampak je bolje pustiti prazno ali 'manual'
+    await pool.query(`
+      INSERT INTO timeslots (salon_id,date,time,status,customer_name,customer_email,customer_phone,service,booked_by) 
+      VALUES ($1,$2,$3,'busy',$4,$5,$6,$7,'manual') 
+      ON CONFLICT (salon_id,date,time) DO NOTHING
+    `, [salon.id, date, extraTime, customerName, customerEmail || '', customerPhone || '', '(' + service + ')']);
   }
   if (salon.notification_email) await sendNotificationToSalon(salon, customerName, customerEmail || '', customerPhone || '', date, service, time);
   res.json({ success: true });
@@ -1128,8 +1136,13 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
       const slotsNeeded = Math.ceil(duration / 30);
       for (let i = 1; i < slotsNeeded; i++) {
         const extraTime = addMinutesToTime(booking.time, i * 30);
-        await pool.query(`INSERT INTO timeslots (salon_id,date,time,status,customer_name,customer_email,customer_phone,service) VALUES ($1,$2,$3,'busy',$4,$5,$6,$7) ON CONFLICT (salon_id,date,time) DO NOTHING`,
-          [actualSalonId, booking.date, extraTime, finalName, finalEmail, finalPhone, '(' + finalService + ')']);
+        // ✅ POPRAVKA: Dodaj booked_by='bot' in naredi UPDATE če obstaja
+        await pool.query(`
+          INSERT INTO timeslots (salon_id,date,time,status,customer_name,customer_email,customer_phone,service,booked_by) 
+          VALUES ($1,$2,$3,'busy',$4,$5,$6,$7,'bot') 
+          ON CONFLICT (salon_id,date,time) DO UPDATE 
+          SET booked_by='bot', service=$7
+        `, [actualSalonId, booking.date, extraTime, finalName, finalEmail, finalPhone, '(' + finalService + ')']);
       }
       if (salon.notification_email) await sendNotificationToSalon(salon, finalName, finalEmail, finalPhone, booking.date, finalService, booking.time);
 
