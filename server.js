@@ -2283,12 +2283,8 @@ function buildAdminPage(salon) {
               <input class="modal-input" type="text" id="svc-name" placeholder="npr. Ženski haircut" />
             </div>
             <div>
-              <div class="modal-field-label">Cena min (€)</div>
-              <input class="modal-input" type="number" id="svc-min" placeholder="25" min="0" step="0.5" />
-            </div>
-            <div>
-              <div class="modal-field-label">Cena max (€)</div>
-              <input class="modal-input" type="number" id="svc-max" placeholder="45" min="0" step="0.5" />
+              <div class="modal-field-label">Cena (€)</div>
+              <input class="modal-input" type="number" id="svc-min" placeholder="35" min="0" step="0.5" />
             </div>
             <div>
               <div class="modal-field-label">Trajanje (min)</div>
@@ -2706,8 +2702,8 @@ function buildAdminPage(salon) {
       }
       el.innerHTML = '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:1px;background:#e0e0e0;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;">'
         + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Storitev</div>'
-        + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Cena min</div>'
-        + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Cena max</div>'
+        + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Cena</div>'
+        + '<div style="background:#f7f7f5;padding:8px 18px;"></div>'
         + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Trajanje</div>'
         + '<div style="background:#f7f7f5;padding:8px 18px;"></div>'
         + svcList.map(s => {
@@ -2715,7 +2711,7 @@ function buildAdminPage(salon) {
           return \`
             <div style="background:#fff;padding:12px 18px;font-size:13px;font-weight:500;color:#0a0a0a;display:flex;align-items:center;">\${s.name}</div>
             <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${parseFloat(s.min_price).toFixed(2)} €</div>
-            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${parseFloat(s.max_price).toFixed(2)} €</div>
+            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;"></div>
             <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${s.duration} min</div>
             <div style="background:#fff;padding:8px 12px;display:flex;align-items:center;gap:6px;">
               <button onclick="editService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#f7f7f5;border:1px solid #e0e0e0;cursor:pointer;color:#444;font-family:system-ui,sans-serif;">Uredi</button>
@@ -2734,12 +2730,10 @@ function buildAdminPage(salon) {
       const err = document.getElementById('svc-err');
       err.style.display = 'none';
       if (!name || !min || !max || !dur) { err.textContent = 'Izpolnite vsa polja.'; err.style.display = 'block'; return; }
-      if (parseFloat(min) > parseFloat(max)) { err.textContent = 'Min cena ne sme biti večja od max cene.'; err.style.display = 'block'; return; }
       const res = await fetch(API_URL + '/admin/' + SALON_ID + '/services', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ name, minPrice: min, maxPrice: max, duration: dur })
-      });
+        body: JSON.stringify({ name, minPrice: min, maxPrice: min, duration: dur })
       const data = await res.json();
       if (data.success) {
         document.getElementById('svc-name').value = '';
