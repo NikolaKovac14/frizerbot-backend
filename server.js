@@ -244,6 +244,48 @@ function scheduleToText(schedule) {
     return name + ': ' + d.from + ' - ' + d.to;
   }).join('\n');
 }
+
+function parseServices(servicesText) {
+  const services = [];
+  if (!servicesText) return services;
+  
+  const lines = servicesText.split('\n').filter(l => l.trim().startsWith('-'));
+  
+  lines.forEach(line => {
+    const cleaned = line.replace(/^-\s*/, '').trim();
+    const nameMatch = cleaned.match(/^([^:]+):\s*(.+)$/);
+    if (!nameMatch) return;
+    
+    const name = nameMatch[1].trim();
+    const rest = nameMatch[2].trim();
+    
+    const priceMatch = rest.match(/(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)\s*(EUR|€)/i);
+    let minPrice = 0, maxPrice = 0;
+    if (priceMatch) {
+      minPrice = parseFloat(priceMatch[1].replace(',', '.'));
+      maxPrice = parseFloat(priceMatch[2].replace(',', '.'));
+    }
+    
+    const durationMatch = rest.match(/\[(\d+)min\]/i);
+    let duration = 30;
+    if (durationMatch) {
+      duration = parseInt(durationMatch[1]);
+    }
+    
+    services.push({
+      name,
+      minPrice,
+      maxPrice,
+      duration,
+      displayPrice: minPrice === maxPrice 
+        ? `${maxPrice.toFixed(2)}€`
+        : `${minPrice.toFixed(2)}-${maxPrice.toFixed(2)}€`,
+      displayName: `${name} — ${minPrice === maxPrice ? maxPrice.toFixed(2) : minPrice + '-' + maxPrice}€ [${duration}min]`
+    });
+  });
+  
+  return services;
+}
 function convertToCSV(data) {
   const rows = [];
   
@@ -377,6 +419,21 @@ async function initDB() {
       expires_at TIMESTAMP NOT NULL,
       used BOOLEAN DEFAULT false,
       created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS services (
+      id SERIAL PRIMARY KEY,
+      salon_id TEXT REFERENCES salons(id),
+      name TEXT NOT NULL,
+      min_price DECIMAL(10,2),
+      max_price DECIMAL(10,2),
+      duration INTEGER DEFAULT 30,
+      position INTEGER DEFAULT 0,
+      active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(salon_id, name)
     )
   `);
 
@@ -927,6 +984,118 @@ app.post('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
   }
   res.json({ success: true });
 }); 
+
+
+// GET: Vse storitve salona
+app.get('/admin/:id/services', requireAdminAuth, async (req, res) => {
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salonId = salonRows[0]?.id;
+  if (!salonId) return res.status(404).json({ error: 'Not found' });
+  
+  const { rows } = await pool.query(
+    'SELECT id, name, min_price, max_price, duration FROM services WHERE salon_id = $1 AND active = true ORDER BY position, created_at',
+    [salonId]
+  );
+  res.json(rows);
+});
+
+// POST: Dodaj novo storitev
+app.post('/admin/:id/services', requireAdminAuth, async (req, res) => {
+  const { name, minPrice, maxPrice, duration } = req.body;
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salonId = salonRows[0]?.id;
+  if (!salonId) return res.status(404).json({ error: 'Not found' });
+  
+  if (!name || !minPrice || !maxPrice || !duration) {
+    return res.status(400).json({ error: 'Manjkajo podatki' });
+  }
+  
+  if (isNaN(minPrice) || isNaN(maxPrice) || isNaN(duration)) {
+    return res.status(400).json({ error: 'Nevaljana števila' });
+  }
+  
+  try {
+    const { rows } = await pool.query(`
+      INSERT INTO services (salon_id, name, min_price, max_price, duration, position)
+      VALUES ($1, $2, $3, $4, $5, (SELECT COALESCE(MAX(position), 0) + 1 FROM services WHERE salon_id = $1))
+      RETURNING id, name, min_price, max_price, duration
+    `, [salonId, name, parseFloat(minPrice), parseFloat(maxPrice), parseInt(duration)]);
+    
+    res.json({ success: true, service: rows[0] });
+  } catch (err) {
+    if (err.code === '23505') { // UNIQUE violation
+      return res.status(409).json({ error: 'Ta storitev že obstaja' });
+    }
+    console.error('❌ Services POST napaka:', err.message);
+    res.status(500).json({ error: 'Napaka pri dodajanju storitve' });
+  }
+});
+
+// PUT: Uredi storitev
+app.put('/admin/:id/services/:serviceId', requireAdminAuth, async (req, res) => {
+  const { name, minPrice, maxPrice, duration } = req.body;
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salonId = salonRows[0]?.id;
+  if (!salonId) return res.status(404).json({ error: 'Not found' });
+  
+  if (!name || !minPrice || !maxPrice || !duration) {
+    return res.status(400).json({ error: 'Manjkajo podatki' });
+  }
+  
+  const { rows } = await pool.query(`
+    UPDATE services SET name=$1, min_price=$2, max_price=$3, duration=$4
+    WHERE id=$5 AND salon_id=$6
+    RETURNING id, name, min_price, max_price, duration
+  `, [name, parseFloat(minPrice), parseFloat(maxPrice), parseInt(duration), req.params.serviceId, salonId]);
+  
+  if (!rows[0]) return res.status(404).json({ error: 'Storitev ne obstaja' });
+  res.json({ success: true, service: rows[0] });
+});
+
+// DELETE: Izbriši storitev
+app.delete('/admin/:id/services/:serviceId', requireAdminAuth, async (req, res) => {
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salonId = salonRows[0]?.id;
+  if (!salonId) return res.status(404).json({ error: 'Not found' });
+  
+  await pool.query('DELETE FROM services WHERE id = $1 AND salon_id = $2', [req.params.serviceId, salonId]);
+  res.json({ success: true });
+});
+
+// GET: Storitve za booking portal
+app.get('/api/book/:slug/services', async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT id, name, min_price, max_price, duration FROM services WHERE salon_id = (SELECT id FROM salons WHERE (id = $1 OR slug = $1) AND active = true) AND active = true ORDER BY position, created_at',
+    [req.params.slug]
+  );
+  
+  if (!rows.length) {
+    // Fallback: stare storitve iz salon.services teksta
+    const { rows: salons } = await pool.query(
+      'SELECT services FROM salons WHERE (id = $1 OR slug = $1) AND active = true',
+      [req.params.slug]
+    );
+    const salon = salons[0];
+    if (!salon) return res.status(404).json({ error: 'Not found' });
+    // Parsiraj staro formato
+    const oldServices = parseServices(salon.services);
+    return res.json({ services: oldServices });
+  }
+  
+  const services = rows.map(s => ({
+    id: s.id,
+    name: s.name,
+    minPrice: parseFloat(s.min_price),
+    maxPrice: parseFloat(s.max_price),
+    duration: s.duration,
+    displayPrice: parseFloat(s.min_price) === parseFloat(s.max_price)
+      ? `${parseFloat(s.max_price).toFixed(2)}€`
+      : `${parseFloat(s.min_price).toFixed(2)}-${parseFloat(s.max_price).toFixed(2)}€`,
+    displayName: `${s.name} — ${parseFloat(s.min_price) === parseFloat(s.max_price) ? parseFloat(s.max_price).toFixed(2) : parseFloat(s.min_price).toFixed(2) + '-' + parseFloat(s.max_price).toFixed(2)}€ [${s.duration}min]`
+  }));
+  
+  res.json({ services });
+});
 
 // ─── SCHEDULE ─────────────────────────────────────────────────────────────────
 app.get('/admin/:id/schedule', requireAdminAuth, async (req, res) => {
@@ -1506,6 +1675,109 @@ function buildLoginPage(salon) {
         err.style.display = 'block';
       }
     }
+
+    // ─── STORITVE ──────────────────────────────────────────────────────────────
+    let svcList = [];
+
+    async function loadServices() {
+      const res = await fetch(API_URL + '/admin/' + SALON_ID + '/services');
+      if (!res.ok) return;
+      svcList = await res.json();
+      renderServices();
+    }
+
+    function renderServices() {
+      const el = document.getElementById('svc-list');
+      if (!svcList.length) {
+        el.innerHTML = '<div style="padding:28px;font-size:13px;color:#aaa;font-style:italic;text-align:center;">Ni storitev. Dodajte prvo storitev zgoraj.</div>';
+        return;
+      }
+      el.innerHTML = '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:1px;background:#e0e0e0;border-left:1px solid #e0e0e0;border-right:1px solid #e0e0e0;">'
+        + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Storitev</div>'
+        + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Cena min</div>'
+        + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Cena max</div>'
+        + '<div style="background:#f7f7f5;padding:8px 18px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#aaa;">Trajanje</div>'
+        + '<div style="background:#f7f7f5;padding:8px 18px;"></div>'
+        + svcList.map(s => {
+          const isEditing = document.getElementById('svc-edit-' + s.id);
+          return \`
+            <div style="background:#fff;padding:12px 18px;font-size:13px;font-weight:500;color:#0a0a0a;display:flex;align-items:center;">\${s.name}</div>
+            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${parseFloat(s.min_price).toFixed(2)} €</div>
+            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${parseFloat(s.max_price).toFixed(2)} €</div>
+            <div style="background:#fff;padding:12px 18px;font-size:13px;color:#444;display:flex;align-items:center;">\${s.duration} min</div>
+            <div style="background:#fff;padding:8px 12px;display:flex;align-items:center;gap:6px;">
+              <button onclick="editService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#f7f7f5;border:1px solid #e0e0e0;cursor:pointer;color:#444;font-family:system-ui,sans-serif;">Uredi</button>
+              <button onclick="deleteService(\${s.id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#fff;border:1px solid #fca5a5;cursor:pointer;color:#dc2626;font-family:system-ui,sans-serif;">Briši</button>
+            </div>
+          \`;
+        }).join('')
+        + '</div>';
+    }
+
+    async function addService() {
+      const name = document.getElementById('svc-name').value.trim();
+      const min = document.getElementById('svc-min').value;
+      const max = document.getElementById('svc-max').value;
+      const dur = document.getElementById('svc-dur').value;
+      const err = document.getElementById('svc-err');
+      err.style.display = 'none';
+      if (!name || !min || !max || !dur) { err.textContent = 'Izpolnite vsa polja.'; err.style.display = 'block'; return; }
+      if (parseFloat(min) > parseFloat(max)) { err.textContent = 'Min cena ne sme biti večja od max cene.'; err.style.display = 'block'; return; }
+      const res = await fetch(API_URL + '/admin/' + SALON_ID + '/services', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name, minPrice: min, maxPrice: max, duration: dur })
+      });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('svc-name').value = '';
+        document.getElementById('svc-min').value = '';
+        document.getElementById('svc-max').value = '';
+        document.getElementById('svc-dur').value = '30';
+        showSvcMsg();
+        loadServices();
+      } else {
+        err.textContent = data.error || 'Napaka pri dodajanju.';
+        err.style.display = 'block';
+      }
+    }
+
+    function editService(id) {
+      const s = svcList.find(x => x.id === id);
+      if (!s) return;
+      const name = prompt('Ime storitve:', s.name);
+      if (name === null) return;
+      const min = prompt('Min cena (€):', parseFloat(s.min_price).toFixed(2));
+      if (min === null) return;
+      const max = prompt('Max cena (€):', parseFloat(s.max_price).toFixed(2));
+      if (max === null) return;
+      const dur = prompt('Trajanje (min) — npr. 15, 30, 45, 60, 90, 120:', s.duration);
+      if (dur === null) return;
+      fetch(API_URL + '/admin/' + SALON_ID + '/services/' + id, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name, minPrice: min, maxPrice: max, duration: dur })
+      }).then(r => r.json()).then(data => {
+        if (data.success) { showSvcMsg(); loadServices(); }
+        else alert(data.error || 'Napaka pri urejanju.');
+      });
+    }
+
+    async function deleteService(id) {
+      const s = svcList.find(x => x.id === id);
+      if (!s || !confirm('Izbriši storitev "' + s.name + '"?')) return;
+      await fetch(API_URL + '/admin/' + SALON_ID + '/services/' + id, { method: 'DELETE' });
+      showSvcMsg();
+      loadServices();
+    }
+
+    function showSvcMsg() {
+      const msg = document.getElementById('svc-save-msg');
+      msg.style.display = 'block';
+      setTimeout(() => msg.style.display = 'none', 2500);
+    }
+
+    loadServices();
   </script>
 </body>
 </html>`;
@@ -2055,6 +2327,7 @@ function buildAdminPage(salon) {
   <nav class="nav">
     <div class="nav-tab active" onclick="switchTab('termini')">Termini</div>
     <div class="nav-tab" onclick="switchTab('urnik')">Delovni čas</div>
+    <div class="nav-tab" onclick="switchTab('storitve')">Storitve</div>
     <div class="nav-tab" onclick="switchTab('nastavitve')">Nastavitve</div>
   </nav>
   <div class="tab-content active" id="tab-termini">
@@ -2081,6 +2354,53 @@ function buildAdminPage(salon) {
         <div class="schedule-footer">
           <div class="save-msg" id="save-msg">&#10003; &nbsp;Shranjeno</div>
           <button class="save-btn" onclick="saveSchedule()">Shrani spremembe</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tab-content" id="tab-storitve">
+    <div class="page">
+      <div class="schedule-card">
+        <div class="schedule-head">
+          <div><div class="schedule-head-title">Storitve</div></div>
+          <div class="schedule-head-sub">Upravljanje storitev</div>
+        </div>
+        <div style="padding:24px 28px;border-bottom:1px solid #e0e0e0;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:14px;">Dodaj novo storitev</div>
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end;">
+            <div>
+              <div class="modal-field-label">Ime storitve</div>
+              <input class="modal-input" type="text" id="svc-name" placeholder="npr. Ženski haircut" />
+            </div>
+            <div>
+              <div class="modal-field-label">Cena min (€)</div>
+              <input class="modal-input" type="number" id="svc-min" placeholder="25" min="0" step="0.5" />
+            </div>
+            <div>
+              <div class="modal-field-label">Cena max (€)</div>
+              <input class="modal-input" type="number" id="svc-max" placeholder="45" min="0" step="0.5" />
+            </div>
+            <div>
+              <div class="modal-field-label">Trajanje (min)</div>
+              <select class="modal-input" id="svc-dur">
+                <option value="15">15 min</option>
+                <option value="30" selected>30 min</option>
+                <option value="45">45 min</option>
+                <option value="60">60 min</option>
+                <option value="90">90 min</option>
+                <option value="120">120 min</option>
+              </select>
+            </div>
+            <button class="save-btn" style="padding:9px 20px;white-space:nowrap;" onclick="addService()">+ Dodaj</button>
+          </div>
+          <div id="svc-err" style="display:none;font-size:12px;color:#dc2626;margin-top:8px;"></div>
+        </div>
+        <div id="svc-list" style="min-height:80px;">
+          <div style="padding:24px 28px;font-size:13px;color:#aaa;font-style:italic;">Nalagam storitve...</div>
+        </div>
+        <div style="padding:14px 28px;border-top:1px solid #e0e0e0;display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:11px;color:#aaa;">Storitve so prikazane strankam v booking portalu kot dropdown.</div>
+          <div id="svc-save-msg" style="display:none;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#2a7a2a;">✓ Shranjeno</div>
         </div>
       </div>
     </div>
@@ -2226,6 +2546,7 @@ function buildAdminPage(salon) {
     function getDayKey(d) { return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()]; }
 
     function switchTab(name) {
+      document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik','storitve','nastavitve'][i] === name));    function switchTab(name) {
       document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik','nastavitve'][i] === name));
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');

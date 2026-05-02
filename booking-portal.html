@@ -80,6 +80,21 @@
     .modal-btn.primary:hover { background: #222; }
     .modal-err { font-size: 12px; color: #dc2626; margin-top: 8px; display: none; }
 
+    /* SELECT STYLING */
+    select.field-input {
+      appearance: none;
+      background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Cpath fill=%22%23666%22 d=%22M4.5 6L8 10l3.5-4z%22/%3E%3C/svg%3E');
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 14px;
+      padding-right: 32px;
+    }
+    select.field-input:focus {
+      outline: none;
+      border-color: var(--black);
+      background-color: var(--white);
+    }
+
     .loading { text-align: center; padding: 60px; color: var(--muted); font-size: 13px; }
 
     @media (max-width: 600px) {
@@ -157,8 +172,11 @@
       </div>
       <div class="modal-field">
         <label class="field-label">Storitev</label>
-        <input class="field-input" type="text" id="modalService" placeholder="npr. Ženski haircut" />
+        <select class="field-input" id="modalService" style="cursor:pointer;">
+          <option value="">— Izberi storitev —</option>
+        </select>
       </div>
+      <div style="font-size:11px;color:#888;margin-top:4px;" id="modalServiceHint"></div>
       <div class="modal-err" id="modalErr"></div>
       <div class="modal-actions">
         <button class="modal-btn" onclick="closeModal()">Preklic</button>
@@ -172,6 +190,7 @@
   const slug = location.pathname.split('/book/')[1]?.split('/')[0];
   let selectedDate = null, selectedTime = null;
   let salonData = null;
+  let services = [];
 
   // Init
   async function init() {
@@ -184,6 +203,11 @@
     document.getElementById('headerEmail').textContent = data.email || '';
     document.getElementById('salonInfo').textContent = '📍 ' + data.salon.address + '  ·  📞 ' + data.salon.phone;
     document.getElementById('logoutLink').href = `/book/${slug}/logout`;
+
+    // Naloži storitve
+    const servicesRes = await fetch(`/api/book/${slug}/services`);
+    const servicesData = await servicesRes.json();
+    services = servicesData.services || [];
 
     // Check for expired link error
     if (location.search.includes('error=expired')) {
@@ -204,15 +228,19 @@
     const btn = document.getElementById('loginBtn');
     const ok = document.getElementById('loginOk');
     const err = document.getElementById('loginErr');
-    ok.style.display = 'none'; err.style.display = 'none';
+    ok.style.display = 'none';
+    err.style.display = 'none';
     if (!email) return;
-    btn.disabled = true; btn.textContent = 'Pošiljam...';
+    btn.disabled = true;
+    btn.textContent = 'Pošiljam...';
     const res = await fetch(`/book/${slug}/login`, {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ email })
     });
     const data = await res.json();
-    btn.disabled = false; btn.textContent = 'Pošlji prijavo →';
+    btn.disabled = false;
+    btn.textContent = 'Pošlji prijavo →';
     if (data.success) {
       ok.style.display = 'block';
       document.getElementById('loginEmail').value = '';
@@ -225,7 +253,10 @@
   // Load slots
   async function loadSlots() {
     const res = await fetch(`/api/book/${slug}/slots`);
-    if (res.status === 401) { location.reload(); return; }
+    if (res.status === 401) {
+      location.reload();
+      return;
+    }
     const data = await res.json();
 
     // My bookings
@@ -264,9 +295,10 @@
     `).join('');
   }
 
-  // Modal
+  // Modal - ISPRAVLJENA VERZIJA
   function openModal(date, dayName, time) {
-    selectedDate = date; selectedTime = time;
+    selectedDate = date;
+    selectedTime = time;
     document.getElementById('modalTime').textContent = time;
     document.getElementById('modalDate').textContent = dayName.toUpperCase();
     document.getElementById('modalErr').style.display = 'none';
@@ -274,11 +306,38 @@
     document.getElementById('modalEmailDisplay').textContent = salonData.email || 'ni vnešeno';
     document.getElementById('modalName').value = '';
     document.getElementById('modalPhone').value = '';
-    document.getElementById('modalService').value = '';
+    
+    // Popuni dropdown storitev
+    const serviceSelect = document.getElementById('modalService');
+    serviceSelect.innerHTML = '<option value="">— Izberi storitev —</option>';
+    services.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.name;
+      opt.textContent = s.displayName;
+      opt.dataset.duration = s.duration;
+      opt.dataset.price = s.minPrice === s.maxPrice ? s.maxPrice : `${s.minPrice}-${s.maxPrice}`;
+      serviceSelect.appendChild(opt);
+    });
+    
+    // Event za prikaz trajanja in cene
+    serviceSelect.onchange = () => {
+      const selected = serviceSelect.querySelector('option:checked');
+      const hint = document.getElementById('modalServiceHint');
+      if (selected.value) {
+        hint.textContent = `⏱ Trajanje: ${selected.dataset.duration} minut · 💰 Cena: ${selected.dataset.price}€`;
+        hint.style.color = '#16a34a';
+      } else {
+        hint.textContent = '';
+      }
+    };
+    
     document.getElementById('modalOverlay').classList.add('open');
     setTimeout(() => document.getElementById('modalName').focus(), 100);
   }
-  function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+  }
 
   async function doReserve() {
     const name = document.getElementById('modalName').value.trim();
@@ -286,10 +345,15 @@
     const service = document.getElementById('modalService').value.trim();
     const err = document.getElementById('modalErr');
     err.style.display = 'none';
-    if (!name || !service) { err.textContent = 'Vpišite ime in storitev.'; err.style.display = 'block'; return; }
+    if (!name || !service) {
+      err.textContent = 'Vpišite ime in izberi storitev.';
+      err.style.display = 'block';
+      return;
+    }
 
     const res = await fetch(`/api/book/${slug}/reserve`, {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ date: selectedDate, time: selectedTime, name, phone, service })
     });
     const data = await res.json();
@@ -303,8 +367,12 @@
   }
 
   // Keyboard
-  document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-  document.getElementById('modalOverlay').addEventListener('click', e => { if (e.target === document.getElementById('modalOverlay')) closeModal(); });
+  document.getElementById('loginEmail').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+  document.getElementById('modalOverlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modalOverlay')) closeModal();
+  });
 
   init();
 </script>
