@@ -699,7 +699,64 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.06);padding:
   <p class="fade-up fd2">Nastavitev traja 5 minut. Prva rezervacija bo prišla še danes.</p>
   <a href="#trial" class="btn-gold fade-up fd3">Začnite brezplačni preizkus</a>
 </section>
+<!-- ─── TRIAL SEKCIJA ─────────────────────────────────────────────────────── -->
+<section id="trial" style="padding:100px 6vw;background:#0a0a0a;position:relative;overflow:hidden;">
+  <div style="position:absolute;inset:0;background:radial-gradient(ellipse 600px 400px at 50% 50%,rgba(201,152,74,.07) 0%,transparent 70%);pointer-events:none;"></div>
+  <div style="max-width:560px;margin:0 auto;text-align:center;position:relative;">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#c9984a;margin-bottom:20px;display:flex;align-items:center;justify-content:center;gap:16px;">
+      <span style="display:block;width:36px;height:1px;background:#8c6830;"></span>
+      Brezplačni preizkus
+      <span style="display:block;width:36px;height:1px;background:#8c6830;"></span>
+    </div>
+    <h2 style="font-family:'Playfair Display',serif;font-size:clamp(28px,4vw,48px);font-weight:900;letter-spacing:-.02em;color:#fff;margin-bottom:14px;line-height:1.1;">
+      Preizkusite <em style="font-style:italic;color:#c9984a;font-weight:400;">brezplačno</em><br>na vašem salonu
+    </h2>
+    <p style="font-size:15px;color:rgba(255,255,255,.4);margin-bottom:44px;line-height:1.7;">
+      20 sporočil. Brez kreditne kartice. Vidite točno kako bo izgledalo za vaše stranke.
+    </p>
+    <div style="background:#111108;border:1px solid rgba(255,255,255,.08);padding:36px;text-align:left;">
+      <div id="trial-err" style="display:none;background:#fee2e2;border-left:3px solid #ef4444;padding:10px 14px;font-size:13px;color:#991b1b;margin-bottom:18px;"></div>
+      <div id="trial-ok" style="display:none;text-align:center;padding:20px 0;">
+        <div style="font-size:36px;margin-bottom:12px;">🎉</div>
+        <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px;">Preizkus je pripravljen!</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.5);line-height:1.7;margin-bottom:20px;">Poslali smo vam e-mail z vsemi linki.<br>Preverite mapo Prejeto.</div>
+        <div id="trial-links" style="display:flex;flex-direction:column;gap:10px;"></div>
+      </div>
+      <div id="trial-form">
+        <div style="margin-bottom:16px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:6px;">Ime salona</div>
+          <input id="trial-salon" type="text" placeholder="npr. Salon Maja" style="width:100%;padding:11px 14px;background:#1a1a14;border:1px solid rgba(255,255,255,.1);color:#fff;font-size:14px;font-family:'DM Sans',sans-serif;outline:none;transition:border .2s;" onfocus="this.style.borderColor='rgba(201,152,74,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" />
+        </div>
+        <div style="margin-bottom:24px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:6px;">E-poštni naslov</div>
+          <input id="trial-email" type="email" placeholder="vas@email.com" style="width:100%;padding:11px 14px;background:#1a1a14;border:1px solid rgba(255,255,255,.1);color:#fff;font-size:14px;font-family:'DM Sans',sans-serif;outline:none;transition:border .2s;" onfocus="this.style.borderColor='rgba(201,152,74,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" />
+        </div>
+        <button onclick="startTrial()" id="trial-btn" style="width:100%;padding:14px;background:#c9984a;border:none;color:#0a0a0a;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background .2s;">
+          Začni brezplačni preizkus →
+        </button>
+        <p style="margin:14px 0 0;font-size:11px;color:rgba(255,255,255,.2);text-align:center;line-height:1.6;">
+          Brez kreditne kartice · 20 sporočil · Takoj dostopno
+        </p>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:28px;margin-top:32px;flex-wrap:wrap;">
+      <div style="font-size:11px;color:rgba(255,255,255,.2);display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;">✓</span> Brez kreditne kartice</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.2);display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;">✓</span> Nastavitev v 2 minutah</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.2);display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;">✓</span> 20 pravih sporočil</div>
+    </div>
+  </div>
+</section>
 
+<!-- ─── WHATSAPP GUMB ──────────────────────────────────────────────────────── -->
+<a href="https://wa.me/38670772363?text=Pozdravljeni%2C%20zanima%20me%20BookWell%20za%20moj%20salon."
+   target="_blank"
+   style="position:fixed;bottom:28px;right:28px;z-index:999;background:#25d366;width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(37,211,102,.4);transition:transform .2s,box-shadow .2s;text-decoration:none;"
+   onmouseover="this.style.transform='scale(1.1)'"
+   onmouseout="this.style.transform='scale(1)'">
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+  </svg>
+</a>
 <footer>
   <div class="foot-logo">Book<span>Well</span></div>
   <div class="foot-copy">© 2026 BookWell.si — Vse pravice pridržane</div>
@@ -998,6 +1055,47 @@ window.addEventListener('load', () => {
     applyConsent(consent);
   }
 });
+/* ── TRIAL ── */
+async function startTrial() {
+  const salonName = document.getElementById('trial-salon').value.trim();
+  const email = document.getElementById('trial-email').value.trim();
+  const err = document.getElementById('trial-err');
+  const btn = document.getElementById('trial-btn');
+  err.style.display = 'none';
+  if (!salonName || !email) { err.textContent = 'Izpolnite vsa polja.'; err.style.display = 'block'; return; }
+  btn.textContent = 'Ustvarjamo...';
+  btn.style.opacity = '0.7';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/trial', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, salonName })
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('trial-form').style.display = 'none';
+      document.getElementById('trial-ok').style.display = 'block';
+      document.getElementById('trial-links').innerHTML =
+        '<a href="' + data.adminUrl + '" target="_blank" style="display:block;background:#0a0a0a;color:#c9984a;padding:13px 20px;text-decoration:none;font-weight:700;font-size:12px;text-align:center;letter-spacing:.08em;border:1px solid rgba(201,152,74,.3);">→ Odpri Admin Panel</a>' +
+        '<a href="' + data.chatUrl + '" target="_blank" style="display:block;background:#111108;color:rgba(255,255,255,.6);padding:12px 20px;text-decoration:none;font-size:12px;text-align:center;border:1px solid rgba(255,255,255,.08);">→ Preizkusi Chat</a>';
+    } else {
+      err.textContent = data.error || 'Napaka. Poskusite znova.';
+      err.style.display = 'block';
+      btn.textContent = 'Začni brezplačni preizkus →';
+      btn.style.opacity = '1';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    err.textContent = 'Napaka pri povezavi. Poskusite znova.';
+    err.style.display = 'block';
+    btn.textContent = 'Začni brezplačni preizkus →';
+    btn.style.opacity = '1';
+    btn.disabled = false;
+  }
+}
+document.getElementById('trial-email')?.addEventListener('keydown', e => { if(e.key==='Enter') startTrial(); });
+document.getElementById('trial-salon')?.addEventListener('keydown', e => { if(e.key==='Enter') startTrial(); });
 </script>
 </body>
 </html>
