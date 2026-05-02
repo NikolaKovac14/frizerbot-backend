@@ -2753,9 +2753,10 @@ function buildAdminPage(salon) {
       if (!s) return;
       const name = prompt('Ime storitve:', s.name);
       if (name === null) return;
-      const min = prompt('Cena (€):', parseFloat(s.min_price).toFixed(2));
+      const min = prompt('Min cena (€):', parseFloat(s.min_price).toFixed(2));
       if (min === null) return;
-      const max = min;
+      const max = prompt('Max cena (€):', parseFloat(s.max_price).toFixed(2));
+      if (max === null) return;
       const dur = prompt('Trajanje (min) — npr. 15, 30, 45, 60, 90, 120:', s.duration);
       if (dur === null) return;
       fetch(API_URL + '/admin/' + SALON_ID + '/services/' + id, {
