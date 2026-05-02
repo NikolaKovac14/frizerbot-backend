@@ -2115,7 +2115,24 @@ function buildAdminPage(salon) {
     .masthead-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: var(--black); padding: 12px 16px 12px 0; border-right: 1px solid var(--rule); white-space: nowrap; }
     .masthead-label { display: none; }
     .masthead-spacer { flex: 1; }
-    .masthead-link { display: flex; align-items: center; gap: 5px; padding: 0 10px; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-decoration: none; border-left: 1px solid var(--rule); white-space: nowrap; height: 52px; }
+    .masthead-link {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 10px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-decoration: none;
+      border-left: 1px solid var(--rule);
+      white-space: nowrap;
+      height: 52px;
+      overflow: hidden;       
+      text-overflow: ellipsis;   
+      max-width: 140px;         
+    }
     .masthead-link:hover { color: var(--black); }
     @media (max-width: 480px) {
       .masthead { padding: 0 12px; }
