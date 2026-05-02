@@ -859,7 +859,7 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
   }
   // ─────────────────────────────────────────────────────────────────────────
   const todayLj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
-  const nextWeek = new Date(todayLj.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const nextWeek = new Date(todayLj.getTime() + 60 * 24 * 60 * 60 * 1000);
   const { rows: busySlots } = await pool.query(
     "SELECT date, time FROM timeslots WHERE salon_id=$1 AND date>=$2 AND date<=$3 AND status='busy' ORDER BY date, time",
     [actualSalonId, todayLj.toISOString().split('T')[0], nextWeek.toISOString().split('T')[0]]
@@ -1692,6 +1692,26 @@ function buildAdminPage(salon) {
           <div style="font-family:'Playfair Display',serif;font-size:32px;font-weight:700;color:#0a0a0a;" id="s-chat-count">—</div>
           <div style="font-size:11px;color:#aaa;margin-top:4px;" id="s-chat-limit"></div>
         </div>
+        <div style="background:#f7f7f5;border-left:3px solid #0a0a0a;padding:16px 20px;margin-bottom:24px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:12px;">Vaši linki</div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:10px;color:#aaa;margin-bottom:4px;">CHAT (za AI rezervacije)</div>
+            <a id="link-chat" href="" target="_blank" style="font-size:12px;color:#c9984a;word-break:break-all;"></a>
+          </div>
+          <div style="margin-bottom:16px;">
+            <div style="font-size:10px;color:#aaa;margin-bottom:4px;">PORTAL (stranka se prijavi sama)</div>
+            <a id="link-portal" href="" target="_blank" style="font-size:12px;color:#c9984a;word-break:break-all;"></a>
+          </div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:6px;">Prilagodi URL (slug)</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span style="font-size:12px;color:#aaa;white-space:nowrap;">bookwell.si/salon/</span>
+            <input class="modal-input" type="text" id="s-slug" style="margin:0;flex:1;" placeholder="moj-salon" />
+            <button class="save-btn" style="padding:9px 16px;white-space:nowrap;" onclick="saveSlug()">Shrani</button>
+          </div>
+          <div id="slug-msg" style="display:none;font-size:11px;color:#2a7a2a;margin-top:6px;"></div>
+          <div id="slug-err" style="display:none;font-size:11px;color:#dc2626;margin-top:6px;"></div>
+          <div style="font-size:11px;color:#aaa;margin-top:6px;">Samo male črke, številke in pomišljaji. Npr: salon-ana</div>
+        </div>
         <div class="modal-field-label">Ime salona</div>
         <input class="modal-input" type="text" id="s-name" style="margin-bottom:14px;" />
         <div class="modal-field-label">Naslov</div>
@@ -1820,6 +1840,14 @@ function buildAdminPage(salon) {
       const limit = planLimits[data.plan] || 3000;
       document.getElementById('s-chat-count').textContent = (data.chat_count || 0) + ' sporočil';
       document.getElementById('s-chat-limit').textContent = 'Plan: ' + (data.plan || 'pro') + ' · Limit: ' + limit;
+      // Linki
+      const baseUrl = 'https://bookwell.si';
+      const slug = data.slug || data.id;
+      document.getElementById('link-chat').href = baseUrl + '/salon/' + slug;
+      document.getElementById('link-chat').textContent = baseUrl + '/salon/' + slug;
+      document.getElementById('link-portal').href = baseUrl + '/book/' + slug;
+      document.getElementById('link-portal').textContent = baseUrl + '/book/' + slug;
+      document.getElementById('s-slug').value = data.slug || '';
     }
 
     async function saveSettings() {
@@ -1839,6 +1867,27 @@ function buildAdminPage(salon) {
         const msg = document.getElementById('settings-saved');
         msg.style.display = 'block';
         setTimeout(() => msg.style.display = 'none', 2500);
+      }
+    }
+
+    async function saveSlug() {
+      const newSlug = document.getElementById('s-slug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      const msg = document.getElementById('slug-msg');
+      const err = document.getElementById('slug-err');
+      msg.style.display = 'none'; err.style.display = 'none';
+      if (!newSlug || newSlug.length < 3) { err.textContent = 'Slug mora biti vsaj 3 znake.'; err.style.display = 'block'; return; }
+      const res = await fetch(API_URL + '/admin/' + SALON_ID + '/slug', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ slug: newSlug })
+      });
+      const data = await res.json();
+      if (data.success) {
+        msg.textContent = '✓ Slug posodobljen. Novi linki so aktivni takoj.';
+        msg.style.display = 'block';
+        loadSettings();
+      } else {
+        err.textContent = data.error || 'Napaka.';
+        err.style.display = 'block';
       }
     }
 
@@ -2497,7 +2546,7 @@ app.get('/api/book/:slug/slots', async (req, res) => {
   if (!salon) return res.status(404).json({ error: 'Not found' });
 
   const todayLj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
-  const nextWeek = new Date(todayLj.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const nextWeek = new Date(todayLj.getTime() + 60 * 24 * 60 * 60 * 1000);
   const todayDateStr = todayLj.toISOString().split('T')[0];
   const currentHour = todayLj.getHours();
   const currentMinute = todayLj.getMinutes();
@@ -2556,6 +2605,20 @@ app.get('/book/:slug/logout', (req, res) => {
   req.session.customerEmail = null;
   req.session.customerSlug = null;
   res.redirect(`/book/${req.params.slug}`);
+});
+
+app.post('/admin/:id/slug', requireAdminAuth, async (req, res) => {
+  const { slug } = req.body;
+  if (!slug || slug.length < 3 || !/^[a-z0-9-]+$/.test(slug)) {
+    return res.status(400).json({ error: 'Neveljaven slug. Samo male črke, številke in pomišljaji.' });
+  }
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
+  const salonId = salonRows[0]?.id;
+  if (!salonId) return res.status(404).json({ error: 'Not found' });
+  const { rows: existing } = await pool.query('SELECT id FROM salons WHERE slug = $1 AND id != $2', [slug, salonId]);
+  if (existing.length) return res.status(409).json({ error: 'Ta slug je že zaseden. Izberite drugega.' });
+  await pool.query('UPDATE salons SET slug = $1 WHERE id = $2', [slug, salonId]);
+  res.json({ success: true });
 });
 
 
