@@ -143,6 +143,11 @@
     </div>
     <div class="modal-body">
       <div class="modal-field">
+        <label class="field-label">E-poštni naslov</label>
+        <input class="field-input" type="email" id="modalEmail" placeholder="vas@email.com" disabled style="opacity:.7;cursor:not-allowed;background:#f0f0f0;" />
+        <div style="font-size:11px;color:#888;margin-top:4px;">Prijavljen kot: <strong id="modalEmailDisplay"></strong></div>
+      </div>
+      <div class="modal-field">
         <label class="field-label">Ime in priimek</label>
         <input class="field-input" type="text" id="modalName" placeholder="Ana Novak" />
       </div>
@@ -152,7 +157,9 @@
       </div>
       <div class="modal-field">
         <label class="field-label">Storitev</label>
-        <input class="field-input" type="text" id="modalService" placeholder="npr. Ženski haircut" />
+        <select class="field-input" id="modalService" style="cursor:pointer;">
+          <option value="">-- Izberite storitev --</option>
+        </select>
       </div>
       <div class="modal-err" id="modalErr"></div>
       <div class="modal-actions">
@@ -166,11 +173,13 @@
 <script>
   const slug = location.pathname.split('/book/')[1]?.split('/')[0];
   let selectedDate = null, selectedTime = null;
+  let salonData = null;
 
   // Init
   async function init() {
     const res = await fetch(`/api/book/${slug}/info`);
     const data = await res.json();
+    salonData = data;
 
     document.getElementById('loginSalonName').textContent = data.salon.name;
     document.getElementById('headerSalonName').textContent = data.salon.name;
@@ -188,7 +197,33 @@
       document.getElementById('loginWrap').style.display = 'none';
       document.getElementById('portalWrap').style.display = 'block';
       loadSlots();
+      populateServices();
     }
+  }
+
+  // Populate services dropdown
+  function populateServices() {
+    const serviceSelect = document.getElementById('modalService');
+    if (!salonData?.salon?.services) return;
+
+    const services = [];
+    const lines = salonData.salon.services.split('\n');
+    lines.forEach(line => {
+      // Preberi samo linijo z naslovjenim storitve (npr "- Ženski haircut: 25-45 EUR")
+      const match = line.trim().match(/^-\s*([^:]+):/);
+      if (match) {
+        const serviceName = match[1].trim();
+        if (serviceName) services.push(serviceName);
+      }
+    });
+
+    // Dodaj v dropdown
+    services.forEach(service => {
+      const option = document.createElement('option');
+      option.value = service;
+      option.textContent = service;
+      serviceSelect.appendChild(option);
+    });
   }
 
   // Login
@@ -214,27 +249,6 @@
       err.style.display = 'block';
     }
   }
-
- async function saveSlug() {
-    const newSlug = document.getElementById('s-slug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    const msg = document.getElementById('slug-msg');
-    const err = document.getElementById('slug-err');
-    msg.style.display = 'none'; err.style.display = 'none';
-    if (!newSlug || newSlug.length < 3) { err.textContent = 'Slug mora biti vsaj 3 znake.'; err.style.display = 'block'; return; }
-    const res = await fetch(API_URL + '/admin/' + SALON_ID + '/slug', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ slug: newSlug })
-    });
-    const data = await res.json();
-    if (data.success) {
-    msg.textContent = '✓ Slug posodobljen. Novi linki so aktivni takoj.';
-    msg.style.display = 'block';
-    loadSettings();
-    } else {
-    err.textContent = data.error || 'Napaka.';
-    err.style.display = 'block';
-    }
- }
 
   // Load slots
   async function loadSlots() {
@@ -284,6 +298,8 @@
     document.getElementById('modalTime').textContent = time;
     document.getElementById('modalDate').textContent = dayName.toUpperCase();
     document.getElementById('modalErr').style.display = 'none';
+    document.getElementById('modalEmail').value = salonData.email || '';
+    document.getElementById('modalEmailDisplay').textContent = salonData.email || 'ni vnešeno';
     document.getElementById('modalName').value = '';
     document.getElementById('modalPhone').value = '';
     document.getElementById('modalService').value = '';
@@ -298,7 +314,7 @@
     const service = document.getElementById('modalService').value.trim();
     const err = document.getElementById('modalErr');
     err.style.display = 'none';
-    if (!name || !service) { err.textContent = 'Vpišite ime in storitev.'; err.style.display = 'block'; return; }
+    if (!name || !service) { err.textContent = 'Vpišite ime in izberite storitev.'; err.style.display = 'block'; return; }
 
     const res = await fetch(`/api/book/${slug}/reserve`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
