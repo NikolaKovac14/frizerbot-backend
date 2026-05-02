@@ -2247,6 +2247,18 @@ app.get('/google8ff95608da7fc974.html', (req, res) => {
   res.sendFile(__dirname + '/google8ff95608da7fc974.html');
 });
 
+app.get('/sitemap.xml', (req, res) => {
+  res.setHeader('Content-Type', 'application/xml');
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://bookwell.si/</loc><priority>1.0</priority></url>
+  <url><loc>https://bookwell.si/privacy</loc><priority>0.5</priority></url>
+  <url><loc>https://bookwell.si/terms</loc><priority>0.5</priority></url>
+  <url><loc>https://bookwell.si/dpa</loc><priority>0.3</priority></url>
+  <url><loc>https://bookwell.si/contact</loc><priority>0.6</priority></url>
+</urlset>`);
+});
+
 app.use((req, res) => {
   res.status(404).sendFile(__dirname + '/404.html');
 }); 
