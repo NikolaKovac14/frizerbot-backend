@@ -218,7 +218,11 @@ function generateHalfHourSlots(from, to) {
   return slots;
 }
 
-function parseServiceDuration(serviceName, servicesText) {
+function parseServiceDuration(serviceName, servicesText, durationMap) {
+  if (durationMap && serviceName) {
+    const found = durationMap[(serviceName || '').toLowerCase()];
+    if (found) return found;
+  }
   if (!serviceName || !servicesText) return 30;
   for (const line of (servicesText || '').split('\n')) {
     if (line.toLowerCase().includes((serviceName || '').toLowerCase())) {
@@ -963,7 +967,7 @@ app.post('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
       await sendConfirmationEmail(cleanEmail, customerName || 'Stranka', salon, date, time, service || '', cancelToken);
     }
     // Blokiraj extra termine
-    const duration = parseServiceDuration(service, salon.services);
+    const duration = parseServiceDuration(service, salon.services)
     const slotsNeeded = Math.ceil(duration / 30);
     for (let i = 1; i < slotsNeeded; i++) {
       const extraTime = addMinutesToTime(time, i * 30);
@@ -1136,7 +1140,7 @@ app.post('/booking', async (req, res) => {
     await sendConfirmationEmail(customerEmail, customerName, salon, date, time, service, cancelToken);
   }
 // Blokiraj extra termine za daljše storitve
-  const duration = parseServiceDuration(service, salon.services);
+  const duration = parseServiceDuration(service, salon.services)
   const slotsNeeded = Math.ceil(duration / 30);
   for (let i = 1; i < slotsNeeded; i++) {
     const extraTime = addMinutesToTime(time, i * 30);
@@ -1164,6 +1168,14 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
   if (!salon) return res.status(404).json({ error: 'Salon not found' });
 
   const actualSalonId = salon.id;
+
+  const { rows: svcRows } = await pool.query(
+    'SELECT name, duration FROM services WHERE salon_id = $1 AND active = true',
+    [salon.id]
+  );
+  const servicesDurationMap = {};
+  svcRows.forEach(s => { servicesDurationMap[s.name.toLowerCase()] = s.duration; });
+  salon._servicesDurationMap = servicesDurationMap;
 
   // ─── PLAN LIMIT CHECK ────────────────────────────────────────────────────────
   const plan = PLANS[salon.plan] || PLANS.pro;
@@ -1301,7 +1313,7 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
         await sendConfirmationEmail(finalEmail, finalName, salon, booking.date, booking.time, finalService, cancelToken);
       }
       // Blokiraj extra termine
-      const duration = parseServiceDuration(finalService, salon.services);
+      const duration = parseServiceDuration(finalService, salon.services, salon._servicesDurationMap)
       const slotsNeeded = Math.ceil(duration / 30);
       for (let i = 1; i < slotsNeeded; i++) {
         const extraTime = addMinutesToTime(booking.time, i * 30);
@@ -2546,8 +2558,7 @@ function buildAdminPage(salon) {
     function getDayKey(d) { return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()]; }
 
     function switchTab(name) {
-      document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik','storitve','nastavitve'][i] === name));    function switchTab(name) {
-      document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik','nastavitve'][i] === name));
+      document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik','storitve','nastavitve'][i] === name));
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
     }
@@ -3331,7 +3342,7 @@ app.post('/api/book/:slug/reserve', async (req, res) => {
     [salon.id, date, time, name, req.session.customerEmail, phone || '', service, cancelToken]);
   await sendConfirmationEmail(req.session.customerEmail, name, salon, date, time, service, cancelToken);
     // Blokiraj extra termine
-    const duration = parseServiceDuration(service, salon.services);
+    const duration = parseServiceDuration(service, salon.services)
     const slotsNeeded = Math.ceil(duration / 30);
     for (let i = 1; i < slotsNeeded; i++) {
       const extraTime = addMinutesToTime(time, i * 30);
