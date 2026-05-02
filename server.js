@@ -773,6 +773,7 @@ app.post('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
     }
   }
   res.json({ success: true });
+}); 
 
 // ─── SCHEDULE ─────────────────────────────────────────────────────────────────
 app.get('/admin/:id/schedule', requireAdminAuth, async (req, res) => {
