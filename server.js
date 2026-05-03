@@ -451,7 +451,7 @@ async function initDB() {
       INSERT INTO salons (id, name, address, phone, hours, services, notification_email, schedule, plan)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `, [
-      'salon_1', 'Salon Aurora', 'Copova 5, Ljubljana', '01 234 5678',
+      'salon_1', 'Salon Aurora', 'Čopova 5, Ljubljana', '01 234 5678',
       'Pon-Pet: 8:00-20:00, Sob: 8:00-14:00, Ned: zaprto',
       '- Žensko striženje: 25-45 EUR\n- Moško striženje: 15-20 EUR\n- Barvanje (celo): 60-120 EUR\n- Balayage/highlights: 80-150 EUR\n- Trajni kodri: 70-100 EUR\n- Frizura za posebne priložnosti: 40-65 EUR\n- Manikura: 20-30 EUR\n- Pedikura: 25-35 EUR',
       'salon@aurora.si',
