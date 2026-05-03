@@ -2151,23 +2151,13 @@ function buildAdminPage(salon) {
     @media (max-width: 600px) {
       .nav { display: none; }
       .mob-acc { display: block; }
-      .page { padding: 16px 6px; }
-      .schedule-card { overflow: hidden; }
-      .schedule-head { padding: 14px 12px; }
-      .day-row { padding: 8px 10px; gap: 8px; }
-      .day-name { width: 62px; font-size: 11px; flex-shrink: 0; }
-      .toggle-wrap { flex-shrink: 0; }
-      .day-times { gap: 3px; flex-shrink: 0; }
-      .day-times input[type=time] {
-        font-size: 11px;
-        padding: 3px 4px;
-        border: 1px solid var(--rule);
-        background: var(--off-white);
-        width: 68px;
-        -webkit-appearance: none;
-      }
-      .day-sep { margin: 0 1px; flex-shrink: 0; }
-      .schedule-footer { padding: 12px; }
+      .page { padding: 20px 12px; }
+      .schedule-head { padding: 16px 16px; }
+      .day-row { padding: 10px 12px; gap: 6px; }
+      .day-name { width: 72px; font-size: 12px; flex-shrink: 0; }
+      .day-times { gap: 4px; font-size: 12px; flex: 1; justify-content: flex-end; }
+      .day-times input[type=time] { padding: 4px 4px; font-size: 12px; width: 72px; }
+      .schedule-footer { padding: 14px 16px; }
     }
     @media (min-width: 601px) {
       .mob-acc { display: none; }
