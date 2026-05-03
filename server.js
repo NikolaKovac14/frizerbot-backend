@@ -2148,7 +2148,7 @@ function buildAdminPage(salon) {
       .masthead-link--desktop { display: none; }
       .masthead-link svg { display: none; }
     }
-      @media (max-width: 600px) {
+    @media (max-width: 600px) {
       .page { padding: 20px 12px; }
       .nav { padding: 0 8px; }
       .nav-tab { padding: 10px 12px; font-size: 10px; letter-spacing: 0.06em; }
@@ -2248,6 +2248,24 @@ function buildAdminPage(salon) {
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--rule); }
+    @media (max-width: 600px) {
+      .nav { display: none; }
+      .mob-acc { display: block; }
+    }
+    @media (min-width: 601px) {
+      .mob-acc { display: none; }
+    }
+    .mob-acc-item { border-bottom: 1px solid var(--rule); background: var(--white); }
+    .mob-acc-btn {
+      width: 100%; padding: 14px 16px; background: none; border: none;
+      font-family: system-ui, sans-serif; font-size: 11px; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; text-align: left;
+    }
+    .mob-acc-btn.active { color: var(--black); border-left: 3px solid var(--gold); padding-left: 13px; }
+    .mob-acc-arrow { font-size: 12px; transition: transform .2s; }
+    .mob-acc-btn.active .mob-acc-arrow { transform: rotate(180deg); }
   </style>
 </head>
 <body>
@@ -2266,6 +2284,12 @@ function buildAdminPage(salon) {
     <div class="nav-tab" onclick="switchTab('storitve')">Storitve</div>
     <div class="nav-tab" onclick="switchTab('nastavitve')">Nastavitve</div>
   </nav>
+  <div class="mob-acc" id="mob-acc">
+    <div class="mob-acc-item"><button class="mob-acc-btn active" onclick="mobToggle(this,'termini')">Termini <span class="mob-acc-arrow">▾</span></button></div>
+    <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'urnik')">Delovni čas <span class="mob-acc-arrow">▾</span></button></div>
+    <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'storitve')">Storitve <span class="mob-acc-arrow">▾</span></button></div>
+    <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'nastavitve')">Nastavitve <span class="mob-acc-arrow">▾</span></button></div>
+  </div>
   <div class="tab-content active" id="tab-termini">
     <div class="page">
       <div class="date-nav">
@@ -2364,8 +2388,8 @@ function buildAdminPage(salon) {
             <a id="link-portal" href="" target="_blank" style="font-size:12px;color:#c9984a;word-break:break-all;"></a>
           </div>
           <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:6px;">Prilagodi URL (slug)</div>
+          <div style="font-size:11px;color:#aaa;margin-bottom:6px;">bookwell.si/salon/</div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <span style="font-size:12px;color:#aaa;white-space:nowrap;">bookwell.si/salon/</span>
             <input class="modal-input" type="text" id="s-slug" style="margin:0;flex:1;" placeholder="moj-salon" />
             <button class="save-btn" style="padding:9px 16px;white-space:nowrap;" onclick="saveSlug()">Shrani</button>
           </div>
@@ -2439,6 +2463,12 @@ function buildAdminPage(salon) {
 
     const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
     const DAY_NAMES_SL = { mon:'Ponedeljek', tue:'Torek', wed:'Sreda', thu:'Četrtek', fri:'Petek', sat:'Sobota', sun:'Nedelja' };
+
+    function mobToggle(btn, name) {
+      document.querySelectorAll('.mob-acc-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      switchTab(name);
+    }
 
     async function changePassword() {
       const current = document.getElementById('pw-current').value;
