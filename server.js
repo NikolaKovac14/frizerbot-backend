@@ -2885,50 +2885,93 @@ function buildAdminPage(salon) {
     }
 
     function editService(id) {
-    const s = svcList.find(x => x.id === id);
-    if (!s) return;
-    
-    // Zapri morebitni drug edit
-    document.querySelectorAll('.svc-edit-row').forEach(el => el.remove());
-    document.querySelectorAll('.svc-row-' + id).forEach(el => el.style.display = '');
-    
-    const isMobile = window.innerWidth < 600;
-    const rowEls = document.querySelectorAll('.svc-row-' + id);
-    
-    const editHtml = \`
-      <div class="svc-edit-row" style="grid-column: 1 / -1; background:#f7f7f5;padding:16px 18px;border-bottom:1px solid #e0e0e0;display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end;">
-        <div>
-          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:4px;">Ime storitve</div>
-          <input class="modal-input" type="text" id="edit-name-\${id}" value="\${s.name}" style="margin:0;" />
+      const s = svcList.find(x => x.id === id);
+      if (!s) return;
+
+      const isMobile = window.innerWidth < 600;
+      
+      if (isMobile) {
+        document.getElementById('svc-mobile-modal')?.remove();
+        const modal = document.createElement('div');
+        modal.id = 'svc-mobile-modal';
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:flex-end;';
+        modal.innerHTML = \`
+          <div style="background:#fff;width:100%;padding:24px;border-radius:16px 16px 0 0;">
+            <div style="font-size:14px;font-weight:700;margin-bottom:20px;">Uredi storitev</div>
+            <div class="modal-field-label">Ime storitve</div>
+            <input class="modal-input" type="text" id="mob-edit-name" value="\${s.name}" style="margin-bottom:12px;" />
+            <div class="modal-field-label">Cena (€)</div>
+            <input class="modal-input" type="number" id="mob-edit-price" value="\${parseFloat(s.max_price).toFixed(2)}" step="0.5" min="0" style="margin-bottom:12px;" />
+            <div class="modal-field-label">Trajanje</div>
+            <select class="modal-input" id="mob-edit-dur" style="margin-bottom:20px;">
+              \${[15,30,45,60,90,120].map(v => \`<option value="\${v}" \${s.duration == v ? 'selected' : ''}>\${v} min</option>\`).join('')}
+            </select>
+            <div style="display:flex;gap:10px;">
+              <button class="save-btn" style="flex:1;padding:12px;" onclick="saveMobEdit(\${id})">Shrani</button>
+              <button onclick="document.getElementById('svc-mobile-modal').remove()" style="padding:12px 20px;background:#f7f7f5;border:1px solid #e0e0e0;font-family:system-ui,sans-serif;font-size:13px;cursor:pointer;">✕</button>
+            </div>
+          </div>
+        \`;
+        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+        document.body.appendChild(modal);
+        setTimeout(() => document.getElementById('mob-edit-name')?.focus(), 100);
+        return;
+      }
+
+      // Desktop
+      document.querySelectorAll('.svc-edit-row').forEach(el => el.remove());
+      document.querySelectorAll('.svc-row-' + id).forEach(el => el.style.display = '');
+
+      const rowEls = document.querySelectorAll('.svc-row-' + id);
+
+      const editHtml = \`
+        <div class="svc-edit-row" style="grid-column: 1 / -1; background:#f7f7f5;padding:16px 18px;border-bottom:1px solid #e0e0e0;display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end;">
+          <div>
+            <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:4px;">Ime storitve</div>
+            <input class="modal-input" type="text" id="edit-name-\${id}" value="\${s.name}" style="margin:0;" />
+          </div>
+          <div>
+            <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:4px;">Cena (€)</div>
+            <input class="modal-input" type="number" id="edit-price-\${id}" value="\${parseFloat(s.max_price).toFixed(2)}" step="0.5" min="0" style="margin:0;" />
+          </div>
+          <div>
+            <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:4px;">Trajanje</div>
+            <select class="modal-input" id="edit-dur-\${id}" style="margin:0;">
+              \${[15,30,45,60,90,120].map(v => \`<option value="\${v}" \${s.duration == v ? 'selected' : ''}>\${v} min</option>\`).join('')}
+            </select>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button onclick="saveEditService(\${id})" class="save-btn" style="padding:9px 16px;white-space:nowrap;">Shrani</button>
+            <button onclick="cancelEdit(\${id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:9px 12px;background:#fff;border:1px solid #e0e0e0;cursor:pointer;color:#666;font-family:system-ui,sans-serif;">✕</button>
+          </div>
         </div>
-        <div>
-          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:4px;">Cena (€)</div>
-          <input class="modal-input" type="number" id="edit-price-\${id}" value="\${parseFloat(s.max_price).toFixed(2)}" step="0.5" min="0" style="margin:0;" />
-        </div>
-        <div>
-          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:4px;">Trajanje</div>
-          <select class="modal-input" id="edit-dur-\${id}" style="margin:0;">
-            \${[15,30,45,60,90,120].map(v => \`<option value="\${v}" \${s.duration == v ? 'selected' : ''}>\${v} min</option>\`).join('')}
-          </select>
-        </div>
-        <div style="display:flex;gap:6px;\${window.innerWidth < 600 ? 'margin-top:4px;' : ''}">
-          <button onclick="saveEditService(\${id})" class="save-btn" style="padding:9px 16px;white-space:nowrap;">Shrani</button>
-          <button onclick="cancelEdit(\${id})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:9px 12px;background:#fff;border:1px solid #e0e0e0;cursor:pointer;color:#666;font-family:system-ui,sans-serif;">✕</button>
-        </div>
-      </div>
-    \`;
-    
-    // Skrij originalne vrstice in vstavi edit formo
-    rowEls.forEach(el => el.style.display = 'none');
-    
-    const container = document.getElementById('svc-list').querySelector('div');
-    const firstRow = document.querySelector('.svc-row-' + id);
-    if (firstRow) {
-      firstRow.insertAdjacentHTML('afterend', editHtml);
+      \`;
+
+      rowEls.forEach(el => el.style.display = 'none');
+      const firstRow = document.querySelector('.svc-row-' + id);
+      if (firstRow) firstRow.insertAdjacentHTML('afterend', editHtml);
+      setTimeout(() => document.getElementById('edit-name-' + id)?.focus(), 50);
     }
-    
-    setTimeout(() => document.getElementById('edit-name-' + id)?.focus(), 50);
-  }
+
+    async function saveMobEdit(id) {
+      const name = document.getElementById('mob-edit-name')?.value.trim();
+      const price = document.getElementById('mob-edit-price')?.value;
+      const dur = document.getElementById('mob-edit-dur')?.value;
+      if (!name || !price || !dur) return;
+      const res = await fetch(API_URL + '/admin/' + SALON_ID + '/services/' + id, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name, minPrice: price, maxPrice: price, duration: dur })
+      });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('svc-mobile-modal')?.remove();
+        showSvcMsg();
+        loadServices();
+      } else {
+        alert(data.error || 'Napaka.');
+      }
+    }
 
   function cancelEdit(id) {
     document.querySelectorAll('.svc-edit-row').forEach(el => el.remove());
