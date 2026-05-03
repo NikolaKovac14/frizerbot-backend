@@ -2254,13 +2254,6 @@ function buildAdminPage(salon) {
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--rule); }
-    @media (max-width: 600px) {
-      .nav { display: none; }
-      .mob-acc { display: block; }
-    }
-    @media (min-width: 601px) {
-      .mob-acc { display: none; }
-    }
     .mob-acc-item { border-bottom: 1px solid var(--rule); background: var(--white); }
     .mob-acc-btn {
       width: 100%; padding: 14px 16px; background: none; border: none;
