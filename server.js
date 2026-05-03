@@ -1447,7 +1447,7 @@ INFORMACIJE O SALONU:
 DELOVNI ČAS:
 ${scheduleToText(schedule)}
 
-STORITVE IN CENIK:
+DODATNE INFORMACIJE O SALONU:
 ${salon.services}
 
 TRAJANJE STORITEV:
@@ -1528,7 +1528,7 @@ INFORMACIJE O SALONU:
 DELOVNI ČAS:
 ${scheduleToText(schedule)}
 
-STORITVE IN CENIK:
+DODATNE INFORMACIJE O SALONU:
 ${salon.services}
 
 TRAJANJE STORITEV:
@@ -2162,38 +2162,41 @@ function buildAdminPage(salon) {
 
   .day-row {
     padding: 10px 14px;
-    gap: 6px;
+    gap: 0;
     flex-wrap: nowrap;
     align-items: center;
+    justify-content: space-between; /* ← razdeli enakomerno */
   }
   .day-name {
     font-size: 12px;
-    width: 70px;
-    min-width: 70px;
+    width: 65px;
+    min-width: 65px;
     flex-shrink: 0;
   }
   .toggle-wrap {
     flex-shrink: 0;
+    margin: 0 8px; /* ← toggle na sredini */
   }
   .day-times {
     gap: 3px;
     flex-shrink: 0;
-    margin-left: auto;
+    display: flex;
+    align-items: center;
   }
   .day-times input[type=time] {
     padding: 4px 4px;
     font-size: 12px;
-    width: 58px;
-    /* Skrij uro ikono v browserju */
+    width: 56px;
     -webkit-appearance: none;
     appearance: none;
+    text-align: center;
   }
-  /* Skrij clock ikono v WebKit (Safari/Chrome) */
   .day-times input[type=time]::-webkit-calendar-picker-indicator {
     display: none;
   }
   .day-sep {
     font-size: 11px;
+    padding: 0 2px;
   }
 }
     @media (min-width: 601px) {
@@ -2448,9 +2451,9 @@ function buildAdminPage(salon) {
         <input class="modal-input" type="text" id="s-phone" style="margin-bottom:14px;" />
         <div class="modal-field-label">E-pošta za obvestila</div>
         <input class="modal-input" type="email" id="s-email" style="margin-bottom:14px;" />
-        <div class="modal-field-label">Storitve in cenik</div>
+        <div class="modal-field-label">Dodatne informacije</div>
         <textarea class="modal-input" id="s-services" rows="10" style="resize:vertical;font-family:system-ui,sans-serif;line-height:1.6;margin-bottom:14px;"></textarea>
-        <div style="font-size:11px;color:#aaa;margin-bottom:20px;">Vsaka storitev v svoji vrstici. Za trajanje dodajte [30min], [45min], [60min] itd.<br>Npr: - Ženski haircut: 25-45 EUR [30min]<br>- Barvanje (celo): 60-120 EUR [60min]</div>
+        <div style="font-size:11px;color:#aaa;margin-bottom:20px;">Npr: Brezplačno parkirišče za stranke. Priporočamo prihod 5 minut prej. Sprejemamo kartice in gotovino.</div>
       </div>
       <div class="schedule-footer">
         <div></div>
