@@ -2184,12 +2184,13 @@ function buildAdminPage(salon) {
     flex-shrink: 0;
   }
   /* ← ključno: inputi brez boxa, samo tekst */
+@media (max-width: 600px) {
   .day-times input[type=time] {
-    padding: 0;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    width: 52px;
     font-size: 13px;
-    width: 48px;
-    border: none;
-    background: transparent;
     color: var(--black);
     outline: none;
     text-align: left;
@@ -2197,6 +2198,7 @@ function buildAdminPage(salon) {
     -webkit-appearance: none;
     appearance: none;
   }
+}
   .day-times input[type=time]::-webkit-calendar-picker-indicator {
     display: none;
   }
