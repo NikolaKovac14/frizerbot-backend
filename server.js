@@ -2889,7 +2889,7 @@ function buildAdminPage(salon) {
     const rowEls = document.querySelectorAll('.svc-row-' + id);
     
     const editHtml = \`
-      <div class="svc-edit-row" style="grid-column: 1 / -1; background:#f7f7f5;padding:16px 18px;border-bottom:1px solid #e0e0e0;display:grid;grid-template-columns:${window.innerWidth < 600 ? '1fr' : '2fr 1fr 1fr auto'};gap:10px;align-items:end;">
+      <div class="svc-edit-row" style="grid-column: 1 / -1; background:#f7f7f5;padding:16px 18px;border-bottom:1px solid #e0e0e0;display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end;">
         <div>
           <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:4px;">Ime storitve</div>
           <input class="modal-input" type="text" id="edit-name-\${id}" value="\${s.name}" style="margin:0;" />
