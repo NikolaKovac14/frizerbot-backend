@@ -2153,10 +2153,10 @@ function buildAdminPage(salon) {
       .mob-acc { display: block; }
       .page { padding: 20px 12px; }
       .schedule-head { padding: 16px 16px; }
-      .day-row { padding: 10px 12px; gap: 6px; }
-      .day-name { width: 72px; font-size: 12px; flex-shrink: 0; }
-      .day-times { gap: 4px; font-size: 12px; flex: 1; justify-content: flex-end; }
-      .day-times input[type=time] { padding: 4px 4px; font-size: 12px; width: 72px; }
+      .day-row { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
+      .day-name { width: 80px; font-size: 12px; }
+      .day-times { gap: 4px; font-size: 12px; }
+      .day-times input[type=time] { padding: 4px 6px; font-size: 12px; width: 80px; }
       .schedule-footer { padding: 14px 16px; }
     }
     @media (min-width: 601px) {
@@ -2254,6 +2254,13 @@ function buildAdminPage(salon) {
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--rule); }
+    @media (max-width: 600px) {
+      .nav { display: none; }
+      .mob-acc { display: block; }
+    }
+    @media (min-width: 601px) {
+      .mob-acc { display: none; }
+    }
     .mob-acc-item { border-bottom: 1px solid var(--rule); background: var(--white); }
     .mob-acc-btn {
       width: 100%; padding: 14px 16px; background: none; border: none;
