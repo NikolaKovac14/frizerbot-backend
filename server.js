@@ -453,7 +453,7 @@ async function initDB() {
     `, [
       'salon_1', 'Salon Aurora', 'Copova 5, Ljubljana', '01 234 5678',
       'Pon-Pet: 8:00-20:00, Sob: 8:00-14:00, Ned: zaprto',
-      '- Ženski haircut: 25-45 EUR\n- Moški haircut: 15-20 EUR\n- Barvanje (celo): 60-120 EUR\n- Balayage/highlights: 80-150 EUR\n- Trajni kodri: 70-100 EUR\n- Frizura za posebne priložnosti: 40-65 EUR\n- Manikura: 20-30 EUR\n- Pedikura: 25-35 EUR',
+      '- Žensko striženje: 25-45 EUR\n- Moško striženje: 15-20 EUR\n- Barvanje (celo): 60-120 EUR\n- Balayage/highlights: 80-150 EUR\n- Trajni kodri: 70-100 EUR\n- Frizura za posebne priložnosti: 40-65 EUR\n- Manikura: 20-30 EUR\n- Pedikura: 25-35 EUR',
       'salon@aurora.si',
       JSON.stringify(DEFAULT_SCHEDULE),
       'agency'
@@ -1480,7 +1480,7 @@ BRISANJE IN PRESELITEV:
 
 NOVA REZERVACIJA - na KONEC odgovora dodaj:
 [[BOOKING:{"date":"YYYY-MM-DD","time":"HH:MM","customerName":"${safeName}","service":"ime storitve"}]]
-Primer: [[BOOKING:{"date":"2025-06-15","time":"10:00","customerName":"${safeName}","service":"Ženski haircut"}]]
+Primer: [[BOOKING:{"date":"2025-06-15","time":"10:00","customerName":"${safeName}","service":"Žensko striženje"}]]
 
 POTEK:
 1. Stranka pove kaj hoče → predlagaj proste termine
@@ -2156,47 +2156,56 @@ function buildAdminPage(salon) {
 @media (max-width: 600px) {
   .nav { display: none; }
   .mob-acc { display: block; }
-  .page { padding: 16px 8px; } /* ← manj padding na straneh */
-  .schedule-head { padding: 14px 12px; }
-  .schedule-footer { padding: 14px 12px; }
-  .schedule-card { overflow: hidden; } /* ← nič ne sme ven */
+  .page { padding: 12px 8px; }
+  .schedule-head { padding: 14px 16px; }
+  .schedule-footer { padding: 14px 16px; }
 
   .day-row {
-    padding: 10px 8px; /* ← manj padding */
-    gap: 6px;
+    padding: 12px 16px;
+    gap: 0;
     flex-wrap: nowrap;
     align-items: center;
+    justify-content: space-between;
   }
   .day-name {
-    font-size: 11px;
-    width: auto;
+    font-size: 13px;
+    font-weight: 500;
+    flex: 1;
     min-width: 0;
-    flex: 0 0 auto;
-    flex-shrink: 0;
   }
   .toggle-wrap {
     flex-shrink: 0;
+    margin: 0 12px;
   }
   .day-times {
-    gap: 2px;
-    flex-shrink: 0;
     display: flex;
     align-items: center;
-    margin-left: auto;
+    gap: 2px;
+    flex-shrink: 0;
   }
+  /* ← ključno: inputi brez boxa, samo tekst */
   .day-times input[type=time] {
-    padding: 4px 2px;
-    font-size: 11px;
-    width: 52px;
+    padding: 0;
+    font-size: 13px;
+    width: 44px;
+    border: none;
+    background: transparent;
+    color: var(--black);
+    outline: none;
+    text-align: center;
+    font-family: system-ui, sans-serif;
     -webkit-appearance: none;
     appearance: none;
-    text-align: center;
   }
   .day-times input[type=time]::-webkit-calendar-picker-indicator {
     display: none;
   }
+  .day-times.disabled input[type=time] {
+    color: var(--muted);
+  }
   .day-sep {
-    font-size: 10px;
+    font-size: 12px;
+    color: var(--muted);
     padding: 0 1px;
   }
 }
@@ -2377,7 +2386,7 @@ function buildAdminPage(salon) {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;">
             <div style="grid-column:1/-1;">
               <div class="modal-field-label">Ime storitve</div>
-              <input class="modal-input" type="text" id="svc-name" placeholder="npr. Ženski haircut" />
+              <input class="modal-input" type="text" id="svc-name" placeholder="npr. Žensko striženje" />
             </div>
             <div>
               <div class="modal-field-label">Cena (€)</div>
@@ -2488,7 +2497,7 @@ function buildAdminPage(salon) {
         <div class="modal-field-label">Ime stranke</div>
         <input class="modal-input" type="text" id="modal-customer" placeholder="Ime Priimek" />
         <div class="modal-field-label">Storitev</div>
-        <input class="modal-input" type="text" id="modal-service" placeholder="npr. Ženski haircut" />
+        <input class="modal-input" type="text" id="modal-service" placeholder="npr. Žensko striženje" />
         <div class="modal-field-label">E-pošta stranke <span class="optional">(neobvezno — za potrditveni e-mail)</span></div>
         <input class="modal-input" type="email" id="modal-email" placeholder="stranka@email.com" />
         <div class="modal-email-hint" id="modal-email-hint"></div>
