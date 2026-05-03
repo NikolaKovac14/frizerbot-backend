@@ -2187,7 +2187,7 @@ function buildAdminPage(salon) {
   .day-times input[type=time] {
     padding: 0;
     font-size: 13px;
-    width: 44px;
+    width: 52px;  /* ← bilo je 44px */
     border: none;
     background: transparent;
     color: var(--black);
