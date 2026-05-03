@@ -2153,40 +2153,49 @@ function buildAdminPage(salon) {
       .masthead-link--desktop { display: none; }
       .masthead-link svg { display: none; }
     }
-    @media (max-width: 600px) {
-      .nav { display: none; }
-      .mob-acc { display: block; }
-      .page { padding: 16px 12px; }
-      .schedule-head { padding: 14px 16px; }
-      .schedule-footer { padding: 14px 16px; }
+@media (max-width: 600px) {
+  .nav { display: none; }
+  .mob-acc { display: block; }
+  .page { padding: 16px 12px; }
+  .schedule-head { padding: 14px 16px; }
+  .schedule-footer { padding: 14px 16px; }
 
-      .day-row {
-        padding: 10px 14px;
-        gap: 8px;
-        flex-wrap: nowrap;        /* ← ključna sprememba */
-        align-items: center;
-      }
-      .day-name {
-        font-size: 12px;
-        width: 78px;
-        min-width: 78px;
-        flex-shrink: 0;
-      }
-      .toggle-wrap {
-        flex-shrink: 0;
-      }
-      .day-times {
-        gap: 4px;
-        font-size: 11px;
-        flex-shrink: 0;
-        margin-left: auto;        /* ← potisne čas na desno */
-      }
-      .day-times input[type=time] {
-        padding: 4px 5px;
-        font-size: 11px;
-        width: 68px;              /* ← malo ožje da vse gre v eno vrstico */
-      }
-    }
+  .day-row {
+    padding: 10px 14px;
+    gap: 6px;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .day-name {
+    font-size: 12px;
+    width: 70px;
+    min-width: 70px;
+    flex-shrink: 0;
+  }
+  .toggle-wrap {
+    flex-shrink: 0;
+  }
+  .day-times {
+    gap: 3px;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+  .day-times input[type=time] {
+    padding: 4px 4px;
+    font-size: 12px;
+    width: 58px;
+    /* Skrij uro ikono v browserju */
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  /* Skrij clock ikono v WebKit (Safari/Chrome) */
+  .day-times input[type=time]::-webkit-calendar-picker-indicator {
+    display: none;
+  }
+  .day-sep {
+    font-size: 11px;
+  }
+}
     @media (min-width: 601px) {
       .mob-acc { display: none; }
     }
