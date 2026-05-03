@@ -2172,6 +2172,7 @@ function buildAdminPage(salon) {
     font-weight: 500;
     flex: 1;
     min-width: 0;
+    margin-right: 12px;  /* ← dodaj to */
   }
   .toggle-wrap {
     flex-shrink: 0;
