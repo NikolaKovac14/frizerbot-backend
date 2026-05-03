@@ -2162,26 +2162,26 @@ function buildAdminPage(salon) {
 
   .day-row {
     padding: 10px 14px;
-    gap: 0;
+    gap: 8px;
     flex-wrap: nowrap;
     align-items: center;
-    justify-content: space-between; /* ← razdeli enakomerno */
   }
   .day-name {
     font-size: 12px;
-    width: 65px;
-    min-width: 65px;
+    width: auto;      /* ← ne fiksna širina */
+    min-width: 0;
+    flex: 0 0 auto;   /* ← samo toliko kot tekst potrebuje */
     flex-shrink: 0;
   }
   .toggle-wrap {
     flex-shrink: 0;
-    margin: 0 8px; /* ← toggle na sredini */
   }
   .day-times {
     gap: 3px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
+    margin-left: auto; /* ← potisne čas čisto na desno */
   }
   .day-times input[type=time] {
     padding: 4px 4px;
