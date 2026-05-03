@@ -2167,6 +2167,13 @@ function buildAdminPage(salon) {
     align-items: center;
     justify-content: space-between;
   }
+
+  .svc-edit-row {
+    grid-column: 1 / -1;
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px;
+  }
 .day-name {
   font-size: 13px;
   font-weight: 500;
