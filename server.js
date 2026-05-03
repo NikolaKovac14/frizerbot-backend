@@ -2151,24 +2151,22 @@ function buildAdminPage(salon) {
     @media (max-width: 600px) {
       .nav { display: none; }
       .mob-acc { display: block; }
-      .page { padding: 16px 8px; }
-      .schedule-card { margin: 0; overflow: hidden; }
+      .page { padding: 16px 6px; }
+      .schedule-card { overflow: hidden; }
       .schedule-head { padding: 14px 12px; }
-      .day-row { padding: 8px 10px; gap: 6px; }
-      .day-name { width: 64px; font-size: 11px; flex-shrink: 0; }
+      .day-row { padding: 8px 10px; gap: 8px; }
+      .day-name { width: 62px; font-size: 11px; flex-shrink: 0; }
       .toggle-wrap { flex-shrink: 0; }
-      .day-times { gap: 2px; flex: 1; overflow: hidden; }
-      .day-times input[type=time] { 
-        font-size: 11px; 
-        padding: 3px 0; 
-        border: none;
-        border-bottom: 1px solid var(--rule);
-        background: transparent;
-        width: 0;
-        flex: 1;
-        min-width: 0;
+      .day-times { gap: 3px; flex-shrink: 0; }
+      .day-times input[type=time] {
+        font-size: 11px;
+        padding: 3px 4px;
+        border: 1px solid var(--rule);
+        background: var(--off-white);
+        width: 68px;
+        -webkit-appearance: none;
       }
-      .day-sep { margin: 0 2px; flex-shrink: 0; }
+      .day-sep { margin: 0 1px; flex-shrink: 0; }
       .schedule-footer { padding: 12px; }
     }
     @media (min-width: 601px) {
