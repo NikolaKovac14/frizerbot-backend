@@ -2152,15 +2152,24 @@ function buildAdminPage(salon) {
       .nav { display: none; }
       .mob-acc { display: block; }
       .page { padding: 16px 8px; }
-      .schedule-card { margin: 0; }
+      .schedule-card { margin: 0; overflow: hidden; }
       .schedule-head { padding: 14px 12px; }
-      .day-row { padding: 10px 12px; gap: 0; justify-content: space-between; }
-      .day-name { width: 70px; font-size: 12px; flex-shrink: 0; }
-      .toggle-wrap { flex-shrink: 0; margin-right: 8px; }
-      .day-times { gap: 2px; font-size: 11px; flex-shrink: 0; }
-      .day-times input[type=time] { padding: 3px 2px; font-size: 11px; width: 60px; min-width: 0; }
-      .day-sep { margin: 0 2px; }
-      .schedule-footer { padding: 12px 12px; }
+      .day-row { padding: 8px 10px; gap: 6px; }
+      .day-name { width: 64px; font-size: 11px; flex-shrink: 0; }
+      .toggle-wrap { flex-shrink: 0; }
+      .day-times { gap: 2px; flex: 1; overflow: hidden; }
+      .day-times input[type=time] { 
+        font-size: 11px; 
+        padding: 3px 0; 
+        border: none;
+        border-bottom: 1px solid var(--rule);
+        background: transparent;
+        width: 0;
+        flex: 1;
+        min-width: 0;
+      }
+      .day-sep { margin: 0 2px; flex-shrink: 0; }
+      .schedule-footer { padding: 12px; }
     }
     @media (min-width: 601px) {
       .mob-acc { display: none; }
