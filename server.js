@@ -162,7 +162,12 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'bookwell-secret-2024',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 }
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000,
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'strict'
+  }
 }));
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -2151,13 +2156,36 @@ function buildAdminPage(salon) {
     @media (max-width: 600px) {
       .nav { display: none; }
       .mob-acc { display: block; }
-      .page { padding: 20px 12px; }
-      .schedule-head { padding: 16px 16px; }
-      .day-row { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
-      .day-name { width: 80px; font-size: 12px; }
-      .day-times { gap: 4px; font-size: 12px; }
-      .day-times input[type=time] { padding: 4px 6px; font-size: 12px; width: 80px; }
+      .page { padding: 16px 12px; }
+      .schedule-head { padding: 14px 16px; }
       .schedule-footer { padding: 14px 16px; }
+
+      .day-row {
+        padding: 10px 14px;
+        gap: 8px;
+        flex-wrap: nowrap;        /* ← ključna sprememba */
+        align-items: center;
+      }
+      .day-name {
+        font-size: 12px;
+        width: 78px;
+        min-width: 78px;
+        flex-shrink: 0;
+      }
+      .toggle-wrap {
+        flex-shrink: 0;
+      }
+      .day-times {
+        gap: 4px;
+        font-size: 11px;
+        flex-shrink: 0;
+        margin-left: auto;        /* ← potisne čas na desno */
+      }
+      .day-times input[type=time] {
+        padding: 4px 5px;
+        font-size: 11px;
+        width: 68px;              /* ← malo ožje da vse gre v eno vrstico */
+      }
     }
     @media (min-width: 601px) {
       .mob-acc { display: none; }
@@ -3537,11 +3565,38 @@ app.get('/sitemap.xml', (req, res) => {
 </urlset>`);
 });
 
+app.post('/api/contact', async (req, res) => {
+  const { name, email, subject, message } = req.body;
+  if (!name || !email || !subject || !message) {
+    return res.status(400).json({ error: 'Manjkajo podatki' });
+  }
+  try {
+    await sgMail.send({
+      to: 'info@bookwell.si',
+      from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
+      replyTo: email,
+      subject: `[Kontakt] ${subject} — od ${name}`,
+      text: `Ime: ${name}\nE-pošta: ${email}\n\n${message}`
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Contact email napaka:', err.message);
+    res.status(500).json({ error: 'Napaka pri pošiljanju' });
+  }
+});
+
 app.use((req, res) => {
   res.status(404).sendFile(__dirname + '/404.html');
 }); 
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
+async function start() {
   await initDB();
+  app.listen(PORT, () => {
+    console.log(`✅ Server teče na portu ${PORT}`);
+  });
+}
+start().catch(err => {
+  console.error('❌ Startup napaka:', err);
+  process.exit(1);
 });
