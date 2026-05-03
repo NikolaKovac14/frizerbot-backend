@@ -2149,12 +2149,18 @@ function buildAdminPage(salon) {
       .masthead-link svg { display: none; }
     }
     @media (max-width: 600px) {
+      .nav { display: none; }
+      .mob-acc { display: block; }
       .page { padding: 20px 12px; }
-      .nav { padding: 0 8px; }
-      .nav-tab { padding: 10px 12px; font-size: 10px; letter-spacing: 0.06em; }
       .schedule-head { padding: 16px 16px; }
-      .day-row { padding: 12px 16px; gap: 10px; }
+      .day-row { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
+      .day-name { width: 80px; font-size: 12px; }
+      .day-times { gap: 4px; font-size: 12px; }
+      .day-times input[type=time] { padding: 4px 6px; font-size: 12px; width: 80px; }
       .schedule-footer { padding: 14px 16px; }
+    }
+    @media (min-width: 601px) {
+      .mob-acc { display: none; }
     }
     .nav { background: var(--white); border-bottom: 1px solid var(--rule); padding: 0 40px; display: flex; gap: 0; }
     .nav-tab { display: flex; align-items: center; gap: 8px; padding: 14px 24px 12px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s; user-select: none; }
