@@ -2167,25 +2167,23 @@ function buildAdminPage(salon) {
     align-items: center;
     justify-content: space-between;
   }
-  .day-name {
-    font-size: 13px;
-    font-weight: 500;
-    flex: 1;
-    min-width: 0;
-    margin-right: 12px;  /* ← dodaj to */
-  }
-  .toggle-wrap {
-    flex-shrink: 0;
-    margin: 0 12px;
-  }
+.day-name {
+  font-size: 13px;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  margin-right: 32px;  /* ← povečaj dokler ni ok */
+}
+.toggle-wrap {
+  flex-shrink: 0;
+  margin: 0 12px 0 24px;  /* ← levi margin večji */
+}
   .day-times {
     display: flex;
     align-items: center;
     gap: 2px;
     flex-shrink: 0;
   }
-  /* ← ključno: inputi brez boxa, samo tekst */
-@media (max-width: 600px) {
   .day-times input[type=time] {
     padding: 0 !important;
     border: none !important;
@@ -2199,7 +2197,6 @@ function buildAdminPage(salon) {
     -webkit-appearance: none;
     appearance: none;
   }
-}
   .day-times input[type=time]::-webkit-calendar-picker-indicator {
     display: none;
   }
