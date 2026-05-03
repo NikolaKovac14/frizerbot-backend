@@ -2156,37 +2156,38 @@ function buildAdminPage(salon) {
 @media (max-width: 600px) {
   .nav { display: none; }
   .mob-acc { display: block; }
-  .page { padding: 16px 12px; }
-  .schedule-head { padding: 14px 16px; }
-  .schedule-footer { padding: 14px 16px; }
+  .page { padding: 16px 8px; } /* ← manj padding na straneh */
+  .schedule-head { padding: 14px 12px; }
+  .schedule-footer { padding: 14px 12px; }
+  .schedule-card { overflow: hidden; } /* ← nič ne sme ven */
 
   .day-row {
-    padding: 10px 14px;
-    gap: 8px;
+    padding: 10px 8px; /* ← manj padding */
+    gap: 6px;
     flex-wrap: nowrap;
     align-items: center;
   }
   .day-name {
-    font-size: 12px;
-    width: auto;      /* ← ne fiksna širina */
+    font-size: 11px;
+    width: auto;
     min-width: 0;
-    flex: 0 0 auto;   /* ← samo toliko kot tekst potrebuje */
+    flex: 0 0 auto;
     flex-shrink: 0;
   }
   .toggle-wrap {
     flex-shrink: 0;
   }
   .day-times {
-    gap: 3px;
+    gap: 2px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    margin-left: auto; /* ← potisne čas čisto na desno */
+    margin-left: auto;
   }
   .day-times input[type=time] {
-    padding: 4px 4px;
-    font-size: 12px;
-    width: 56px;
+    padding: 4px 2px;
+    font-size: 11px;
+    width: 52px;
     -webkit-appearance: none;
     appearance: none;
     text-align: center;
@@ -2195,8 +2196,8 @@ function buildAdminPage(salon) {
     display: none;
   }
   .day-sep {
-    font-size: 11px;
-    padding: 0 2px;
+    font-size: 10px;
+    padding: 0 1px;
   }
 }
     @media (min-width: 601px) {
