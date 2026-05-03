@@ -2192,7 +2192,7 @@ function buildAdminPage(salon) {
     background: transparent;
     color: var(--black);
     outline: none;
-    text-align: center;
+    text-align: left;
     font-family: system-ui, sans-serif;
     -webkit-appearance: none;
     appearance: none;
