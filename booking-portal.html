@@ -315,7 +315,7 @@
       opt.value = s.name;
       opt.textContent = s.displayName;
       opt.dataset.duration = s.duration;
-      opt.dataset.price = s.minPrice === s.maxPrice ? s.maxPrice : `${s.minPrice}-${s.maxPrice}`;
+      opt.dataset.price = s.maxPrice;
       serviceSelect.appendChild(opt);
     });
     
