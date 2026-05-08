@@ -16,6 +16,126 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(cors());
 
+// NA ZAČETKU server.js
+const twilio = require('twilio');
+
+// Inicijalizacija Twilio klienta
+const twilioClient = new twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
+
+// ─── VOICE ROUTES ───────────────────────────────────────────────────
+// Ko stranka pozove
+app.post('/voice/incoming', (req, res) => {
+  const VoiceResponse = twilio.twiml.VoiceResponse;
+  const twiml = new VoiceResponse();
+  
+  twiml.say({
+    voice: 'alice',
+    language: 'sl-SI' // Slovenščina!
+  }, 'Pozdravljeni! Salon je trenutno zaseden.');
+  
+  twiml.say({
+    voice: 'alice',
+    language: 'sl-SI'
+  }, 'Pritisnite 1 za AI rezervacijo, ali 2 za čakanje na operatorja.');
+  
+  twiml.gather({
+    numDigits: 1,
+    timeout: 10,
+    action: '/voice/choice',
+    method: 'POST'
+  });
+  
+  res.type('text/xml');
+  res.send(twiml.toString());
+});
+
+// Stranka izbere opcijo
+app.post('/voice/choice', (req, res) => {
+  const digit = req.body.Digits;
+  const VoiceResponse = twilio.twiml.VoiceResponse;
+  const twiml = new VoiceResponse();
+  
+  if (digit === '1') {
+    // AI rezervacija
+    twiml.say({
+      voice: 'alice',
+      language: 'sl-SI'
+    }, 'Pozdravljen! Imam prosto termin v torek ob 14 ur in 30 minut. Pritisnite 1 za potrditev.');
+    
+    twiml.gather({
+      numDigits: 1,
+      timeout: 10,
+      action: '/voice/book-confirm',
+      method: 'POST'
+    });
+  } else if (digit === '2') {
+    // Prebadi na šefa
+    twiml.say({
+      voice: 'alice',
+      language: 'sl-SI'
+    }, 'Vas prebajam na operatorja...');
+    
+    twiml.dial(process.env.SALON_PHONE);
+  } else {
+    twiml.say({
+      voice: 'alice',
+      language: 'sl-SI'
+    }, 'Slabo sem vas razumel. Pozaj.');
+  }
+  
+  res.type('text/xml');
+  res.send(twiml.toString());
+});
+
+// Potrditev rezervacije
+app.post('/voice/book-confirm', async (req, res) => {
+  const digit = req.body.Digits;
+  const VoiceResponse = twilio.twiml.VoiceResponse;
+  const twiml = new VoiceResponse();
+  
+  if (digit === '1') {
+    // Shrani v DB
+    const phone = req.body.Caller; // Telefonska številka ki je klicala
+    
+    try {
+      await pool.query(`
+        INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_phone, service, booked_by)
+        VALUES ($1, $2, $3, 'busy', $4, $5, $6, 'voice_bot')
+      `, ['salon_1', '2025-05-13', '14:30', 'Klicatelj', phone, 'Termin iz klica']);
+      
+      twiml.say({
+        voice: 'alice',
+        language: 'sl-SI'
+      }, 'Odlično! Vaša rezervacija je potrdena. Termin je torek ob 14 ur in 30 minut.');
+      
+      // Pošlji SMS potrdilo
+      await twilioClient.messages.create({
+        body: '✅ Salon: Termin je rezerviran za torek ob 14:30. Se vidimo! 🙂',
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: phone
+      });
+      
+    } catch (err) {
+      console.error('❌ Voice booking napaka:', err.message);
+      twiml.say({
+        voice: 'alice',
+        language: 'sl-SI'
+      }, 'Prišlo je do tehnične napake. Pokličite nas senare.');
+    }
+  } else {
+    twiml.say({
+      voice: 'alice',
+      language: 'sl-SI'
+    }, 'Rezervacija ni bila potrdena.');
+  }
+  
+  res.type('text/xml');
+  res.send(twiml.toString());
+});
+
 // ─── STRIPE WEBHOOK (mora biti PRED express.json!) ────────────────────────────
 app.post('/stripe-webhook',
   express.raw({ type: 'application/json' }),
