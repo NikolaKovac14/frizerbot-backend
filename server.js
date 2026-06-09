@@ -769,15 +769,16 @@ app.get('/admin/:id/revenue', requireAdminAuth, async (req, res) => {
       AND t.service NOT LIKE '(%'
   `, [salonId]);
 
+  const days = parseInt(req.query.days) || 60;
   const { rows: inactive } = await pool.query(`
     SELECT customer_email, MAX(customer_name) AS customer_name, MAX(date) AS last_visit, COUNT(*) AS visit_count
     FROM timeslots
     WHERE salon_id=$1 AND customer_email != '' AND status='busy' AND service NOT LIKE '(%'
     GROUP BY customer_email
-    HAVING MAX(date) < CURRENT_DATE - INTERVAL '60 days'
+    HAVING MAX(date) < CURRENT_DATE - ($2 * INTERVAL '1 day')
     ORDER BY last_visit ASC
-    LIMIT 25
-  `, [salonId]);
+    LIMIT 50
+  `, [salonId, days]);
 
   res.json({
     bookings_month: parseInt(stats[0].bookings_month) || 0,
@@ -788,6 +789,69 @@ app.get('/admin/:id/revenue', requireAdminAuth, async (req, res) => {
     unmatched_bookings: parseInt(rev[0].unmatched_bookings) || 0,
     inactive_customers: inactive
   });
+});
+
+// ─── REACTIVATION CAMPAIGN ────────────────────────────────────────────────────
+app.post('/admin/:id/reactivation-campaign', requireAdminAuth, async (req, res) => {
+  const { days = 60 } = req.body;
+  const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE (id=$1 OR slug=$1)', [req.params.id]);
+  const salon = salonRows[0];
+  if (!salon) return res.status(404).json({ error: 'Not found' });
+
+  const { rows: customers } = await pool.query(`
+    SELECT customer_email, MAX(customer_name) AS customer_name
+    FROM timeslots
+    WHERE salon_id=$1 AND customer_email != '' AND status='busy' AND service NOT LIKE '(%'
+    GROUP BY customer_email
+    HAVING MAX(date) < CURRENT_DATE - ($2 * INTERVAL '1 day')
+  `, [salon.id, parseInt(days)]);
+
+  if (!customers.length) return res.json({ sent: 0 });
+
+  const bookingUrl = `${process.env.API_URL || 'https://bookwell.si'}/book/${salon.slug || salon.id}`;
+  let sent = 0;
+
+  for (const c of customers) {
+    try {
+      await sgMail.send({
+        to: c.customer_email,
+        from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
+        subject: `Pogrešamo vas v ${salon.name} — 10 % popust za vas`,
+        html: `
+          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px;color:#2d2520;">
+            <div style="background:#1a1410;padding:24px 28px;border-radius:10px 10px 0 0;text-align:center;">
+              <h1 style="color:#c9a84c;margin:0;font-size:22px;">${salon.name}</h1>
+            </div>
+            <div style="background:#fff;padding:32px 28px;border-radius:0 0 10px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+              <p style="font-size:16px;margin:0 0 16px;">Pozdravljeni${c.customer_name ? ' <strong>' + c.customer_name + '</strong>' : ''},</p>
+              <p style="font-size:14px;color:#555;line-height:1.7;margin:0 0 24px;">
+                Že nekaj časa vas ni bilo pri nas — pogrešamo vas! 😊<br>
+                Ker ste naša zvesta stranka, vam pripravljamo posebno ponudbo:
+              </p>
+              <div style="background:#fdf6ec;border:2px solid #c9a84c;border-radius:8px;padding:20px;text-align:center;margin:0 0 28px;">
+                <div style="font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8c6830;margin-bottom:6px;">Vaša posebna ponudba</div>
+                <div style="font-size:36px;font-weight:700;color:#c9a84c;line-height:1;">10 %</div>
+                <div style="font-size:14px;color:#555;margin-top:4px;">popust na naslednji obisk</div>
+              </div>
+              <div style="text-align:center;">
+                <a href="${bookingUrl}" style="display:inline-block;background:#1a1410;color:#c9a84c;padding:14px 32px;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:.06em;border-radius:6px;">
+                  Rezervirajte termin →
+                </a>
+              </div>
+              <p style="font-size:11px;color:#aaa;text-align:center;margin-top:20px;">
+                Ponudba velja do konca meseca. Pokažite ta email pri rezervaciji.
+              </p>
+            </div>
+          </div>
+        `
+      });
+      sent++;
+    } catch(e) {
+      console.error('Reactivation email napaka:', c.customer_email, e.message);
+    }
+  }
+
+  res.json({ sent, total: customers.length });
 });
 
 // ─── HOSTED CHAT STRAN ────────────────────────────────────────────────────────
@@ -2639,11 +2703,26 @@ function buildAdminPage(salon) {
           </div>
         </div>
         <div style="background:#fff;border:1px solid #e0e0e0;">
-          <div style="padding:20px 24px;border-bottom:2px solid #0a0a0a;display:flex;align-items:baseline;justify-content:space-between;">
+          <div style="padding:20px 24px;border-bottom:2px solid #0a0a0a;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
             <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;">Neaktivne stranke</div>
-            <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#888;">60+ dni ni bilo rezervacije</div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#888;">Neaktivne</div>
+              <select id="rev-days-filter" onchange="reloadRevenue()" style="padding:5px 10px;border:1px solid #e0e0e0;font-size:12px;font-family:system-ui,sans-serif;background:#f7f7f5;cursor:pointer;">
+                <option value="30">30+ dni</option>
+                <option value="60" selected>60+ dni</option>
+                <option value="90">90+ dni</option>
+                <option value="120">120+ dni</option>
+              </select>
+            </div>
           </div>
           <div id="rev-inactive-list" style="min-height:60px;"></div>
+          <div id="rev-campaign-bar" style="display:none;padding:16px 24px;border-top:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+            <div id="rev-campaign-info" style="font-size:12px;color:#555;"></div>
+            <button onclick="sendCampaign()" style="background:#1a1410;color:#c9a84c;border:none;padding:10px 24px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;font-family:system-ui,sans-serif;">
+              Pošlji email kampanjo
+            </button>
+          </div>
+          <div id="rev-campaign-msg" style="display:none;padding:14px 24px;font-size:12px;font-weight:600;"></div>
         </div>
       </div>
     </div>
@@ -2804,46 +2883,83 @@ function buildAdminPage(salon) {
       if (name === 'prihodki') loadRevenue();
     }
 
-    let revLoaded = false;
     async function loadRevenue() {
-      if (revLoaded) return;
-      revLoaded = true;
+      const days = document.getElementById('rev-days-filter')?.value || 60;
+      document.getElementById('rev-loading').style.display = 'block';
+      document.getElementById('rev-content').style.display = 'none';
       try {
-        const res = await fetch(API_URL + '/admin/' + SALON_ID + '/revenue');
+        const res = await fetch(API_URL + '/admin/' + SALON_ID + '/revenue?days=' + days);
         const d = await res.json();
         document.getElementById('rev-loading').style.display = 'none';
         document.getElementById('rev-content').style.display = 'block';
         if (d.unmatched_bookings > 0) {
           const w = document.getElementById('rev-warn');
-          w.textContent = d.unmatched_bookings + ' rezervacij(' + (d.unmatched_bookings === 1 ? 'a' : 'e') + ') nima ujemajoče storitve z ceno. Preverite da se ime storitve v rezervaciji ujema z imenom v tabu Storitve (npr. "Striženje" ≠ "Žensko striženje 25 €").';
+          w.textContent = d.unmatched_bookings + ' rezervacij nima ujemajoče storitve z ceno. Preverite da se ime storitve v rezervaciji ujema z imenom v tabu Storitve.';
           w.style.display = 'block';
         }
-        document.getElementById('rev-revenue').textContent = d.revenue_month > 0 ? d.revenue_month.toFixed(0) + ' €' : '0 €';
-        document.getElementById('rev-cancelled-rev').textContent = d.cancelled_revenue > 0 ? d.cancelled_revenue.toFixed(0) + ' €' : '0 €';
+        document.getElementById('rev-revenue').textContent = (d.revenue_month || 0).toFixed(0) + ' €';
+        document.getElementById('rev-cancelled-rev').textContent = (d.cancelled_revenue || 0).toFixed(0) + ' €';
         document.getElementById('rev-cancelled-count').textContent = d.cancelled_month + ' ' + (d.cancelled_month === 1 ? 'odpoved' : 'odpovedi');
         document.getElementById('rev-bookings').textContent = d.bookings_month;
         document.getElementById('rev-inactive').textContent = d.inactive_customers.length;
 
         const list = document.getElementById('rev-inactive-list');
+        const bar = document.getElementById('rev-campaign-bar');
+        const info = document.getElementById('rev-campaign-info');
         if (!d.inactive_customers.length) {
-          list.innerHTML = '<div style="padding:24px 28px;font-size:13px;color:#aaa;font-style:italic;">Ni neaktivnih strank. Odlično!</div>';
+          list.innerHTML = '<div style="padding:24px 28px;font-size:13px;color:#aaa;font-style:italic;">Ni neaktivnih strank za izbrano obdobje.</div>';
+          bar.style.display = 'none';
         } else {
+          const withEmail = d.inactive_customers.filter(c => c.customer_email);
           list.innerHTML = d.inactive_customers.map(c => {
-            const days = Math.floor((Date.now() - new Date(c.last_visit)) / 86400000);
+            const daysAgo = Math.floor((Date.now() - new Date(c.last_visit)) / 86400000);
             return \`<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid #f0f0f0;">
               <div>
                 <div style="font-size:13px;font-weight:600;">\${c.customer_name || '—'}</div>
-                <div style="font-size:11px;color:#888;">\${c.customer_email}</div>
+                <div style="font-size:11px;color:#888;">\${c.customer_email || 'ni emaila'}</div>
               </div>
               <div style="text-align:right;">
-                <div style="font-size:12px;font-weight:700;color:#c9984a;">\${days} dni</div>
-                <div style="font-size:10px;color:#aaa;">\${c.visit_count} obiskov skupaj</div>
+                <div style="font-size:12px;font-weight:700;color:#c9984a;">\${daysAgo} dni</div>
+                <div style="font-size:10px;color:#aaa;">\${c.visit_count} obiskov</div>
               </div>
             </div>\`;
           }).join('');
+          bar.style.display = 'flex';
+          info.textContent = withEmail.length + ' strankam z emailom bo poslan 10 % popust';
+          document.getElementById('rev-campaign-msg').style.display = 'none';
         }
       } catch(e) {
         document.getElementById('rev-loading').textContent = 'Napaka pri nalaganju.';
+      }
+    }
+
+    function reloadRevenue() { loadRevenue(); }
+
+    async function sendCampaign() {
+      const days = document.getElementById('rev-days-filter')?.value || 60;
+      const btn = document.querySelector('[onclick="sendCampaign()"]');
+      const msg = document.getElementById('rev-campaign-msg');
+      btn.textContent = 'Pošiljam...';
+      btn.disabled = true;
+      try {
+        const res = await fetch(API_URL + '/admin/' + SALON_ID + '/reactivation-campaign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ days: parseInt(days) })
+        });
+        const d = await res.json();
+        msg.style.display = 'block';
+        msg.style.color = '#2a7a2a';
+        msg.style.background = '#f0fdf4';
+        msg.textContent = '✓ Kampanja poslana ' + d.sent + ' strankam.';
+        document.getElementById('rev-campaign-bar').style.display = 'none';
+      } catch(e) {
+        msg.style.display = 'block';
+        msg.style.color = '#991b1b';
+        msg.textContent = 'Napaka pri pošiljanju.';
+      } finally {
+        btn.textContent = 'Pošlji email kampanjo';
+        btn.disabled = false;
       }
     }
 
