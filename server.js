@@ -793,18 +793,30 @@ app.get('/admin/:id/revenue', requireAdminAuth, async (req, res) => {
 
 // ─── REACTIVATION CAMPAIGN ────────────────────────────────────────────────────
 app.post('/admin/:id/reactivation-campaign', requireAdminAuth, async (req, res) => {
-  const { days = 60 } = req.body;
+  const { emails, days = 60 } = req.body;
   const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE (id=$1 OR slug=$1)', [req.params.id]);
   const salon = salonRows[0];
   if (!salon) return res.status(404).json({ error: 'Not found' });
 
-  const { rows: customers } = await pool.query(`
-    SELECT customer_email, MAX(customer_name) AS customer_name
-    FROM timeslots
-    WHERE salon_id=$1 AND customer_email != '' AND status='busy' AND service NOT LIKE '(%'
-    GROUP BY customer_email
-    HAVING MAX(date) < CURRENT_DATE - ($2 * INTERVAL '1 day')
-  `, [salon.id, parseInt(days)]);
+  let customers;
+  if (emails && emails.length) {
+    const { rows } = await pool.query(
+      `SELECT DISTINCT customer_email, MAX(customer_name) AS customer_name
+       FROM timeslots WHERE salon_id=$1 AND customer_email = ANY($2)
+       GROUP BY customer_email`,
+      [salon.id, emails]
+    );
+    customers = rows;
+  } else {
+    const { rows } = await pool.query(`
+      SELECT customer_email, MAX(customer_name) AS customer_name
+      FROM timeslots
+      WHERE salon_id=$1 AND customer_email != '' AND status='busy' AND service NOT LIKE '(%'
+      GROUP BY customer_email
+      HAVING MAX(date) < CURRENT_DATE - ($2 * INTERVAL '1 day')
+    `, [salon.id, parseInt(days)]);
+    customers = rows;
+  }
 
   if (!customers.length) return res.json({ sent: 0 });
 
@@ -2704,7 +2716,10 @@ function buildAdminPage(salon) {
         </div>
         <div style="background:#fff;border:1px solid #e0e0e0;">
           <div style="padding:20px 24px;border-bottom:2px solid #0a0a0a;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-            <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;">Neaktivne stranke</div>
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;">Neaktivne stranke</div>
+              <button id="rev-check-all-btn" onclick="toggleCheckAll()" style="display:none;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#f7f7f5;border:1px solid #e0e0e0;cursor:pointer;color:#444;font-family:system-ui,sans-serif;">Označi vse</button>
+            </div>
             <div style="display:flex;align-items:center;gap:10px;">
               <div style="font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#888;">Neaktivne</div>
               <select id="rev-days-filter" onchange="reloadRevenue()" style="padding:5px 10px;border:1px solid #e0e0e0;font-size:12px;font-family:system-ui,sans-serif;background:#f7f7f5;cursor:pointer;">
@@ -2913,19 +2928,22 @@ function buildAdminPage(salon) {
           const withEmail = d.inactive_customers.filter(c => c.customer_email);
           list.innerHTML = d.inactive_customers.map(c => {
             const daysAgo = Math.floor((Date.now() - new Date(c.last_visit)) / 86400000);
-            return \`<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid #f0f0f0;">
-              <div>
+            const hasEmail = !!c.customer_email;
+            const safeEmail = (c.customer_email || '').replace(/"/g, '');
+            return \`<div style="display:flex;align-items:center;gap:14px;padding:12px 24px;border-bottom:1px solid #f0f0f0;\${hasEmail ? '' : 'opacity:.45;'}">
+              <input type="checkbox" \${hasEmail ? 'checked' : 'disabled'} data-email="\${safeEmail}" onchange="updateCampaignBar()" style="width:15px;height:15px;cursor:\${hasEmail ? 'pointer' : 'default'};flex-shrink:0;">
+              <div style="flex:1;min-width:0;">
                 <div style="font-size:13px;font-weight:600;">\${c.customer_name || '—'}</div>
                 <div style="font-size:11px;color:#888;">\${c.customer_email || 'ni emaila'}</div>
               </div>
-              <div style="text-align:right;">
+              <div style="text-align:right;flex-shrink:0;">
                 <div style="font-size:12px;font-weight:700;color:#c9984a;">\${daysAgo} dni</div>
                 <div style="font-size:10px;color:#aaa;">\${c.visit_count} obiskov</div>
               </div>
             </div>\`;
           }).join('');
-          bar.style.display = 'flex';
-          info.textContent = withEmail.length + ' strankam z emailom bo poslan 10 % popust';
+          document.getElementById('rev-check-all-btn').style.display = withEmail.length ? 'inline-block' : 'none';
+          updateCampaignBar();
           document.getElementById('rev-campaign-msg').style.display = 'none';
         }
       } catch(e) {
@@ -2935,8 +2953,32 @@ function buildAdminPage(salon) {
 
     function reloadRevenue() { loadRevenue(); }
 
+    function getCheckedEmails() {
+      return Array.from(document.querySelectorAll('#rev-inactive-list input[type=checkbox]:checked'))
+        .map(cb => cb.dataset.email).filter(Boolean);
+    }
+
+    function updateCampaignBar() {
+      const checked = getCheckedEmails();
+      const bar = document.getElementById('rev-campaign-bar');
+      const info = document.getElementById('rev-campaign-info');
+      const allBtn = document.getElementById('rev-check-all-btn');
+      const total = document.querySelectorAll('#rev-inactive-list input[type=checkbox]:not(:disabled)').length;
+      bar.style.display = checked.length ? 'flex' : 'none';
+      info.textContent = checked.length + ' / ' + total + ' strankam bo poslan email z 10 % popustom';
+      allBtn.textContent = checked.length === total ? 'Odznači vse' : 'Označi vse';
+    }
+
+    function toggleCheckAll() {
+      const boxes = document.querySelectorAll('#rev-inactive-list input[type=checkbox]:not(:disabled)');
+      const allChecked = Array.from(boxes).every(b => b.checked);
+      boxes.forEach(b => b.checked = !allChecked);
+      updateCampaignBar();
+    }
+
     async function sendCampaign() {
-      const days = document.getElementById('rev-days-filter')?.value || 60;
+      const emails = getCheckedEmails();
+      if (!emails.length) return;
       const btn = document.querySelector('[onclick="sendCampaign()"]');
       const msg = document.getElementById('rev-campaign-msg');
       btn.textContent = 'Pošiljam...';
@@ -2945,14 +2987,16 @@ function buildAdminPage(salon) {
         const res = await fetch(API_URL + '/admin/' + SALON_ID + '/reactivation-campaign', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ days: parseInt(days) })
+          body: JSON.stringify({ emails })
         });
         const d = await res.json();
         msg.style.display = 'block';
         msg.style.color = '#2a7a2a';
         msg.style.background = '#f0fdf4';
+        msg.style.padding = '14px 24px';
         msg.textContent = '✓ Kampanja poslana ' + d.sent + ' strankam.';
         document.getElementById('rev-campaign-bar').style.display = 'none';
+        document.getElementById('rev-check-all-btn').style.display = 'none';
       } catch(e) {
         msg.style.display = 'block';
         msg.style.color = '#991b1b';
