@@ -2827,10 +2827,10 @@ function buildAdminPage(salon) {
               <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Samodejno zapolnjevanje odpovedi</div>
               <div style="font-size:11px;color:#888;line-height:1.5;">Ko stranka odpove termin, sistem avtomatsko obvesti primerne stranke ki se že 30+ dni niso naročile.</div>
             </div>
-            <div class="toggle-wrap" style="width:44px;height:22px;">
+            <label class="toggle-wrap" style="width:44px;height:22px;">
               <input type="checkbox" id="s-recovery">
               <span class="toggle-slider" style="border-radius:22px;"></span>
-            </div>
+            </label>
           </div>
         </div>
       </div>
