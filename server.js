@@ -2827,10 +2827,10 @@ function buildAdminPage(salon) {
               <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Samodejno zapolnjevanje odpovedi</div>
               <div style="font-size:11px;color:#888;line-height:1.5;">Ko stranka odpove termin, sistem avtomatsko obvesti primerne stranke ki se že 30+ dni niso naročile.</div>
             </div>
-            <label style="position:relative;display:inline-block;width:44px;height:22px;flex-shrink:0;">
-              <input type="checkbox" id="s-recovery" style="opacity:0;width:0;height:0;">
-              <span onclick="document.getElementById('s-recovery').click()" style="position:absolute;cursor:pointer;inset:0;background:#e0e0e0;border-radius:22px;transition:.2s;" id="s-recovery-slider"></span>
-            </label>
+            <div class="toggle-wrap" style="width:44px;height:22px;">
+              <input type="checkbox" id="s-recovery">
+              <span class="toggle-slider" style="border-radius:22px;"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -3066,9 +3066,7 @@ function buildAdminPage(salon) {
       document.getElementById('s-phone').value = data.phone || '';
       document.getElementById('s-email').value = data.notification_email || '';
       document.getElementById('s-services').value = data.services || '';
-      const cb = document.getElementById('s-recovery');
-      cb.checked = !!data.cancellation_recovery_enabled;
-      document.getElementById('s-recovery-slider').style.background = cb.checked ? '#c9984a' : '#e0e0e0';
+      document.getElementById('s-recovery').checked = !!data.cancellation_recovery_enabled;
       const planLimits = { starter: 1000, pro: 3000, agency: '10000' };
       const limit = planLimits[data.plan] || 3000;
       document.getElementById('s-chat-count').textContent = (data.chat_count || 0) + ' sporočil';
