@@ -2784,7 +2784,7 @@ function buildAdminPage(salon) {
         <div class="schedule-head-sub">Podatki & storitve</div>
       </div>
       <div style="padding:28px;">
-        <div id="settings-saved" style="display:none;color:#2a7a2a;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px;">✓ Shranjeno</div>
+        <div id="settings-saved" style="display:none;background:#f0fdf4;border-left:3px solid #4ade80;padding:12px 16px;font-size:13px;font-weight:600;color:#166534;margin-bottom:16px;">✓ Spremembe uspešno shranjene</div>
         <div style="background:#f7f7f5;border-left:3px solid #c9984a;padding:16px 20px;margin-bottom:24px;">
           <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:8px;">Poraba sporočil ta mesec</div>
           <div style="font-family:'Playfair Display',serif;font-size:32px;font-weight:700;color:#0a0a0a;" id="s-chat-count">—</div>
