@@ -735,10 +735,35 @@ app.get('/admin/:id/revenue', requireAdminAuth, async (req, res) => {
 
   const { rows: rev } = await pool.query(`
     SELECT
-      COALESCE(SUM(COALESCE(t.price_paid, (s.min_price + COALESCE(s.max_price, s.min_price)) / 2)), 0) AS revenue_month,
-      COALESCE(SUM(COALESCE(t.price_paid, (s.min_price + COALESCE(s.max_price, s.min_price)) / 2)) FILTER (WHERE t.status='cancelled'), 0) AS cancelled_revenue
+      COALESCE(SUM(COALESCE(t.price_paid, (
+        SELECT (s.min_price + COALESCE(s.max_price, s.min_price)) / 2
+        FROM services s
+        WHERE s.salon_id = t.salon_id AND s.active = true
+          AND (LOWER(s.name) = LOWER(t.service)
+               OR LOWER(t.service) LIKE '%' || LOWER(s.name) || '%'
+               OR LOWER(s.name) LIKE '%' || LOWER(t.service) || '%')
+        ORDER BY CASE WHEN LOWER(s.name) = LOWER(t.service) THEN 0 ELSE 1 END
+        LIMIT 1
+      ))) FILTER (WHERE t.status='busy'), 0) AS revenue_month,
+      COALESCE(SUM(COALESCE(t.price_paid, (
+        SELECT (s.min_price + COALESCE(s.max_price, s.min_price)) / 2
+        FROM services s
+        WHERE s.salon_id = t.salon_id AND s.active = true
+          AND (LOWER(s.name) = LOWER(t.service)
+               OR LOWER(t.service) LIKE '%' || LOWER(s.name) || '%'
+               OR LOWER(s.name) LIKE '%' || LOWER(t.service) || '%')
+        ORDER BY CASE WHEN LOWER(s.name) = LOWER(t.service) THEN 0 ELSE 1 END
+        LIMIT 1
+      ))) FILTER (WHERE t.status='cancelled'), 0) AS cancelled_revenue,
+      COUNT(*) FILTER (WHERE t.status='busy' AND t.price_paid IS NULL AND (
+        SELECT 1 FROM services s
+        WHERE s.salon_id = t.salon_id AND s.active = true
+          AND (LOWER(s.name) = LOWER(t.service)
+               OR LOWER(t.service) LIKE '%' || LOWER(s.name) || '%'
+               OR LOWER(s.name) LIKE '%' || LOWER(t.service) || '%')
+        LIMIT 1
+      ) IS NULL) AS unmatched_bookings
     FROM timeslots t
-    LEFT JOIN services s ON s.salon_id = t.salon_id AND LOWER(s.name) = LOWER(t.service) AND s.active = true
     WHERE t.salon_id = $1
       AND t.date >= date_trunc('month', CURRENT_DATE)
       AND t.service NOT LIKE '(%'
@@ -760,6 +785,7 @@ app.get('/admin/:id/revenue', requireAdminAuth, async (req, res) => {
     total_customers: parseInt(stats[0].total_customers) || 0,
     revenue_month: parseFloat(rev[0].revenue_month) || 0,
     cancelled_revenue: parseFloat(rev[0].cancelled_revenue) || 0,
+    unmatched_bookings: parseInt(rev[0].unmatched_bookings) || 0,
     inactive_customers: inactive
   });
 });
@@ -1240,19 +1266,6 @@ app.get('/api/book/:slug/services', async (req, res) => {
     'SELECT id, name, min_price, max_price, duration FROM services WHERE salon_id = (SELECT id FROM salons WHERE (id = $1 OR slug = $1) AND active = true) AND active = true ORDER BY position, created_at',
     [req.params.slug]
   );
-  
-  if (!rows.length) {
-    // Fallback: stare storitve iz salon.services teksta
-    const { rows: salons } = await pool.query(
-      'SELECT services FROM salons WHERE (id = $1 OR slug = $1) AND active = true',
-      [req.params.slug]
-    );
-    const salon = salons[0];
-    if (!salon) return res.status(404).json({ error: 'Not found' });
-    // Parsiraj staro formato
-    const oldServices = parseServices(salon.services);
-    return res.json({ services: oldServices });
-  }
   
   const services = rows.map(s => ({
     id: s.id,
@@ -2601,6 +2614,7 @@ function buildAdminPage(salon) {
       <div style="font-size:12px;color:#888;margin-bottom:28px;letter-spacing:.04em;">Ta mesec &mdash; ocena na podlagi rezervacij</div>
       <hr class="section-rule thick">
       <div id="rev-loading" style="color:#aaa;font-size:13px;padding:20px 0;">Nalagam...</div>
+      <div id="rev-warn" style="display:none;background:#fff8e1;border-left:3px solid #c9984a;padding:14px 18px;font-size:12px;color:#7a5a00;margin-bottom:20px;"></div>
       <div id="rev-content" style="display:none;">
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1px;background:#e0e0e0;border:1px solid #e0e0e0;margin-bottom:32px;">
           <div style="background:#fff;padding:24px 22px;">
@@ -2713,7 +2727,9 @@ function buildAdminPage(salon) {
         <div class="modal-field-label">Ime stranke</div>
         <input class="modal-input" type="text" id="modal-customer" placeholder="Ime Priimek" />
         <div class="modal-field-label">Storitev</div>
-        <input class="modal-input" type="text" id="modal-service" placeholder="npr. Žensko striženje" />
+        <select class="modal-input" id="modal-service" style="cursor:pointer;">
+          <option value="">— Izberi storitev —</option>
+        </select>
         <div class="modal-field-label">E-pošta stranke <span class="optional">(neobvezno — za potrditveni e-mail)</span></div>
         <input class="modal-input" type="email" id="modal-email" placeholder="stranka@email.com" />
         <div class="modal-email-hint" id="modal-email-hint"></div>
@@ -2797,6 +2813,11 @@ function buildAdminPage(salon) {
         const d = await res.json();
         document.getElementById('rev-loading').style.display = 'none';
         document.getElementById('rev-content').style.display = 'block';
+        if (d.unmatched_bookings > 0) {
+          const w = document.getElementById('rev-warn');
+          w.textContent = d.unmatched_bookings + ' rezervacij(' + (d.unmatched_bookings === 1 ? 'a' : 'e') + ') nima ujemajoče storitve z ceno. Preverite da se ime storitve v rezervaciji ujema z imenom v tabu Storitve (npr. "Striženje" ≠ "Žensko striženje 25 €").';
+          w.style.display = 'block';
+        }
         document.getElementById('rev-revenue').textContent = d.revenue_month > 0 ? d.revenue_month.toFixed(0) + ' €' : '0 €';
         document.getElementById('rev-cancelled-rev').textContent = d.cancelled_revenue > 0 ? d.cancelled_revenue.toFixed(0) + ' €' : '0 €';
         document.getElementById('rev-cancelled-count').textContent = d.cancelled_month + ' ' + (d.cancelled_month === 1 ? 'odpoved' : 'odpovedi');
@@ -2954,8 +2975,26 @@ function buildAdminPage(salon) {
       document.getElementById('modal-time-display').textContent = time;
       document.getElementById('modal-date-label').textContent = formatDateSl(currentDate).toUpperCase();
       document.getElementById('modal-customer').value = slot?.customer_name || '';
-      document.getElementById('modal-service').value = slot?.service || '';
       document.getElementById('modal-email').value = slot?.customer_email || '';
+
+      const sel = document.getElementById('modal-service');
+      sel.innerHTML = '<option value="">— Izberi storitev —</option>';
+      svcList.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.name;
+        opt.textContent = s.name + ' — ' + parseFloat(s.max_price).toFixed(0) + ' €';
+        sel.appendChild(opt);
+      });
+      const existing = slot?.service || '';
+      if (existing) {
+        const match = Array.from(sel.options).find(o => o.value && existing.toLowerCase().includes(o.value.toLowerCase()));
+        if (match) { match.selected = true; }
+        else {
+          const opt = document.createElement('option');
+          opt.value = existing; opt.textContent = existing; opt.selected = true;
+          sel.appendChild(opt);
+        }
+      }
       document.getElementById('modal-email-hint').textContent = '';
       const infoCard = document.getElementById('modal-info-card');
       if (slot && slot.customer_email) {
