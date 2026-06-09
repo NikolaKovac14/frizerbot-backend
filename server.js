@@ -525,6 +525,22 @@ async function initDB() {
   await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS booked_by TEXT DEFAULT 'manual'`);
   await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP`);
   await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS price_paid DECIMAL(10,2)`);
+  await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS cancellation_recovery_enabled BOOLEAN DEFAULT false`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS recovery_slots (
+      id SERIAL PRIMARY KEY,
+      token TEXT UNIQUE NOT NULL,
+      salon_id TEXT REFERENCES salons(id),
+      date DATE NOT NULL,
+      time TEXT NOT NULL,
+      service TEXT,
+      candidate_email TEXT,
+      candidate_phone TEXT,
+      candidate_name TEXT,
+      status TEXT DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS breach_log (
@@ -696,12 +712,12 @@ app.get('/admin/:id/settings', requireAdminAuth, async (req, res) => {
 });
 
 app.post('/admin/:id/settings', requireAdminAuth, async (req, res) => {
-  const { name, address, phone, services, notificationEmail } = req.body;
+  const { name, address, phone, services, notificationEmail, cancellationRecoveryEnabled } = req.body;
   const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
   const salonId = salonRows[0]?.id;
   await pool.query(
-    'UPDATE salons SET name=$1, address=$2, phone=$3, services=$4, notification_email=$5 WHERE id=$6',
-    [name, address, phone, services, notificationEmail, salonId]
+    'UPDATE salons SET name=$1, address=$2, phone=$3, services=$4, notification_email=$5, cancellation_recovery_enabled=$6 WHERE id=$7',
+    [name, address, phone, services, notificationEmail, !!cancellationRecoveryEnabled, salonId]
   );
   res.json({ success: true });
 });
@@ -2805,6 +2821,18 @@ function buildAdminPage(salon) {
         <div class="modal-field-label">Dodatne informacije</div>
         <textarea class="modal-input" id="s-services" rows="10" style="resize:vertical;font-family:system-ui,sans-serif;line-height:1.6;margin-bottom:14px;"></textarea>
         <div style="font-size:11px;color:#aaa;margin-bottom:20px;">Npr: Brezplačno parkirišče za stranke. Priporočamo prihod 5 minut prej. Sprejemamo kartice in gotovino.</div>
+        <div style="border-top:1px solid #e0e0e0;padding-top:20px;margin-top:4px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
+            <div>
+              <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Samodejno zapolnjevanje odpovedi</div>
+              <div style="font-size:11px;color:#888;line-height:1.5;">Ko stranka odpove termin, sistem avtomatsko obvesti primerne stranke ki se že 30+ dni niso naročile.</div>
+            </div>
+            <label style="position:relative;display:inline-block;width:44px;height:22px;flex-shrink:0;">
+              <input type="checkbox" id="s-recovery" style="opacity:0;width:0;height:0;">
+              <span onclick="document.getElementById('s-recovery').click()" style="position:absolute;cursor:pointer;inset:0;background:#e0e0e0;border-radius:22px;transition:.2s;" id="s-recovery-slider"></span>
+            </label>
+          </div>
+        </div>
       </div>
       <div class="schedule-footer">
         <div></div>
@@ -3038,6 +3066,9 @@ function buildAdminPage(salon) {
       document.getElementById('s-phone').value = data.phone || '';
       document.getElementById('s-email').value = data.notification_email || '';
       document.getElementById('s-services').value = data.services || '';
+      const cb = document.getElementById('s-recovery');
+      cb.checked = !!data.cancellation_recovery_enabled;
+      document.getElementById('s-recovery-slider').style.background = cb.checked ? '#c9984a' : '#e0e0e0';
       const planLimits = { starter: 1000, pro: 3000, agency: '10000' };
       const limit = planLimits[data.plan] || 3000;
       document.getElementById('s-chat-count').textContent = (data.chat_count || 0) + ' sporočil';
@@ -3061,7 +3092,8 @@ function buildAdminPage(salon) {
           address: document.getElementById('s-address').value.trim(),
           phone: document.getElementById('s-phone').value.trim(),
           notificationEmail: document.getElementById('s-email').value.trim(),
-          services: document.getElementById('s-services').value.trim()
+          services: document.getElementById('s-services').value.trim(),
+          cancellationRecoveryEnabled: document.getElementById('s-recovery').checked
         })
       });
       const data = await res.json();
@@ -3565,6 +3597,71 @@ app.post('/cancel/:token', async (req, res) => {
   if (slot.customer_email) {
     await pool.query(`DELETE FROM timeslots WHERE salon_id=$1 AND date=$2 AND customer_email=$3 AND time>$4 AND service LIKE '(%'`,
       [slot.salon_id, slot.date, slot.customer_email, slot.time]);
+  }
+
+  // Cancellation Recovery
+  try {
+    const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE id=$1', [slot.salon_id]);
+    const salon = salonRows[0];
+    if (salon?.cancellation_recovery_enabled) {
+      const { rows: candidates } = await pool.query(`
+        SELECT customer_email, MAX(customer_name) AS customer_name
+        FROM timeslots
+        WHERE salon_id=$1
+          AND customer_email != ''
+          AND customer_email != $2
+          AND status = 'busy'
+          AND service NOT LIKE '(%'
+          AND (LOWER(service) LIKE '%' || LOWER($3) || '%' OR LOWER($3) LIKE '%' || LOWER(service) || '%')
+        GROUP BY customer_email
+        HAVING MAX(date) < CURRENT_DATE - INTERVAL '30 days'
+          AND customer_email NOT IN (
+            SELECT DISTINCT customer_email FROM timeslots
+            WHERE salon_id=$1 AND status='busy' AND date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '14 days'
+          )
+        ORDER BY MAX(date) ASC
+        LIMIT 3
+      `, [slot.salon_id, slot.customer_email || '', slot.service || '']);
+
+      const bookingUrl = `${process.env.API_URL || 'https://bookwell.si'}/book/${salon.slug || salon.id}`;
+      for (const c of candidates) {
+        const recoveryToken = crypto.randomBytes(16).toString('hex');
+        await pool.query(
+          `INSERT INTO recovery_slots (token, salon_id, date, time, service, candidate_email, candidate_name) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [recoveryToken, salon.id, slot.date, slot.time, slot.service, c.customer_email, c.customer_name]
+        );
+        const dateF = new Date(slot.date).toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long' });
+        await sgMail.send({
+          to: c.customer_email,
+          from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
+          subject: `Sprostil se je termin v ${salon.name}`,
+          html: `
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;color:#2d2520;">
+              <div style="background:#1a1410;padding:20px 24px;border-radius:10px 10px 0 0;text-align:center;">
+                <h1 style="color:#c9a84c;margin:0;font-size:20px;">${salon.name}</h1>
+              </div>
+              <div style="background:#fff;padding:28px 24px;border-radius:0 0 10px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+                <p style="font-size:15px;margin:0 0 16px;">Pozdravljeni${c.customer_name ? ' <strong>' + c.customer_name + '</strong>' : ''},</p>
+                <p style="font-size:14px;color:#555;line-height:1.7;margin:0 0 20px;">Ravnokar se je sprostil termin:</p>
+                <div style="background:#f5f0eb;border-left:3px solid #c9a84c;padding:16px 20px;border-radius:4px;margin:0 0 24px;font-size:14px;line-height:2;">
+                  <div>📅 <strong>${dateF}</strong></div>
+                  <div>🕐 <strong>${slot.time}</strong></div>
+                  <div>💇 <strong>${slot.service || '—'}</strong></div>
+                </div>
+                <div style="text-align:center;">
+                  <a href="${bookingUrl}" style="display:inline-block;background:#1a1410;color:#c9a84c;padding:14px 32px;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:.06em;border-radius:6px;">
+                    Rezervirajte ta termin →
+                  </a>
+                </div>
+                <p style="font-size:11px;color:#aaa;text-align:center;margin-top:16px;">Termin je na voljo dokler ga ne zasede druga stranka.</p>
+              </div>
+            </div>
+          `
+        });
+      }
+    }
+  } catch(e) {
+    console.error('Recovery napaka:', e.message);
   }
 
   if (slot.notification_email) {
