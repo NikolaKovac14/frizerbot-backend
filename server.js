@@ -523,6 +523,8 @@ async function initDB() {
   `);
   await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS cancel_token TEXT UNIQUE`);
   await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS booked_by TEXT DEFAULT 'manual'`);
+  await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP`);
+  await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS price_paid DECIMAL(10,2)`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS breach_log (
@@ -715,6 +717,51 @@ app.post('/admin/:id/change-password', requireAdminAuth, async (req, res) => {
   const hashed = await bcrypt.hash(newPassword, 10);
   await pool.query('UPDATE salons SET admin_password = $1 WHERE id = $2', [hashed, salon.id]);
   res.json({ success: true });
+});
+
+// ─── REVENUE DASHBOARD API ────────────────────────────────────────────────────
+app.get('/admin/:id/revenue', requireAdminAuth, async (req, res) => {
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id=$1 OR slug=$1)', [req.params.id]);
+  const salonId = salonRows[0]?.id;
+  if (!salonId) return res.status(404).json({ error: 'Not found' });
+
+  const { rows: stats } = await pool.query(`
+    SELECT
+      COUNT(*) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) AND status='busy' AND service NOT LIKE '(%)') AS bookings_month,
+      COUNT(*) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) AND status='cancelled' AND service NOT LIKE '(%)') AS cancelled_month,
+      COUNT(DISTINCT customer_email) FILTER (WHERE customer_email != '' AND status='busy') AS total_customers
+    FROM timeslots WHERE salon_id = $1
+  `, [salonId]);
+
+  const { rows: rev } = await pool.query(`
+    SELECT
+      COALESCE(SUM(COALESCE(t.price_paid, (s.min_price + COALESCE(s.max_price, s.min_price)) / 2)), 0) AS revenue_month,
+      COALESCE(SUM(COALESCE(t.price_paid, (s.min_price + COALESCE(s.max_price, s.min_price)) / 2)) FILTER (WHERE t.status='cancelled'), 0) AS cancelled_revenue
+    FROM timeslots t
+    LEFT JOIN services s ON s.salon_id = t.salon_id AND LOWER(s.name) = LOWER(t.service) AND s.active = true
+    WHERE t.salon_id = $1
+      AND t.date >= date_trunc('month', CURRENT_DATE)
+      AND t.service NOT LIKE '(%'
+  `, [salonId]);
+
+  const { rows: inactive } = await pool.query(`
+    SELECT customer_email, MAX(customer_name) AS customer_name, MAX(date) AS last_visit, COUNT(*) AS visit_count
+    FROM timeslots
+    WHERE salon_id=$1 AND customer_email != '' AND status='busy' AND service NOT LIKE '(%'
+    GROUP BY customer_email
+    HAVING MAX(date) < CURRENT_DATE - INTERVAL '60 days'
+    ORDER BY last_visit ASC
+    LIMIT 25
+  `, [salonId]);
+
+  res.json({
+    bookings_month: parseInt(stats[0].bookings_month) || 0,
+    cancelled_month: parseInt(stats[0].cancelled_month) || 0,
+    total_customers: parseInt(stats[0].total_customers) || 0,
+    revenue_month: parseFloat(rev[0].revenue_month) || 0,
+    cancelled_revenue: parseFloat(rev[0].cancelled_revenue) || 0,
+    inactive_customers: inactive
+  });
 });
 
 // ─── HOSTED CHAT STRAN ────────────────────────────────────────────────────────
@@ -2465,12 +2512,14 @@ function buildAdminPage(salon) {
     <div class="nav-tab active" onclick="switchTab('termini')">Termini</div>
     <div class="nav-tab" onclick="switchTab('urnik')">Delovni čas</div>
     <div class="nav-tab" onclick="switchTab('storitve')">Storitve</div>
+    <div class="nav-tab" onclick="switchTab('prihodki')">Prihodki</div>
     <div class="nav-tab" onclick="switchTab('nastavitve')">Nastavitve</div>
   </nav>
   <div class="mob-acc" id="mob-acc">
     <div class="mob-acc-item"><button class="mob-acc-btn active" onclick="mobToggle(this,'termini')">Termini <span class="mob-acc-arrow">▾</span></button></div>
     <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'urnik')">Delovni čas <span class="mob-acc-arrow">▾</span></button></div>
     <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'storitve')">Storitve <span class="mob-acc-arrow">▾</span></button></div>
+    <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'prihodki')">Prihodki <span class="mob-acc-arrow">▾</span></button></div>
     <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'nastavitve')">Nastavitve <span class="mob-acc-arrow">▾</span></button></div>
   </div>
   <div class="tab-content active" id="tab-termini">
@@ -2546,6 +2595,46 @@ function buildAdminPage(salon) {
       </div>
     </div>
   </div>
+  <div class="tab-content" id="tab-prihodki">
+    <div class="page">
+      <div style="font-family:'Playfair Display',serif;font-size:32px;font-weight:700;letter-spacing:-.02em;margin-bottom:6px;">Prihodki</div>
+      <div style="font-size:12px;color:#888;margin-bottom:28px;letter-spacing:.04em;">Ta mesec &mdash; ocena na podlagi rezervacij</div>
+      <hr class="section-rule thick">
+      <div id="rev-loading" style="color:#aaa;font-size:13px;padding:20px 0;">Nalagam...</div>
+      <div id="rev-content" style="display:none;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1px;background:#e0e0e0;border:1px solid #e0e0e0;margin-bottom:32px;">
+          <div style="background:#fff;padding:24px 22px;">
+            <div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#888;margin-bottom:10px;">Prihodki ta mesec</div>
+            <div id="rev-revenue" style="font-family:'Playfair Display',serif;font-size:30px;font-weight:700;color:#0a0a0a;">—</div>
+            <div style="font-size:11px;color:#aaa;margin-top:4px;">ocena iz storitev</div>
+          </div>
+          <div style="background:#fff;padding:24px 22px;">
+            <div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#888;margin-bottom:10px;">Izgubljeno (odpovedi)</div>
+            <div id="rev-cancelled-rev" style="font-family:'Playfair Display',serif;font-size:30px;font-weight:700;color:#8a1a1a;">—</div>
+            <div id="rev-cancelled-count" style="font-size:11px;color:#aaa;margin-top:4px;">0 odpovedi</div>
+          </div>
+          <div style="background:#fff;padding:24px 22px;">
+            <div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#888;margin-bottom:10px;">Rezervacije ta mesec</div>
+            <div id="rev-bookings" style="font-family:'Playfair Display',serif;font-size:30px;font-weight:700;color:#0a0a0a;">—</div>
+            <div style="font-size:11px;color:#aaa;margin-top:4px;">potrjenih terminov</div>
+          </div>
+          <div style="background:#fff;padding:24px 22px;">
+            <div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#888;margin-bottom:10px;">Neaktivne stranke</div>
+            <div id="rev-inactive" style="font-family:'Playfair Display',serif;font-size:30px;font-weight:700;color:#c9984a;">—</div>
+            <div style="font-size:11px;color:#aaa;margin-top:4px;">60+ dni odsotne</div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #e0e0e0;">
+          <div style="padding:20px 24px;border-bottom:2px solid #0a0a0a;display:flex;align-items:baseline;justify-content:space-between;">
+            <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;">Neaktivne stranke</div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#888;">60+ dni ni bilo rezervacije</div>
+          </div>
+          <div id="rev-inactive-list" style="min-height:60px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="tab-content" id="tab-nastavitve">
   <div class="page">
     <div class="schedule-card">
@@ -2693,9 +2782,48 @@ function buildAdminPage(salon) {
     function getDayKey(d) { return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()]; }
 
     function switchTab(name) {
-      document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik','storitve','nastavitve'][i] === name));
+      document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik','storitve','prihodki','nastavitve'][i] === name));
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
+      if (name === 'prihodki') loadRevenue();
+    }
+
+    let revLoaded = false;
+    async function loadRevenue() {
+      if (revLoaded) return;
+      revLoaded = true;
+      try {
+        const res = await fetch(API_URL + '/admin/' + SALON_ID + '/revenue');
+        const d = await res.json();
+        document.getElementById('rev-loading').style.display = 'none';
+        document.getElementById('rev-content').style.display = 'block';
+        document.getElementById('rev-revenue').textContent = d.revenue_month > 0 ? d.revenue_month.toFixed(0) + ' €' : '0 €';
+        document.getElementById('rev-cancelled-rev').textContent = d.cancelled_revenue > 0 ? d.cancelled_revenue.toFixed(0) + ' €' : '0 €';
+        document.getElementById('rev-cancelled-count').textContent = d.cancelled_month + ' ' + (d.cancelled_month === 1 ? 'odpoved' : 'odpovedi');
+        document.getElementById('rev-bookings').textContent = d.bookings_month;
+        document.getElementById('rev-inactive').textContent = d.inactive_customers.length;
+
+        const list = document.getElementById('rev-inactive-list');
+        if (!d.inactive_customers.length) {
+          list.innerHTML = '<div style="padding:24px 28px;font-size:13px;color:#aaa;font-style:italic;">Ni neaktivnih strank. Odlično!</div>';
+        } else {
+          list.innerHTML = d.inactive_customers.map(c => {
+            const days = Math.floor((Date.now() - new Date(c.last_visit)) / 86400000);
+            return \`<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid #f0f0f0;">
+              <div>
+                <div style="font-size:13px;font-weight:600;">\${c.customer_name || '—'}</div>
+                <div style="font-size:11px;color:#888;">\${c.customer_email}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:12px;font-weight:700;color:#c9984a;">\${days} dni</div>
+                <div style="font-size:10px;color:#aaa;">\${c.visit_count} obiskov skupaj</div>
+              </div>
+            </div>\`;
+          }).join('');
+        }
+      } catch(e) {
+        document.getElementById('rev-loading').textContent = 'Napaka pri nalaganju.';
+      }
     }
 
     function formatDate(d) { return d.toISOString().split('T')[0]; }
@@ -3214,8 +3342,8 @@ app.post('/cancel/:token', async (req, res) => {
   const slot = rows[0];
   const dateFormatted = new Date(slot.date).toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  await pool.query('DELETE FROM timeslots WHERE cancel_token = $1', [token]);
-  // Briši extra termine (nadaljevanje)
+  await pool.query("UPDATE timeslots SET status='cancelled', cancelled_at=NOW() WHERE cancel_token = $1", [token]);
+  // Briši extra (nadaljevalne) termine za daljše storitve
   if (slot.customer_email) {
     await pool.query(`DELETE FROM timeslots WHERE salon_id=$1 AND date=$2 AND customer_email=$3 AND time>$4 AND service LIKE '(%'`,
       [slot.salon_id, slot.date, slot.customer_email, slot.time]);
