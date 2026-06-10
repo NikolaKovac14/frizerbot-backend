@@ -810,7 +810,8 @@ app.get('/admin/:id/revenue', requireAdminAuth, async (req, res) => {
 // ─── REACTIVATION CAMPAIGN ────────────────────────────────────────────────────
 app.post('/admin/:id/reactivation-campaign', requireAdminAuth, async (req, res) => {
   const { emails, days = 60, discount = 10 } = req.body;
-  const discountNum = Math.min(99, Math.max(1, parseInt(discount) || 10));
+  const discountNum = parseInt(discount) || 0;
+  const hasDiscount = discountNum > 0;
   const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE (id=$1 OR slug=$1)', [req.params.id]);
   const salon = salonRows[0];
   if (!salon) return res.status(404).json({ error: 'Not found' });
@@ -841,47 +842,78 @@ app.post('/admin/:id/reactivation-campaign', requireAdminAuth, async (req, res) 
   let sent = 0;
 
   for (const c of customers) {
-    const couponCode = `${discountNum}OFF-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const greeting = c.customer_name ? ' <strong>' + c.customer_name + '</strong>' : '';
+    let subject, html;
+    if (hasDiscount) {
+      const couponCode = `${discountNum}OFF-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+      subject = `Pogrešamo vas v ${salon.name} — ${discountNum} % popust za vas`;
+      html = `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px;color:#2d2520;">
+          <div style="background:#1a1410;padding:24px 28px;border-radius:10px 10px 0 0;text-align:center;">
+            <h1 style="color:#c9a84c;margin:0;font-size:22px;">${salon.name}</h1>
+          </div>
+          <div style="background:#fff;padding:32px 28px;border-radius:0 0 10px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+            <p style="font-size:16px;margin:0 0 16px;">Pozdravljeni${greeting},</p>
+            <p style="font-size:14px;color:#555;line-height:1.7;margin:0 0 24px;">
+              Že nekaj časa vas ni bilo pri nas — pogrešamo vas! 😊<br>
+              Ker ste naša zvesta stranka, vam pripravljamo posebno ponudbo:
+            </p>
+            <div style="background:#fdf6ec;border:2px solid #c9a84c;border-radius:8px;padding:24px;text-align:center;margin:0 0 20px;">
+              <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8c6830;margin-bottom:8px;">Vaša posebna ponudba</div>
+              <div style="font-size:40px;font-weight:700;color:#c9a84c;line-height:1;">${discountNum} %</div>
+              <div style="font-size:14px;color:#555;margin-top:4px;">popust na naslednji obisk</div>
+              <div style="margin-top:16px;background:#fff;border:2px dashed #c9a84c;border-radius:6px;padding:12px 20px;display:inline-block;">
+                <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#888;margin-bottom:4px;">Koda kupona</div>
+                <div style="font-size:22px;font-weight:700;letter-spacing:.12em;color:#1a1410;">${couponCode}</div>
+              </div>
+            </div>
+            <div style="background:#f0fdf4;border-left:3px solid #4ade80;padding:12px 16px;border-radius:4px;font-size:13px;color:#166534;margin:0 0 24px;">
+              <strong>Kako uveljaviti:</strong> Pokažite ta email ob prihodu v salon ali ga omeni pri rezervaciji.
+            </div>
+            <div style="text-align:center;">
+              <a href="${bookingUrl}" style="display:inline-block;background:#1a1410;color:#c9a84c;padding:14px 32px;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:.06em;border-radius:6px;">
+                Rezervirajte termin →
+              </a>
+            </div>
+            <p style="font-size:11px;color:#aaa;text-align:center;margin-top:20px;">
+              Ponudba velja do konca meseca. Koda je edinstvena za vas.
+            </p>
+          </div>
+          <div style="text-align:center;padding:12px;font-size:11px;color:#aaa;">Poganja BookWell.si</div>
+        </div>
+      `;
+    } else {
+      subject = `Pogrešamo vas v ${salon.name} — pridite kmalu!`;
+      html = `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px;color:#2d2520;">
+          <div style="background:#1a1410;padding:24px 28px;border-radius:10px 10px 0 0;text-align:center;">
+            <h1 style="color:#c9a84c;margin:0;font-size:22px;">${salon.name}</h1>
+          </div>
+          <div style="background:#fff;padding:32px 28px;border-radius:0 0 10px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+            <p style="font-size:16px;margin:0 0 16px;">Pozdravljeni${greeting},</p>
+            <p style="font-size:14px;color:#555;line-height:1.7;margin:0 0 24px;">
+              Že nekaj časa vas ni bilo pri nas — pogrešamo vas! 😊<br>
+              Bi že čas za nov obisk? Z veseljem vas spet vidimo.
+            </p>
+            <div style="text-align:center;margin:0 0 24px;">
+              <a href="${bookingUrl}" style="display:inline-block;background:#1a1410;color:#c9a84c;padding:14px 32px;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:.06em;border-radius:6px;">
+                Rezervirajte termin →
+              </a>
+            </div>
+            <p style="font-size:12px;color:#aaa;text-align:center;">
+              Rezervacija je hitra in enostavna — samo kliknite zgoraj.
+            </p>
+          </div>
+          <div style="text-align:center;padding:12px;font-size:11px;color:#aaa;">Poganja BookWell.si</div>
+        </div>
+      `;
+    }
     try {
       await sgMail.send({
         to: c.customer_email,
         from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
-        subject: `Pogrešamo vas v ${salon.name} — ${discountNum} % popust za vas`,
-        html: `
-          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px;color:#2d2520;">
-            <div style="background:#1a1410;padding:24px 28px;border-radius:10px 10px 0 0;text-align:center;">
-              <h1 style="color:#c9a84c;margin:0;font-size:22px;">${salon.name}</h1>
-            </div>
-            <div style="background:#fff;padding:32px 28px;border-radius:0 0 10px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-              <p style="font-size:16px;margin:0 0 16px;">Pozdravljeni${c.customer_name ? ' <strong>' + c.customer_name + '</strong>' : ''},</p>
-              <p style="font-size:14px;color:#555;line-height:1.7;margin:0 0 24px;">
-                Že nekaj časa vas ni bilo pri nas — pogrešamo vas! 😊<br>
-                Ker ste naša zvesta stranka, vam pripravljamo posebno ponudbo:
-              </p>
-              <div style="background:#fdf6ec;border:2px solid #c9a84c;border-radius:8px;padding:24px;text-align:center;margin:0 0 20px;">
-                <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8c6830;margin-bottom:8px;">Vaša posebna ponudba</div>
-                <div style="font-size:40px;font-weight:700;color:#c9a84c;line-height:1;">${discountNum} %</div>
-                <div style="font-size:14px;color:#555;margin-top:4px;">popust na naslednji obisk</div>
-                <div style="margin-top:16px;background:#fff;border:2px dashed #c9a84c;border-radius:6px;padding:12px 20px;display:inline-block;">
-                  <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#888;margin-bottom:4px;">Koda kupona</div>
-                  <div style="font-size:22px;font-weight:700;letter-spacing:.12em;color:#1a1410;">${couponCode}</div>
-                </div>
-              </div>
-              <div style="background:#f0fdf4;border-left:3px solid #4ade80;padding:12px 16px;border-radius:4px;font-size:13px;color:#166534;margin:0 0 24px;">
-                <strong>Kako uveljaviti:</strong> Pokažite ta email ob prihodu v salon ali ga omeni pri rezervaciji.
-              </div>
-              <div style="text-align:center;">
-                <a href="${bookingUrl}" style="display:inline-block;background:#1a1410;color:#c9a84c;padding:14px 32px;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:.06em;border-radius:6px;">
-                  Rezervirajte termin →
-                </a>
-              </div>
-              <p style="font-size:11px;color:#aaa;text-align:center;margin-top:20px;">
-                Ponudba velja do konca meseca. Koda je edinstvena za vas.
-              </p>
-            </div>
-            <div style="text-align:center;padding:12px;font-size:11px;color:#aaa;">Poganja BookWell.si</div>
-          </div>
-        `
+        subject,
+        html
       });
       sent++;
     } catch(e) {
@@ -2764,10 +2796,16 @@ function buildAdminPage(salon) {
           <div id="rev-campaign-bar" style="display:none;padding:16px 24px;border-top:1px solid #e0e0e0;flex-direction:column;gap:12px;">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <div id="rev-campaign-info" style="font-size:12px;color:#555;flex:1;"></div>
-              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-                <div style="font-size:11px;font-weight:600;color:#888;">Popust:</div>
-                <input id="rev-discount" type="number" value="10" min="1" max="99" style="width:58px;padding:6px 8px;border:1px solid #e0e0e0;font-size:13px;font-family:system-ui,sans-serif;text-align:center;">
-                <div style="font-size:13px;color:#888;">%</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#555;cursor:pointer;white-space:nowrap;">
+                  <input type="checkbox" id="rev-no-discount" onchange="toggleDiscountInput()" style="width:14px;height:14px;cursor:pointer;">
+                  Samo povabilo (brez popusta)
+                </label>
+                <div id="rev-discount-wrap" style="display:flex;align-items:center;gap:6px;">
+                  <div style="font-size:11px;font-weight:600;color:#888;">Popust:</div>
+                  <input id="rev-discount" type="number" value="10" min="1" max="99" style="width:58px;padding:6px 8px;border:1px solid #e0e0e0;font-size:13px;font-family:system-ui,sans-serif;text-align:center;">
+                  <div style="font-size:13px;color:#888;">%</div>
+                </div>
                 <button onclick="sendCampaign()" style="background:#1a1410;color:#c9a84c;border:none;padding:10px 20px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;font-family:system-ui,sans-serif;">
                   Pošlji kampanjo
                 </button>
@@ -3002,6 +3040,12 @@ function buildAdminPage(salon) {
 
     function reloadRevenue() { loadRevenue(); }
 
+    function toggleDiscountInput() {
+      const noDiscount = document.getElementById('rev-no-discount').checked;
+      document.getElementById('rev-discount-wrap').style.display = noDiscount ? 'none' : 'flex';
+      updateCampaignBar();
+    }
+
     function getCheckedEmails() {
       return Array.from(document.querySelectorAll('#rev-inactive-list input[type=checkbox]:checked'))
         .map(cb => cb.dataset.email).filter(Boolean);
@@ -3014,8 +3058,11 @@ function buildAdminPage(salon) {
       const allBtn = document.getElementById('rev-check-all-btn');
       const total = document.querySelectorAll('#rev-inactive-list input[type=checkbox]:not(:disabled)').length;
       bar.style.display = checked.length ? 'flex' : 'none';
+      const noDiscount = document.getElementById('rev-no-discount')?.checked;
       const disc = document.getElementById('rev-discount')?.value || 10;
-      info.textContent = checked.length + ' / ' + total + ' strankam bo poslan email z ' + disc + ' % popustom';
+      info.textContent = noDiscount
+        ? checked.length + ' / ' + total + ' strankam bo poslano povabilo (brez popusta)'
+        : checked.length + ' / ' + total + ' strankam bo poslan email z ' + disc + ' % popustom';
       allBtn.textContent = checked.length === total ? 'Odznači vse' : 'Označi vse';
     }
 
@@ -3034,8 +3081,9 @@ function buildAdminPage(salon) {
       btn.textContent = 'Pošiljam...';
       btn.disabled = true;
       try {
-        const discount = parseInt(document.getElementById('rev-discount')?.value) || 10;
-      const res = await fetch(API_URL + '/admin/' + SALON_ID + '/reactivation-campaign', {
+        const noDiscount = document.getElementById('rev-no-discount')?.checked;
+        const discount = noDiscount ? 0 : (parseInt(document.getElementById('rev-discount')?.value) || 10);
+        const res = await fetch(API_URL + '/admin/' + SALON_ID + '/reactivation-campaign', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ emails, discount })
