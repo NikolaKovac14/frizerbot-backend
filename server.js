@@ -1777,6 +1777,7 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
   const currentHour = todayLj.getHours();
   const currentMinute = todayLj.getMinutes();
   const schedule = salon.schedule || DEFAULT_SCHEDULE;
+  const employees = salon._employees || [];
 
   // busy po datumu (skupaj) in po zaposlenem
   const busyByDate = {};
@@ -1839,7 +1840,6 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
     slotsText = days.length > 0 ? days.join('\n') : 'Trenutno ni prostih terminov v naslednjih 7 dneh.';
   }
 
-  const employees = salon._employees || [];
   const hasMultipleEmployees = employees.length >= 2;
   const employeeListText = hasMultipleEmployees
     ? `\nZAPOSLENI (stranka MORA izbrati enega preden rezervira):\n${employees.map(e => `- ${e.name} (id: ${e.id})`).join('\n')}\n`
