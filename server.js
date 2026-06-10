@@ -344,6 +344,19 @@ function generateHalfHourSlots(from, to) {
   return slots;
 }
 
+function getHoursForEmployee(schedule, dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const dayMap = ['sun','mon','tue','wed','thu','fri','sat'];
+  const dayKey = dayMap[d.getDay()];
+  const day = schedule && schedule[dayKey];
+  if (!day || !day.open) return [];
+  const slots = new Set();
+  for (const p of (day.periods || [])) {
+    for (const t of generateHalfHourSlots(p.from, p.to)) slots.add(t);
+  }
+  return [...slots].sort();
+}
+
 function parseServiceDuration(serviceName, servicesText, durationMap) {
   if (durationMap && serviceName) {
     const found = durationMap[(serviceName || '').toLowerCase()];
@@ -526,6 +539,18 @@ async function initDB() {
   await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP`);
   await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS price_paid DECIMAL(10,2)`);
   await pool.query(`ALTER TABLE salons ADD COLUMN IF NOT EXISTS cancellation_recovery_enabled BOOLEAN DEFAULT false`);
+  await pool.query(`ALTER TABLE timeslots ADD COLUMN IF NOT EXISTS employee_id INT`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS employees (
+      id SERIAL PRIMARY KEY,
+      salon_id TEXT REFERENCES salons(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      active BOOLEAN DEFAULT true,
+      position INT DEFAULT 0,
+      schedule JSONB DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS recovery_slots (
       id SERIAL PRIMARY KEY,
@@ -1274,20 +1299,21 @@ app.get('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
 });
 
 app.post('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
-  const { date, time, status, customerName, customerEmail, service } = req.body;
+  const { date, time, status, customerName, customerEmail, service, employeeId } = req.body;
   const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
   const salon = salonRows[0];
   if (!salon) return res.status(404).json({ error: 'Not found' });
   const salonId = salon.id;
+  const empId = employeeId ? parseInt(employeeId) : null;
 
   if (status === 'busy') {
     const cleanEmail = (customerEmail || '').trim();
     await pool.query(`
-      INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, service)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, service, employee_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       ON CONFLICT (salon_id, date, time) DO UPDATE
-      SET status = $4, customer_name = $5, customer_email = $6, service = $7
-    `, [salonId, date, time, status, customerName, cleanEmail, service]);
+      SET status = $4, customer_name = $5, customer_email = $6, service = $7, employee_id = $8
+    `, [salonId, date, time, status, customerName, cleanEmail, service, empId]);
 
     if (cleanEmail) {
       const cancelToken = crypto.randomBytes(20).toString('hex');
@@ -1430,6 +1456,49 @@ app.post('/admin/:id/schedule', requireAdminAuth, async (req, res) => {
   const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id = $1 OR slug = $1)', [req.params.id]);
   const salonId = salonRows[0]?.id || req.params.id;
   await pool.query('UPDATE salons SET schedule = $1 WHERE id = $2', [JSON.stringify(req.body), salonId]);
+  res.json({ success: true });
+});
+
+// ─── EMPLOYEES ────────────────────────────────────────────────────────────────
+app.get('/admin/:id/employees', requireAdminAuth, async (req, res) => {
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id=$1 OR slug=$1)', [req.params.id]);
+  const salonId = salonRows[0]?.id;
+  if (!salonId) return res.status(404).json({ error: 'Not found' });
+  const { rows } = await pool.query('SELECT * FROM employees WHERE salon_id=$1 ORDER BY position, created_at', [salonId]);
+  res.json(rows);
+});
+
+app.post('/admin/:id/employees', requireAdminAuth, async (req, res) => {
+  const { name } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Ime je obvezno' });
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id=$1 OR slug=$1)', [req.params.id]);
+  const salonId = salonRows[0]?.id;
+  if (!salonId) return res.status(404).json({ error: 'Not found' });
+  const { rows } = await pool.query('INSERT INTO employees (salon_id, name) VALUES ($1,$2) RETURNING *', [salonId, name.trim()]);
+  res.json(rows[0]);
+});
+
+app.put('/admin/:id/employees/:eid', requireAdminAuth, async (req, res) => {
+  const { name, active, schedule } = req.body;
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id=$1 OR slug=$1)', [req.params.id]);
+  const salonId = salonRows[0]?.id;
+  if (!salonId) return res.status(404).json({ error: 'Not found' });
+  const updates = [];
+  const vals = [];
+  if (name !== undefined) { updates.push(`name=$${vals.length+1}`); vals.push(name); }
+  if (active !== undefined) { updates.push(`active=$${vals.length+1}`); vals.push(active); }
+  if (schedule !== undefined) { updates.push(`schedule=$${vals.length+1}`); vals.push(JSON.stringify(schedule)); }
+  if (!updates.length) return res.json({ success: true });
+  vals.push(req.params.eid, salonId);
+  await pool.query(`UPDATE employees SET ${updates.join(',')} WHERE id=$${vals.length-1} AND salon_id=$${vals.length}`, vals);
+  res.json({ success: true });
+});
+
+app.delete('/admin/:id/employees/:eid', requireAdminAuth, async (req, res) => {
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id=$1 OR slug=$1)', [req.params.id]);
+  const salonId = salonRows[0]?.id;
+  if (!salonId) return res.status(404).json({ error: 'Not found' });
+  await pool.query('DELETE FROM employees WHERE id=$1 AND salon_id=$2', [req.params.eid, salonId]);
   res.json({ success: true });
 });
 
@@ -2663,6 +2732,7 @@ function buildAdminPage(salon) {
     <div class="nav-tab active" onclick="switchTab('termini')">Termini</div>
     <div class="nav-tab" onclick="switchTab('urnik')">Delovni čas</div>
     <div class="nav-tab" onclick="switchTab('storitve')">Storitve</div>
+    <div class="nav-tab" onclick="switchTab('zaposleni')">Zaposleni</div>
     <div class="nav-tab" onclick="switchTab('prihodki')">Prihodki</div>
     <div class="nav-tab" onclick="switchTab('nastavitve')">Nastavitve</div>
   </nav>
@@ -2670,6 +2740,7 @@ function buildAdminPage(salon) {
     <div class="mob-acc-item"><button class="mob-acc-btn active" onclick="mobToggle(this,'termini')">Termini <span class="mob-acc-arrow">▾</span></button></div>
     <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'urnik')">Delovni čas <span class="mob-acc-arrow">▾</span></button></div>
     <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'storitve')">Storitve <span class="mob-acc-arrow">▾</span></button></div>
+    <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'zaposleni')">Zaposleni <span class="mob-acc-arrow">▾</span></button></div>
     <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'prihodki')">Prihodki <span class="mob-acc-arrow">▾</span></button></div>
     <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'nastavitve')">Nastavitve <span class="mob-acc-arrow">▾</span></button></div>
   </div>
@@ -2682,6 +2753,12 @@ function buildAdminPage(salon) {
         <button class="nav-arrow" id="next">&#8594;</button>
       </div>
       <hr class="section-rule thick">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#888;">Zaposlen/a:</div>
+        <select id="emp-filter" onchange="loadSlots()" style="padding:5px 10px;border:1px solid #e0e0e0;font-size:12px;font-family:system-ui,sans-serif;background:#f7f7f5;cursor:pointer;">
+          <option value="">Vsi zaposleni</option>
+        </select>
+      </div>
       <div class="stats-row" id="stats-row"></div>
       <div id="slots-container"></div>
     </div>
@@ -2745,6 +2822,39 @@ function buildAdminPage(salon) {
         </div>
       </div>
     </div>
+  </div>
+  <div class="tab-content" id="tab-zaposleni">
+  <div class="page">
+    <div class="schedule-card">
+      <div class="schedule-head">
+        <div><div class="schedule-head-title">Zaposleni</div></div>
+        <div class="schedule-head-sub">Urniki in dodelitve</div>
+      </div>
+      <div style="padding:24px 28px;border-bottom:1px solid #e0e0e0;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:12px;">Dodaj zaposlenega</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="modal-input" type="text" id="emp-new-name" style="margin:0;flex:1;" placeholder="Ime in priimek" />
+          <button class="save-btn" style="padding:9px 16px;white-space:nowrap;" onclick="addEmployee()">+ Dodaj</button>
+        </div>
+        <div id="emp-add-err" style="display:none;font-size:11px;color:#dc2626;margin-top:6px;"></div>
+      </div>
+      <div id="emp-list" style="min-height:60px;">
+        <div style="padding:24px 28px;font-size:13px;color:#aaa;font-style:italic;">Nalagam zaposlene...</div>
+      </div>
+      <div id="emp-schedule-panel" style="display:none;border-top:2px solid #0a0a0a;">
+        <div style="padding:20px 28px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;" id="emp-sched-title">Urnik</div>
+          <button onclick="closeEmpSchedule()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#888;">×</button>
+        </div>
+        <div id="emp-sched-rows" style="padding:0 28px;"></div>
+        <div style="padding:18px 28px;border-top:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-between;">
+          <div id="emp-sched-msg" style="font-size:11px;font-weight:700;color:#2a7a2a;display:none;">✓ Shranjeno</div>
+          <div></div>
+          <button class="save-btn" onclick="saveEmployeeSchedule()">Shrani urnik</button>
+        </div>
+      </div>
+    </div>
+  </div>
   </div>
   <div class="tab-content" id="tab-prihodki">
     <div class="page">
@@ -2911,6 +3021,10 @@ function buildAdminPage(salon) {
         <select class="modal-input" id="modal-service" style="cursor:pointer;">
           <option value="">— Izberi storitev —</option>
         </select>
+        <div class="modal-field-label">Zaposlen/a <span class="optional">(neobvezno)</span></div>
+        <select class="modal-input" id="modal-employee" style="cursor:pointer;">
+          <option value="">— Kdorkoli —</option>
+        </select>
         <div class="modal-field-label">E-pošta stranke <span class="optional">(neobvezno — za potrditveni e-mail)</span></div>
         <input class="modal-input" type="email" id="modal-email" placeholder="stranka@email.com" />
         <div class="modal-email-hint" id="modal-email-hint"></div>
@@ -2929,6 +3043,8 @@ function buildAdminPage(salon) {
     let currentSlot = null;
     let slotsData = {};
     let schedule = ${scheduleJson};
+    let empList = [];
+    let activeEmpId = null;
 
     const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
     const DAY_NAMES_SL = { mon:'Ponedeljek', tue:'Torek', wed:'Sreda', thu:'Četrtek', fri:'Petek', sat:'Sobota', sun:'Nedelja' };
@@ -2979,10 +3095,11 @@ function buildAdminPage(salon) {
     function getDayKey(d) { return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()]; }
 
     function switchTab(name) {
-      document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik','storitve','prihodki','nastavitve'][i] === name));
+      document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik','storitve','zaposleni','prihodki','nastavitve'][i] === name));
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
       if (name === 'prihodki') loadRevenue();
+      if (name === 'zaposleni') loadEmployees();
     }
 
     async function loadRevenue() {
@@ -3185,18 +3302,34 @@ function buildAdminPage(salon) {
       const dayNum = currentDate.toLocaleDateString('sl-SI', { day: 'numeric', month: 'long', year: 'numeric' });
       dateHeading.innerHTML = dayName + ', <em>' + dayNum + (isTodayFlag ? ' — danes' : '') + '</em>';
       const dayKey = getDayKey(currentDate);
-      const daySchedule = schedule[dayKey];
       const container = document.getElementById('slots-container');
-      if (!daySchedule || !daySchedule.open) {
-        container.innerHTML = \`<div class="closed-banner"><div class="closed-title">Salon je zaprt</div><div class="closed-sub">Ta dan ni delovnega časa</div></div>\`;
-        document.getElementById('stats-row').innerHTML = '';
-        return;
+      const selEmpId = document.getElementById('emp-filter')?.value || '';
+      const selEmp = selEmpId ? empList.find(e => String(e.id) === selEmpId) : null;
+      let hours;
+      if (selEmp && selEmp.schedule) {
+        hours = getHoursForEmployeeJS(selEmp.schedule, dateStr);
+        if (!hours.length) {
+          container.innerHTML = \`<div class="closed-banner"><div class="closed-title">\${selEmp.name} ne dela ta dan</div><div class="closed-sub">Ni delovnega časa za ta dan</div></div>\`;
+          document.getElementById('stats-row').innerHTML = '';
+          return;
+        }
+      } else {
+        const daySchedule = schedule[dayKey];
+        if (!daySchedule || !daySchedule.open) {
+          container.innerHTML = \`<div class="closed-banner"><div class="closed-title">Salon je zaprt</div><div class="closed-sub">Ta dan ni delovnega časa</div></div>\`;
+          document.getElementById('stats-row').innerHTML = '';
+          return;
+        }
+        hours = generateSlots(daySchedule.from, daySchedule.to);
       }
       const res = await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots?date=' + dateStr);
       const data = await res.json();
       slotsData = {};
-      data.forEach(s => { slotsData[s.time] = s; });
-      const hours = generateSlots(daySchedule.from, daySchedule.to);
+      data.forEach(s => {
+        if (!selEmpId || !s.employee_id || String(s.employee_id) === selEmpId) {
+          slotsData[s.time] = s;
+        }
+      });
       const busyCount = hours.filter(h => slotsData[h] && slotsData[h].status === 'busy').length;
       const botCount = hours.filter(h => slotsData[h] && slotsData[h].status === 'busy' && slotsData[h].customer_email).length;
       const freeCount = hours.length - busyCount;
@@ -3226,7 +3359,9 @@ function buildAdminPage(salon) {
         card.className = 'slot-card ' + cls;
         const statusLabel = isBusy ? (isBot ? 'Bot' : 'Zaseden') : 'Prost';
         const nameHtml = slot && slot.customer_name ? \`<div class="slot-name">\${slot.customer_name}</div>\` : \`<div class="slot-name">&nbsp;</div>\`;
-        card.innerHTML = \`<div class="slot-top"><div class="slot-time">\${hour}</div><div class="slot-dot"></div></div>\${nameHtml}<div class="slot-label">\${statusLabel}</div>\`;
+        const emp = slot?.employee_id ? empList.find(e => e.id === slot.employee_id) : null;
+        const empHtml = emp ? \`<div style="font-size:9px;color:#c9a84c;font-weight:600;letter-spacing:.04em;margin-top:2px;">\${emp.name}</div>\` : '';
+        card.innerHTML = \`<div class="slot-top"><div class="slot-time">\${hour}</div><div class="slot-dot"></div></div>\${nameHtml}\${empHtml}<div class="slot-label">\${statusLabel}</div>\`;
         card.addEventListener('click', () => openModal(hour, slot));
         grid.appendChild(card);
       });
@@ -3257,6 +3392,8 @@ function buildAdminPage(salon) {
           sel.appendChild(opt);
         }
       }
+      const empSel = document.getElementById('modal-employee');
+      if (empSel) { empSel.value = slot?.employee_id ? String(slot.employee_id) : ''; }
       document.getElementById('modal-email-hint').textContent = '';
       const infoCard = document.getElementById('modal-info-card');
       if (slot && slot.customer_email) {
@@ -3278,10 +3415,11 @@ function buildAdminPage(salon) {
         document.getElementById('modal-email-hint').style.color = '#c0392b';
         return;
       }
+      const employeeId = document.getElementById('modal-employee')?.value || '';
       const res = await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: formatDate(currentDate), time: currentSlot, status, customerName, customerEmail, service })
+        body: JSON.stringify({ date: formatDate(currentDate), time: currentSlot, status, customerName, customerEmail, service, employeeId: employeeId || null })
       });
       const data = await res.json();
       document.getElementById('modal-overlay').classList.remove('open');
@@ -3558,6 +3696,200 @@ function buildAdminPage(salon) {
     }
 
     loadServices();
+
+    // ─── ZAPOSLENI ────────────────────────────────────────────────────────────
+    function getHoursForEmployeeJS(schedule, dateStr) {
+      const d = new Date(dateStr + 'T12:00:00');
+      const dayMap = ['sun','mon','tue','wed','thu','fri','sat'];
+      const dayKey = dayMap[d.getDay()];
+      const day = schedule && schedule[dayKey];
+      if (!day || !day.open) return [];
+      const set = new Set();
+      for (const p of (day.periods || [])) {
+        let [h, m] = (p.from || '08:00').split(':').map(Number);
+        const [eh, em] = (p.to || '17:00').split(':').map(Number);
+        while (h < eh || (h === eh && m < em)) {
+          set.add(String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0'));
+          m += 30; if (m >= 60) { m -= 60; h++; }
+        }
+      }
+      return [...set].sort();
+    }
+
+    async function loadEmployees() {
+      const res = await fetch(API_URL + '/admin/' + SALON_ID + '/employees');
+      if (!res.ok) return;
+      empList = await res.json();
+      renderEmployees();
+      // posodobi filter v termini tabu
+      const sel = document.getElementById('emp-filter');
+      if (sel) {
+        const prev = sel.value;
+        sel.innerHTML = '<option value="">Vsi zaposleni</option>';
+        empList.filter(e => e.active).forEach(e => {
+          const o = document.createElement('option');
+          o.value = e.id; o.textContent = e.name;
+          if (String(e.id) === prev) o.selected = true;
+          sel.appendChild(o);
+        });
+      }
+      // posodobi employee dropdown v modalu
+      const empSel = document.getElementById('modal-employee');
+      if (empSel) {
+        const prevM = empSel.value;
+        empSel.innerHTML = '<option value="">— Kdorkoli —</option>';
+        empList.filter(e => e.active).forEach(e => {
+          const o = document.createElement('option');
+          o.value = e.id; o.textContent = e.name;
+          if (String(e.id) === prevM) o.selected = true;
+          empSel.appendChild(o);
+        });
+      }
+    }
+
+    function renderEmployees() {
+      const el = document.getElementById('emp-list');
+      if (!empList.length) {
+        el.innerHTML = '<div style="padding:24px 28px;font-size:13px;color:#aaa;font-style:italic;">Ni zaposlenih. Dodajte prvega zgoraj.</div>';
+        return;
+      }
+      el.innerHTML = empList.map(e => \`
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 28px;border-bottom:1px solid #e0e0e0;">
+          <div style="flex:1;font-size:13px;font-weight:500;\${e.active ? '' : 'color:#aaa;text-decoration:line-through;'}">\${e.name}</div>
+          <button onclick="openEmpSchedule(\${e.id}, \${JSON.stringify(e).replace(/"/g,'&quot;')})" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:#f7f7f5;border:1px solid #e0e0e0;cursor:pointer;color:#444;font-family:system-ui,sans-serif;">Urnik</button>
+          <label class="toggle-wrap" title="\${e.active ? 'Aktiven' : 'Neaktiven'}">
+            <input type="checkbox" \${e.active ? 'checked' : ''} onchange="toggleEmployee(\${e.id}, this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+          <button onclick="deleteEmployee(\${e.id})" style="background:none;border:none;font-size:18px;color:#ccc;cursor:pointer;padding:0 4px;" title="Izbriši">×</button>
+        </div>
+      \`).join('');
+    }
+
+    async function addEmployee() {
+      const name = document.getElementById('emp-new-name').value.trim();
+      const err = document.getElementById('emp-add-err');
+      if (!name) { err.textContent = 'Vpišite ime.'; err.style.display = 'block'; return; }
+      err.style.display = 'none';
+      const res = await fetch(API_URL + '/admin/' + SALON_ID + '/employees', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ name })
+      });
+      if (res.ok) { document.getElementById('emp-new-name').value = ''; await loadEmployees(); }
+    }
+
+    async function toggleEmployee(id, active) {
+      await fetch(API_URL + '/admin/' + SALON_ID + '/employees/' + id, {
+        method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ active })
+      });
+      await loadEmployees();
+    }
+
+    async function deleteEmployee(id) {
+      if (!confirm('Res izbrisati zaposlenega?')) return;
+      await fetch(API_URL + '/admin/' + SALON_ID + '/employees/' + id, { method: 'DELETE' });
+      await loadEmployees();
+    }
+
+    let editingEmpId = null;
+    const EMP_DEFAULT_SCHEDULE = {
+      mon:{open:true,periods:[{from:'08:00',to:'17:00'}]},
+      tue:{open:true,periods:[{from:'08:00',to:'17:00'}]},
+      wed:{open:true,periods:[{from:'08:00',to:'17:00'}]},
+      thu:{open:true,periods:[{from:'08:00',to:'17:00'}]},
+      fri:{open:true,periods:[{from:'08:00',to:'17:00'}]},
+      sat:{open:false,periods:[]},
+      sun:{open:false,periods:[]}
+    };
+
+    function openEmpSchedule(id, emp) {
+      editingEmpId = id;
+      document.getElementById('emp-sched-title').textContent = 'Urnik — ' + emp.name;
+      document.getElementById('emp-schedule-panel').style.display = 'block';
+      document.getElementById('emp-sched-msg').style.display = 'none';
+      buildEmpScheduleUI(emp.schedule || EMP_DEFAULT_SCHEDULE);
+      document.getElementById('emp-schedule-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function closeEmpSchedule() {
+      document.getElementById('emp-schedule-panel').style.display = 'none';
+      editingEmpId = null;
+    }
+
+    function buildEmpScheduleUI(sched) {
+      const container = document.getElementById('emp-sched-rows');
+      container.innerHTML = '';
+      DAY_KEYS.forEach(key => {
+        const d = sched[key] || { open: false, periods: [] };
+        const row = document.createElement('div');
+        row.style.cssText = 'border-bottom:1px solid #e0e0e0;';
+        row.innerHTML = \`
+          <div style="display:flex;align-items:center;gap:16px;padding:12px 0;">
+            <div style="width:110px;font-size:13px;font-weight:500;">\${DAY_NAMES_SL[key]}</div>
+            <label class="toggle-wrap"><input type="checkbox" id="emp-open-\${key}" \${d.open ? 'checked' : ''} onchange="toggleEmpDay('\${key}')"><span class="toggle-slider"></span></label>
+            <div id="emp-day-wrap-\${key}" style="display:\${d.open ? 'flex' : 'none'};flex-direction:column;gap:6px;flex:1;">
+              <div id="emp-periods-\${key}"></div>
+              <button onclick="addEmpPeriod('\${key}')" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;background:#f7f7f5;border:1px solid #e0e0e0;cursor:pointer;color:#444;font-family:system-ui,sans-serif;align-self:flex-start;">+ Dodaj obdobje</button>
+            </div>
+          </div>
+        \`;
+        container.appendChild(row);
+        (d.periods || []).forEach(p => addEmpPeriod(key, p.from, p.to));
+      });
+    }
+
+    function addEmpPeriod(key, from, to) {
+      const wrap = document.getElementById('emp-periods-' + key);
+      const div = document.createElement('div');
+      div.style.cssText = 'display:flex;align-items:center;gap:6px;';
+      div.innerHTML = \`
+        <input type="time" value="\${from || '08:00'}" step="1800" style="padding:5px 8px;border:1px solid #e0e0e0;font-size:12px;font-family:system-ui,sans-serif;">
+        <span style="color:#888;">–</span>
+        <input type="time" value="\${to || '17:00'}" step="1800" style="padding:5px 8px;border:1px solid #e0e0e0;font-size:12px;font-family:system-ui,sans-serif;">
+        <button onclick="this.parentElement.remove()" style="background:none;border:none;font-size:16px;color:#ccc;cursor:pointer;padding:0 4px;">×</button>
+      \`;
+      wrap.appendChild(div);
+    }
+
+    function toggleEmpDay(key) {
+      const open = document.getElementById('emp-open-' + key).checked;
+      const wrap = document.getElementById('emp-day-wrap-' + key);
+      wrap.style.display = open ? 'flex' : 'none';
+      if (open && document.getElementById('emp-periods-' + key).children.length === 0) {
+        addEmpPeriod(key);
+      }
+    }
+
+    function readEmpSchedule() {
+      const sched = {};
+      DAY_KEYS.forEach(key => {
+        const open = document.getElementById('emp-open-' + key)?.checked || false;
+        const periodRows = document.getElementById('emp-periods-' + key)?.querySelectorAll('div') || [];
+        const periods = [];
+        periodRows.forEach(row => {
+          const inputs = row.querySelectorAll('input[type=time]');
+          if (inputs.length === 2) periods.push({ from: inputs[0].value || '08:00', to: inputs[1].value || '17:00' });
+        });
+        sched[key] = { open, periods };
+      });
+      return sched;
+    }
+
+    async function saveEmployeeSchedule() {
+      if (!editingEmpId) return;
+      const schedule = readEmpSchedule();
+      await fetch(API_URL + '/admin/' + SALON_ID + '/employees/' + editingEmpId, {
+        method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ schedule })
+      });
+      const msg = document.getElementById('emp-sched-msg');
+      msg.style.display = 'block';
+      setTimeout(() => msg.style.display = 'none', 2500);
+      await loadEmployees();
+    }
+
+    // Zaposlenega shrani pri rezervaciji
+    const _origSaveSlot = saveSlot;
+
+    loadEmployees();
   </script>
 </body>
 </html>`;
