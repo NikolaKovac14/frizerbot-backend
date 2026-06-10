@@ -832,6 +832,80 @@ app.get('/admin/:id/revenue', requireAdminAuth, async (req, res) => {
   });
 });
 
+// ─── ANALYTICS ────────────────────────────────────────────────────────────────
+app.get('/admin/:id/analytics/services', requireAdminAuth, async (req, res) => {
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id=$1 OR slug=$1)', [req.params.id]);
+  const salonId = salonRows[0]?.id;
+  if (!salonId) return res.status(404).json({ error: 'Not found' });
+
+  const { rows } = await pool.query(`
+    SELECT
+      t.service AS name,
+      COUNT(*) AS count,
+      ROUND(AVG(
+        COALESCE(t.price_paid, (
+          SELECT (sv.min_price + sv.max_price) / 2
+          FROM services sv
+          WHERE sv.salon_id = $1
+            AND (LOWER(t.service) LIKE '%' || LOWER(sv.name) || '%' OR LOWER(sv.name) LIKE '%' || LOWER(t.service) || '%')
+          LIMIT 1
+        ))
+      ), 2) AS avg_price,
+      ROUND(SUM(
+        COALESCE(t.price_paid, (
+          SELECT (sv.min_price + sv.max_price) / 2
+          FROM services sv
+          WHERE sv.salon_id = $1
+            AND (LOWER(t.service) LIKE '%' || LOWER(sv.name) || '%' OR LOWER(sv.name) LIKE '%' || LOWER(t.service) || '%')
+          LIMIT 1
+        ))
+      ), 2) AS total_revenue
+    FROM timeslots t
+    WHERE t.salon_id = $1
+      AND t.status = 'busy'
+      AND t.service NOT LIKE '(%'
+      AND t.service != ''
+    GROUP BY t.service
+    ORDER BY count DESC
+    LIMIT 20
+  `, [salonId]);
+
+  res.json(rows);
+});
+
+app.get('/admin/:id/analytics/customers', requireAdminAuth, async (req, res) => {
+  const { rows: salonRows } = await pool.query('SELECT id FROM salons WHERE (id=$1 OR slug=$1)', [req.params.id]);
+  const salonId = salonRows[0]?.id;
+  if (!salonId) return res.status(404).json({ error: 'Not found' });
+
+  const { rows } = await pool.query(`
+    SELECT
+      MAX(customer_name) AS name,
+      customer_email AS email,
+      COUNT(*) AS count,
+      MAX(date) AS last_visit,
+      ROUND(SUM(
+        COALESCE(price_paid, (
+          SELECT (sv.min_price + sv.max_price) / 2
+          FROM services sv
+          WHERE sv.salon_id = $1
+            AND (LOWER(t.service) LIKE '%' || LOWER(sv.name) || '%' OR LOWER(sv.name) LIKE '%' || LOWER(t.service) || '%')
+          LIMIT 1
+        ))
+      ), 2) AS total_spent
+    FROM timeslots t
+    WHERE t.salon_id = $1
+      AND t.status = 'busy'
+      AND t.customer_email != ''
+      AND t.service NOT LIKE '(%'
+    GROUP BY customer_email
+    ORDER BY count DESC
+    LIMIT 30
+  `, [salonId]);
+
+  res.json(rows);
+});
+
 // ─── REACTIVATION CAMPAIGN ────────────────────────────────────────────────────
 app.post('/admin/:id/reactivation-campaign', requireAdminAuth, async (req, res) => {
   const { emails, days = 60, discount = 10 } = req.body;
@@ -2675,6 +2749,7 @@ function buildAdminPage(salon) {
     .today-btn:hover { border-color: var(--black); color: var(--black); }
     .section-rule { border: none; border-top: 1px solid var(--rule); margin: 16px 0 28px; }
     .section-rule.thick { border-top: 2px solid var(--black); margin: 0 0 28px; }
+    @media (max-width: 700px) { .analytics-grid { grid-template-columns: 1fr !important; } }
     .stats-row { font-size: 12px; font-weight: 500; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 32px; display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
     .stat-item { display: flex; align-items: center; gap: 6px; }
     .stat-item .num { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: var(--black); letter-spacing: -0.01em; }
@@ -2786,6 +2861,7 @@ function buildAdminPage(salon) {
     <div class="nav-tab" onclick="switchTab('urnik')">Delovni čas</div>
     <div class="nav-tab" onclick="switchTab('storitve')">Storitve</div>
     <div class="nav-tab" onclick="switchTab('zaposleni')">Zaposleni</div>
+    <div class="nav-tab" onclick="switchTab('analitika')">Analitika</div>
     <div class="nav-tab" onclick="switchTab('prihodki')">Prihodki</div>
     <div class="nav-tab" onclick="switchTab('nastavitve')">Nastavitve</div>
   </nav>
@@ -2794,6 +2870,7 @@ function buildAdminPage(salon) {
     <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'urnik')">Delovni čas <span class="mob-acc-arrow">▾</span></button></div>
     <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'storitve')">Storitve <span class="mob-acc-arrow">▾</span></button></div>
     <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'zaposleni')">Zaposleni <span class="mob-acc-arrow">▾</span></button></div>
+    <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'analitika')">Analitika <span class="mob-acc-arrow">▾</span></button></div>
     <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'prihodki')">Prihodki <span class="mob-acc-arrow">▾</span></button></div>
     <div class="mob-acc-item"><button class="mob-acc-btn" onclick="mobToggle(this,'nastavitve')">Nastavitve <span class="mob-acc-arrow">▾</span></button></div>
   </div>
@@ -2906,6 +2983,37 @@ function buildAdminPage(salon) {
           <button class="save-btn" onclick="saveEmployeeSchedule()">Shrani urnik</button>
         </div>
       </div>
+    </div>
+  </div>
+  </div>
+  <div class="tab-content" id="tab-analitika">
+  <div class="page">
+    <div style="font-family:'Playfair Display',serif;font-size:32px;font-weight:700;letter-spacing:-.02em;margin-bottom:6px;">Analitika</div>
+    <div style="font-size:12px;color:#888;margin-bottom:28px;letter-spacing:.04em;">Statistike po storitvah in strankah</div>
+    <hr class="section-rule thick">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px;" class="analytics-grid">
+
+      <!-- Storitve -->
+      <div style="background:#fff;border:1px solid #e0e0e0;">
+        <div style="padding:20px 24px;border-bottom:2px solid #0a0a0a;">
+          <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;">Storitve</div>
+          <div style="font-size:11px;color:#aaa;margin-top:2px;">po številu rezervacij</div>
+        </div>
+        <div id="an-services-loading" style="padding:24px;font-size:13px;color:#aaa;">Nalagam...</div>
+        <div id="an-services" style="display:none;"></div>
+      </div>
+
+      <!-- Stranke -->
+      <div style="background:#fff;border:1px solid #e0e0e0;">
+        <div style="padding:20px 24px;border-bottom:2px solid #0a0a0a;">
+          <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;">Zveste stranke</div>
+          <div style="font-size:11px;color:#aaa;margin-top:2px;">po številu obiskov</div>
+        </div>
+        <div id="an-customers-loading" style="padding:24px;font-size:13px;color:#aaa;">Nalagam...</div>
+        <div id="an-customers" style="display:none;"></div>
+      </div>
+
     </div>
   </div>
   </div>
@@ -3148,11 +3256,12 @@ function buildAdminPage(salon) {
     function getDayKey(d) { return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()]; }
 
     function switchTab(name) {
-      document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik','storitve','zaposleni','prihodki','nastavitve'][i] === name));
+      document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['termini','urnik','storitve','zaposleni','analitika','prihodki','nastavitve'][i] === name));
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
       if (name === 'prihodki') loadRevenue();
       if (name === 'zaposleni') loadEmployees();
+      if (name === 'analitika') loadAnalytics();
     }
 
     async function loadRevenue() {
@@ -3762,6 +3871,74 @@ function buildAdminPage(salon) {
     }
 
     loadServices();
+
+    // ─── ANALITIKA ────────────────────────────────────────────────────────────
+    let analyticsLoaded = false;
+
+    async function loadAnalytics() {
+      if (analyticsLoaded) return;
+      analyticsLoaded = true;
+      const [svcRes, custRes] = await Promise.all([
+        fetch(API_URL + '/admin/' + SALON_ID + '/analytics/services'),
+        fetch(API_URL + '/admin/' + SALON_ID + '/analytics/customers')
+      ]);
+      const services = await svcRes.json();
+      const customers = await custRes.json();
+
+      const svcEl = document.getElementById('an-services');
+      const svcLoad = document.getElementById('an-services-loading');
+      if (!services.length) {
+        svcLoad.textContent = 'Ni podatkov.';
+      } else {
+        svcLoad.style.display = 'none';
+        svcEl.style.display = 'block';
+        const maxCount = Math.max(...services.map(s => parseInt(s.count)));
+        svcEl.innerHTML = services.map((s, i) => {
+          const pct = Math.round(parseInt(s.count) / maxCount * 100);
+          return \`
+            <div style="padding:14px 24px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:12px;">
+              <div style="width:22px;text-align:right;font-size:11px;font-weight:700;color:#bbb;">\${i+1}</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\${s.name}</div>
+                <div style="margin-top:5px;height:4px;background:#f0f0f0;border-radius:2px;">
+                  <div style="height:4px;background:#c9a84c;border-radius:2px;width:\${pct}%;"></div>
+                </div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;">
+                <div style="font-size:13px;font-weight:700;">\${s.count}x</div>
+                <div style="font-size:11px;color:#aaa;">\${s.total_revenue ? parseFloat(s.total_revenue).toFixed(0) + ' €' : '—'}</div>
+              </div>
+            </div>
+          \`;
+        }).join('');
+      }
+
+      const custEl = document.getElementById('an-customers');
+      const custLoad = document.getElementById('an-customers-loading');
+      if (!customers.length) {
+        custLoad.textContent = 'Ni podatkov.';
+      } else {
+        custLoad.style.display = 'none';
+        custEl.style.display = 'block';
+        custEl.innerHTML = customers.map((c, i) => {
+          const lastDate = c.last_visit ? new Date(c.last_visit).toLocaleDateString('sl-SI', { day: 'numeric', month: 'numeric', year: 'numeric' }) : '—';
+          return \`
+            <div style="padding:14px 24px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:12px;">
+              <div style="width:22px;text-align:right;font-size:11px;font-weight:700;color:#bbb;">\${i+1}</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\${c.name || '—'}</div>
+                <div style="font-size:11px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\${c.email}</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;">
+                <div style="font-size:13px;font-weight:700;">\${c.count}x</div>
+                <div style="font-size:11px;color:#aaa;">\${c.total_spent ? parseFloat(c.total_spent).toFixed(0) + ' €' : '—'}</div>
+                <div style="font-size:10px;color:#ccc;">\${lastDate}</div>
+              </div>
+            </div>
+          \`;
+        }).join('');
+      }
+    }
 
     // ─── ZAPOSLENI ────────────────────────────────────────────────────────────
     function getHoursForEmployeeJS(schedule, dateStr) {
