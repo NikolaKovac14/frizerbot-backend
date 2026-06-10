@@ -1570,6 +1570,12 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
     ).join('\n');
   }
 
+  const { rows: empRows } = await pool.query(
+    'SELECT id, name FROM employees WHERE salon_id=$1 AND active=true ORDER BY position, created_at',
+    [salon.id]
+  );
+  salon._employees = empRows;
+
   // ─── PLAN LIMIT CHECK ────────────────────────────────────────────────────────
   const plan = PLANS[salon.plan] || PLANS.pro;
 
@@ -1683,6 +1689,7 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
       const finalEmail = cInfo.email || booking.customerEmail || '';
       const finalPhone = cInfo.phone || booking.customerPhone || '';
       const finalService = booking.service || 'Storitev';
+      const finalEmpId = booking.employeeId ? parseInt(booking.employeeId) : null;
 
       if (existing.length > 0) {
         if (existing[0].customer_email === finalEmail) {
@@ -1694,11 +1701,11 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
       }
 
       await pool.query(`
-        INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, customer_phone, service, booked_by)
-        VALUES ($1,$2,$3,'busy',$4,$5,$6,$7,'bot')
+        INSERT INTO timeslots (salon_id, date, time, status, customer_name, customer_email, customer_phone, service, booked_by, employee_id)
+        VALUES ($1,$2,$3,'busy',$4,$5,$6,$7,'bot',$8)
         ON CONFLICT (salon_id, date, time) DO UPDATE
-        SET status='busy', customer_name=$4, customer_email=$5, customer_phone=$6, service=$7
-      `, [actualSalonId, booking.date, booking.time, finalName, finalEmail, finalPhone, finalService]);
+        SET status='busy', customer_name=$4, customer_email=$5, customer_phone=$6, service=$7, employee_id=$8
+      `, [actualSalonId, booking.date, booking.time, finalName, finalEmail, finalPhone, finalService, finalEmpId]);
 
       if (finalEmail) {
         const cancelToken = crypto.randomBytes(20).toString('hex');
@@ -1801,6 +1808,15 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
 
   const slotsText = days.length > 0 ? days.join('\n') : 'Trenutno ni prostih terminov v naslednjih 7 dneh.';
 
+  const employees = salon._employees || [];
+  const hasMultipleEmployees = employees.length >= 2;
+  const employeeListText = hasMultipleEmployees
+    ? `\nZAPOSLENI (stranka MORA izbrati enega preden rezervira):\n${employees.map(e => `- ${e.name} (id: ${e.id})`).join('\n')}\n`
+    : '';
+  const employeeBookingRule = hasMultipleEmployees
+    ? `\nZAPOSLENI - PRAVILO:\n- PREDEN predlagaš termine, OBVEZNO vprašaj pri katerem zaposlenem se želi naročiti\n- Ko stranka izbere zaposlenega, dodaj "employeeId": ID v [[BOOKING:...]] tag\n- Primer: [[BOOKING:{"date":"2026-06-15","time":"10:00","customerName":"Ana","service":"Striženje","employeeId":${employees[0]?.id || 1}}]]\n`
+    : '';
+
   if (customerInfo) {
     const safeName = (customerInfo.name || '').replace(/"/g, '').replace(/\\/g, '');
     return `Si AI asistent za frizerski salon ${salon.name}. Odgovarjaš VEDNO in SAMO v slovenščini.
@@ -1849,14 +1865,15 @@ PODATKI STRANKE (že vpisani - NE sprašuj znova):
 - Ime: ${safeName}
 - E-pošta: ${customerInfo.email}
 - Telefon: ${customerInfo.phone}
-
+${employeeListText}
 REZERVACIJE - PRAVILA:
 - Stranka JE že vpisala podatke
 - Ko stranka izbere termin in storitev, TAKOJ potrdi rezervacijo brez dodatnih vprašanj
 - Rezerviraj SAMO termine iz zgornjega seznama prostih terminov - nobenih drugih
-- KRITIČNO: [[BOOKING:...]] tag dodaj SAMO ko imaš VSE: datum + čas + IME + STORITEV
+- KRITIČNO: [[BOOKING:...]] tag dodaj SAMO ko imaš VSE: datum + čas + IME + STORITEV${hasMultipleEmployees ? ' + ZAPOSLENEGA' : ''}
 - ČE STRANKA NI POVEDALA STORITVE: vprašaj za storitev, NE dodajaj [[BOOKING:...]] taga
 - NE rezerviraj z "Storitev" ali prazno storitvijo kot placeholder
+${employeeBookingRule}
 
 BRISANJE TERMINA:
 - Če stranka želi IZBRISATI termin, VEDNO dodaj [[DELETE:YYYY-MM-DDTHH:MM]] na KONEC odgovora
@@ -1927,11 +1944,12 @@ PROSTI TERMINI (oblika YYYY-MM-DD) - samo termini od zdaj naprej:
 ${slotsText}
 
 STRANKA NI VPISALA PODATKOV.
-
+${employeeListText}
 REZERVACIJE - PRAVILA:
 - Ko stranka hoče rezervirati termin, dodaj [[NEED_INFO]] na KONEC odgovora
 - Primer: "Odlično! Pred rezervacijo potrebujem še vaše podatke.[[NEED_INFO]]"
 - Rezerviraj SAMO termine iz zgornjega seznama
+${employeeBookingRule}
 
 PRAVILA:
 - Nikoli si ne izmišljuj prostih terminov
