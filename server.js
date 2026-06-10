@@ -893,7 +893,7 @@ app.post('/admin/:id/reactivation-campaign', requireAdminAuth, async (req, res) 
             <p style="font-size:16px;margin:0 0 16px;">Pozdravljeni${greeting},</p>
             <p style="font-size:14px;color:#555;line-height:1.7;margin:0 0 24px;">
               Že nekaj časa vas ni bilo pri nas — pogrešamo vas! 😊<br>
-              Bi že čas za nov obisk? Z veseljem vas spet vidimo.
+              Bi že bil čas za nov obisk? Z veseljem vas spet vidimo.
             </p>
             <div style="text-align:center;margin:0 0 24px;">
               <a href="${bookingUrl}" style="display:inline-block;background:#1a1410;color:#c9a84c;padding:14px 32px;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:.06em;border-radius:6px;">
@@ -3082,7 +3082,8 @@ function buildAdminPage(salon) {
       btn.disabled = true;
       try {
         const noDiscount = document.getElementById('rev-no-discount')?.checked;
-        const discount = noDiscount ? 0 : (parseInt(document.getElementById('rev-discount')?.value) || 10);
+        const discountRaw = document.getElementById('rev-discount')?.value;
+        const discount = noDiscount ? 0 : (discountRaw === '' ? 10 : parseInt(discountRaw));
         const res = await fetch(API_URL + '/admin/' + SALON_ID + '/reactivation-campaign', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
