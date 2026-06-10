@@ -1275,11 +1275,15 @@ app.post('/admin/:id/timeslots', requireAdminAuth, async (req, res) => {
       `, [salonId, date, extraTime, customerName, cleanEmail, '(' + (service || '') + ')']);
     }
   } else {
-    const { rows: slotToDelete } = await pool.query('SELECT customer_email FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3', [salonId, date, time]);
+    const { rows: slotToDelete } = await pool.query('SELECT * FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3', [salonId, date, time]);
+    const deletedSlot = slotToDelete[0];
     await pool.query('DELETE FROM timeslots WHERE salon_id = $1 AND date = $2 AND time = $3', [salonId, date, time]);
-    if (slotToDelete[0]?.customer_email) {
+    if (deletedSlot?.customer_email) {
       await pool.query(`DELETE FROM timeslots WHERE salon_id=$1 AND date=$2 AND customer_email=$3 AND time>$4 AND service LIKE '(%'`,
-        [salonId, date, slotToDelete[0].customer_email, time]);
+        [salonId, date, deletedSlot.customer_email, time]);
+    }
+    if (deletedSlot?.status === 'busy') {
+      await triggerCancellationRecovery(salon, deletedSlot.date, deletedSlot.time, deletedSlot.service, deletedSlot.customer_email);
     }
   }
   res.json({ success: true });
@@ -3577,6 +3581,73 @@ app.get('/cancel/:token', async (req, res) => {
 </html>`);
 });
 
+async function triggerCancellationRecovery(salon, slotDate, slotTime, slotService, excludeEmail) {
+  if (!salon?.cancellation_recovery_enabled) return;
+  try {
+    const { rows: candidates } = await pool.query(`
+      SELECT customer_email, MAX(customer_name) AS customer_name
+      FROM timeslots
+      WHERE salon_id=$1
+        AND customer_email != ''
+        AND customer_email != $2
+        AND status = 'busy'
+        AND service NOT LIKE '(%'
+        AND (LOWER(service) LIKE '%' || LOWER($3) || '%' OR LOWER($3) LIKE '%' || LOWER(service) || '%')
+      GROUP BY customer_email
+      HAVING MAX(date) < CURRENT_DATE - INTERVAL '30 days'
+        AND customer_email NOT IN (
+          SELECT DISTINCT customer_email FROM timeslots
+          WHERE salon_id=$1 AND status='busy' AND date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '14 days'
+        )
+        AND customer_email NOT IN (
+          SELECT DISTINCT candidate_email FROM recovery_slots
+          WHERE salon_id=$1 AND created_at > NOW() - INTERVAL '30 days'
+        )
+      ORDER BY MAX(date) ASC
+      LIMIT 3
+    `, [salon.id, excludeEmail || '', slotService || '']);
+
+    const bookingUrl = `${process.env.API_URL || 'https://bookwell.si'}/book/${salon.slug || salon.id}`;
+    const dateF = new Date(slotDate).toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long' });
+    for (const c of candidates) {
+      const recoveryToken = crypto.randomBytes(16).toString('hex');
+      await pool.query(
+        `INSERT INTO recovery_slots (token, salon_id, date, time, service, candidate_email, candidate_name) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [recoveryToken, salon.id, slotDate, slotTime, slotService, c.customer_email, c.customer_name]
+      );
+      await sgMail.send({
+        to: c.customer_email,
+        from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
+        subject: `Sprostil se je termin v ${salon.name}`,
+        html: `
+          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;color:#2d2520;">
+            <div style="background:#1a1410;padding:20px 24px;border-radius:10px 10px 0 0;text-align:center;">
+              <h1 style="color:#c9a84c;margin:0;font-size:20px;">${salon.name}</h1>
+            </div>
+            <div style="background:#fff;padding:28px 24px;border-radius:0 0 10px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+              <p style="font-size:15px;margin:0 0 16px;">Pozdravljeni${c.customer_name ? ' <strong>' + c.customer_name + '</strong>' : ''},</p>
+              <p style="font-size:14px;color:#555;line-height:1.7;margin:0 0 20px;">Ravnokar se je sprostil termin:</p>
+              <div style="background:#f5f0eb;border-left:3px solid #c9a84c;padding:16px 20px;border-radius:4px;margin:0 0 24px;font-size:14px;line-height:2;">
+                <div>📅 <strong>${dateF}</strong></div>
+                <div>🕐 <strong>${slotTime}</strong></div>
+                <div>💇 <strong>${slotService || '—'}</strong></div>
+              </div>
+              <div style="text-align:center;">
+                <a href="${bookingUrl}" style="display:inline-block;background:#1a1410;color:#c9a84c;padding:14px 32px;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:.06em;border-radius:6px;">
+                  Rezervirajte ta termin →
+                </a>
+              </div>
+              <p style="font-size:11px;color:#aaa;text-align:center;margin-top:16px;">Termin je na voljo dokler ga ne zasede druga stranka.</p>
+            </div>
+          </div>
+        `
+      });
+    }
+  } catch(e) {
+    console.error('Recovery napaka:', e.message);
+  }
+}
+
 app.post('/cancel/:token', async (req, res) => {
   const { token } = req.params;
   const { rows } = await pool.query(
@@ -3598,69 +3669,8 @@ app.post('/cancel/:token', async (req, res) => {
   }
 
   // Cancellation Recovery
-  try {
-    const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE id=$1', [slot.salon_id]);
-    const salon = salonRows[0];
-    if (salon?.cancellation_recovery_enabled) {
-      const { rows: candidates } = await pool.query(`
-        SELECT customer_email, MAX(customer_name) AS customer_name
-        FROM timeslots
-        WHERE salon_id=$1
-          AND customer_email != ''
-          AND customer_email != $2
-          AND status = 'busy'
-          AND service NOT LIKE '(%'
-          AND (LOWER(service) LIKE '%' || LOWER($3) || '%' OR LOWER($3) LIKE '%' || LOWER(service) || '%')
-        GROUP BY customer_email
-        HAVING MAX(date) < CURRENT_DATE - INTERVAL '30 days'
-          AND customer_email NOT IN (
-            SELECT DISTINCT customer_email FROM timeslots
-            WHERE salon_id=$1 AND status='busy' AND date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '14 days'
-          )
-        ORDER BY MAX(date) ASC
-        LIMIT 3
-      `, [slot.salon_id, slot.customer_email || '', slot.service || '']);
-
-      const bookingUrl = `${process.env.API_URL || 'https://bookwell.si'}/book/${salon.slug || salon.id}`;
-      for (const c of candidates) {
-        const recoveryToken = crypto.randomBytes(16).toString('hex');
-        await pool.query(
-          `INSERT INTO recovery_slots (token, salon_id, date, time, service, candidate_email, candidate_name) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-          [recoveryToken, salon.id, slot.date, slot.time, slot.service, c.customer_email, c.customer_name]
-        );
-        const dateF = new Date(slot.date).toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long' });
-        await sgMail.send({
-          to: c.customer_email,
-          from: process.env.SENDGRID_FROM_EMAIL || 'info@bookwell.si',
-          subject: `Sprostil se je termin v ${salon.name}`,
-          html: `
-            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;color:#2d2520;">
-              <div style="background:#1a1410;padding:20px 24px;border-radius:10px 10px 0 0;text-align:center;">
-                <h1 style="color:#c9a84c;margin:0;font-size:20px;">${salon.name}</h1>
-              </div>
-              <div style="background:#fff;padding:28px 24px;border-radius:0 0 10px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-                <p style="font-size:15px;margin:0 0 16px;">Pozdravljeni${c.customer_name ? ' <strong>' + c.customer_name + '</strong>' : ''},</p>
-                <p style="font-size:14px;color:#555;line-height:1.7;margin:0 0 20px;">Ravnokar se je sprostil termin:</p>
-                <div style="background:#f5f0eb;border-left:3px solid #c9a84c;padding:16px 20px;border-radius:4px;margin:0 0 24px;font-size:14px;line-height:2;">
-                  <div>📅 <strong>${dateF}</strong></div>
-                  <div>🕐 <strong>${slot.time}</strong></div>
-                  <div>💇 <strong>${slot.service || '—'}</strong></div>
-                </div>
-                <div style="text-align:center;">
-                  <a href="${bookingUrl}" style="display:inline-block;background:#1a1410;color:#c9a84c;padding:14px 32px;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:.06em;border-radius:6px;">
-                    Rezervirajte ta termin →
-                  </a>
-                </div>
-                <p style="font-size:11px;color:#aaa;text-align:center;margin-top:16px;">Termin je na voljo dokler ga ne zasede druga stranka.</p>
-              </div>
-            </div>
-          `
-        });
-      }
-    }
-  } catch(e) {
-    console.error('Recovery napaka:', e.message);
-  }
+  const { rows: salonRows } = await pool.query('SELECT * FROM salons WHERE id=$1', [slot.salon_id]);
+  await triggerCancellationRecovery(salonRows[0], slot.date, slot.time, slot.service, slot.customer_email);
 
   if (slot.notification_email) {
     try {
