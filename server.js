@@ -2774,7 +2774,7 @@ function buildAdminPage(salon) {
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
         <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#888;">Zaposlen/a:</div>
         <select id="emp-filter" onchange="loadSlots()" style="padding:5px 10px;border:1px solid #e0e0e0;font-size:12px;font-family:system-ui,sans-serif;background:#f7f7f5;cursor:pointer;">
-          <option value="">Vsi zaposleni</option>
+          <option value="">Nalagam...</option>
         </select>
       </div>
       <div class="stats-row" id="stats-row"></div>
@@ -3332,13 +3332,26 @@ function buildAdminPage(salon) {
           return;
         }
       } else {
-        const daySchedule = schedule[dayKey];
-        if (!daySchedule || !daySchedule.open) {
-          container.innerHTML = \`<div class="closed-banner"><div class="closed-title">Salon je zaprt</div><div class="closed-sub">Ta dan ni delovnega časa</div></div>\`;
-          document.getElementById('stats-row').innerHTML = '';
-          return;
+        const activeEmps = empList.filter(e => e.active && e.schedule);
+        if (activeEmps.length >= 2) {
+          // Unija vseh urnikov zaposlenih
+          const set = new Set();
+          activeEmps.forEach(e => getHoursForEmployeeJS(e.schedule, dateStr).forEach(t => set.add(t)));
+          hours = [...set].sort();
+          if (!hours.length) {
+            container.innerHTML = \`<div class="closed-banner"><div class="closed-title">Salon je zaprt</div><div class="closed-sub">Nobeden zaposleni ne dela ta dan</div></div>\`;
+            document.getElementById('stats-row').innerHTML = '';
+            return;
+          }
+        } else {
+          const daySchedule = schedule[dayKey];
+          if (!daySchedule || !daySchedule.open) {
+            container.innerHTML = \`<div class="closed-banner"><div class="closed-title">Salon je zaprt</div><div class="closed-sub">Ta dan ni delovnega časa</div></div>\`;
+            document.getElementById('stats-row').innerHTML = '';
+            return;
+          }
+          hours = generateSlots(daySchedule.from, daySchedule.to);
         }
-        hours = generateSlots(daySchedule.from, daySchedule.to);
       }
       const res = await fetch(API_URL + '/admin/' + SALON_ID + '/timeslots?date=' + dateStr);
       const data = await res.json();
@@ -3742,14 +3755,26 @@ function buildAdminPage(salon) {
       // posodobi filter v termini tabu
       const sel = document.getElementById('emp-filter');
       if (sel) {
+        const active = empList.filter(e => e.active);
         const prev = sel.value;
-        sel.innerHTML = '<option value="">Vsi zaposleni</option>';
-        empList.filter(e => e.active).forEach(e => {
+        sel.innerHTML = '';
+        if (active.length < 2) {
+          // 0 ali 1 zaposlen — pokaži "Vsi"
+          const all = document.createElement('option');
+          all.value = ''; all.textContent = 'Vsi zaposleni';
+          sel.appendChild(all);
+        }
+        active.forEach(e => {
           const o = document.createElement('option');
           o.value = e.id; o.textContent = e.name;
-          if (String(e.id) === prev) o.selected = true;
           sel.appendChild(o);
         });
+        // obnovi prejšnjo vrednost ali auto-izberi prvega ko je 2+
+        if (prev && [...sel.options].some(o => o.value === prev)) {
+          sel.value = prev;
+        } else if (active.length >= 2) {
+          sel.value = String(active[0].id);
+        }
       }
       // posodobi employee dropdown v modalu
       const empSel = document.getElementById('modal-employee');
