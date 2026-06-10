@@ -1571,7 +1571,7 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
   }
 
   const { rows: empRows } = await pool.query(
-    'SELECT id, name FROM employees WHERE salon_id=$1 AND active=true ORDER BY position, created_at',
+    'SELECT id, name, schedule FROM employees WHERE salon_id=$1 AND active=true ORDER BY position, created_at',
     [salon.id]
   );
   salon._employees = empRows;
@@ -1636,7 +1636,7 @@ app.post('/chat', monthlyIpLimiter, chatLimiter, async (req, res) => {
   const todayLj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
   const nextWeek = new Date(todayLj.getTime() + 60 * 24 * 60 * 60 * 1000);
   const { rows: busySlots } = await pool.query(
-    "SELECT date, time FROM timeslots WHERE salon_id=$1 AND date>=$2 AND date<=$3 AND status='busy' ORDER BY date, time",
+    "SELECT date, time, employee_id FROM timeslots WHERE salon_id=$1 AND date>=$2 AND date<=$3 AND status='busy' ORDER BY date, time",
     [actualSalonId, todayLj.toISOString().split('T')[0], nextWeek.toISOString().split('T')[0]]
   );
 
@@ -1778,35 +1778,66 @@ function buildSystemPrompt(salon, busySlots, customerInfo) {
   const currentMinute = todayLj.getMinutes();
   const schedule = salon.schedule || DEFAULT_SCHEDULE;
 
+  // busy po datumu (skupaj) in po zaposlenem
   const busyByDate = {};
+  const busyByEmpDate = {}; // { empId: { date: Set<time> } }
   busySlots.forEach(s => {
     const d = typeof s.date === 'string' ? s.date.split('T')[0] : s.date.toISOString().split('T')[0];
     if (!busyByDate[d]) busyByDate[d] = new Set();
     busyByDate[d].add(s.time);
+    if (s.employee_id) {
+      if (!busyByEmpDate[s.employee_id]) busyByEmpDate[s.employee_id] = {};
+      if (!busyByEmpDate[s.employee_id][d]) busyByEmpDate[s.employee_id][d] = new Set();
+      busyByEmpDate[s.employee_id][d].add(s.time);
+    }
   });
 
-  const days = [];
-  for (let i = 0; i < 60; i++) {
-    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
-    d.setDate(d.getDate() + i);
-    const dateStr = d.toISOString().split('T')[0];
-    const dayName = d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'numeric' });
-    const allHours = getHoursForDate(schedule, dateStr);
-    if (allHours.length === 0) continue;
-    const busy = busyByDate[dateStr] || new Set();
-    let free = allHours.filter(h => !busy.has(h));
+  function getFreeSlots(hoursForDay, dateStr, busySet) {
+    let free = hoursForDay.filter(h => !busySet.has(h));
     if (dateStr === todayDateStr) {
       free = free.filter(h => {
         const [hh, mm] = h.split(':').map(Number);
-        if (hh > currentHour) return true;
-        if (hh === currentHour && mm > currentMinute) return true;
-        return false;
+        return hh > currentHour || (hh === currentHour && mm > currentMinute);
       });
     }
-    if (free.length > 0) days.push(dateStr + ' (' + dayName + '): ' + free.join(', '));
+    return free;
   }
 
-  const slotsText = days.length > 0 ? days.join('\n') : 'Trenutno ni prostih terminov v naslednjih 7 dneh.';
+  let slotsText;
+  if (employees.length >= 2) {
+    // Per-employee sloti
+    const empSections = [];
+    for (const emp of employees) {
+      if (!emp.schedule) continue;
+      const days = [];
+      for (let i = 0; i < 30; i++) {
+        const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
+        d.setDate(d.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        const dayName = d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'numeric' });
+        const allHours = getHoursForEmployee(emp.schedule, dateStr);
+        if (!allHours.length) continue;
+        const busySet = busyByEmpDate[emp.id]?.[dateStr] || new Set();
+        const free = getFreeSlots(allHours, dateStr, busySet);
+        if (free.length > 0) days.push(dateStr + ' (' + dayName + '): ' + free.join(', '));
+      }
+      empSections.push(`${emp.name} (id: ${emp.id}):\n${days.length ? days.join('\n') : 'Ni prostih terminov'}`);
+    }
+    slotsText = empSections.join('\n\n');
+  } else {
+    const days = [];
+    for (let i = 0; i < 60; i++) {
+      const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Ljubljana' }));
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayName = d.toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'numeric' });
+      const allHours = getHoursForDate(schedule, dateStr);
+      if (!allHours.length) continue;
+      const free = getFreeSlots(allHours, dateStr, busyByDate[dateStr] || new Set());
+      if (free.length > 0) days.push(dateStr + ' (' + dayName + '): ' + free.join(', '));
+    }
+    slotsText = days.length > 0 ? days.join('\n') : 'Trenutno ni prostih terminov v naslednjih 7 dneh.';
+  }
 
   const employees = salon._employees || [];
   const hasMultipleEmployees = employees.length >= 2;
@@ -1858,8 +1889,10 @@ TRAJANJE STORITEV:
 Če storitev ima [60min] — strežnik bo blokiral 2 zaporedna termina.
 POMEMBNO: Pred rezervacijo preveri da sta oba zaporedna termina prosta v seznamu prostih terminov!
 
-PROSTI TERMINI (oblika YYYY-MM-DD) - samo termini od zdaj naprej:
+PROSTI TERMINI (oblika YYYY-MM-DD) - samo termini od zdaj naprej${employees.length >= 2 ? ' — razporejeni PO ZAPOSLENIH' : ''}:
 ${slotsText}
+
+KRITIČNO ZA SLOTE: Vsak zaposleni ima SVOJE proste termine. Ko stranka izbere zaposlenega, ponudi SAMO termine tega zaposlenega. NE ponujaj terminov ki niso na seznamu tega zaposlenega.
 
 PODATKI STRANKE (že vpisani - NE sprašuj znova):
 - Ime: ${safeName}
@@ -1940,8 +1973,10 @@ TRAJANJE STORITEV:
 Če storitev ima [60min] — strežnik bo blokiral 2 zaporedna termina.
 POMEMBNO: Pred rezervacijo preveri da sta oba zaporedna termina prosta v seznamu prostih terminov!
 
-PROSTI TERMINI (oblika YYYY-MM-DD) - samo termini od zdaj naprej:
+PROSTI TERMINI (oblika YYYY-MM-DD) - samo termini od zdaj naprej${employees.length >= 2 ? ' — razporejeni PO ZAPOSLENIH' : ''}:
 ${slotsText}
+
+KRITIČNO ZA SLOTE: Vsak zaposleni ima SVOJE proste termine. Ko stranka izbere zaposlenega, ponudi SAMO termine tega zaposlenega. NE ponujaj terminov ki niso na seznamu tega zaposlenega.
 
 STRANKA NI VPISALA PODATKOV.
 ${employeeListText}
